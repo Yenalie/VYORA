@@ -100,7 +100,7 @@ di [Panduan Developer](docs/DEVELOPMENT.md).
 - [Room](https://developer.android.com/training/data-storage/room)
 - [Coil](https://github.com/coil-kt/coil)
 - [LRCLIB](https://lrclib.net) untuk lirik
-- Efek glass dari [Convx](https://github.com/cosmictaserdev-creator/Convx) dan [Kyant0/backdrop](https://github.com/Kyant0/backdrop)
+- Efek glass dari [Kyant0/backdrop](https://github.com/Kyant0/backdrop)
 
 ## Lisensi
 
