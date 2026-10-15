@@ -1,0 +1,22 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!--
+      Launch theme follows the system appearance (values-night overrides it), so the very
+      first frame already matches. MainActivity then picks Theme.Vyora.Dark / .Light from
+      the in-app setting before any content is drawn.
+    -->
+    <style name="Theme.ComposeEmptyActivity" parent="Theme.Vyora.Light" />
+
+    <style name="Theme.Vyora.Light" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/vyora_window_light</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <style name="Theme.Vyora.Dark" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/vyora_window</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

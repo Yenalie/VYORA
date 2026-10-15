@@ -1,0 +1,4 @@
+<resources>
+    <color name="vyora_window">#FF000000</color>
+    <color name="vyora_window_light">#FFFFFFFF</color>
+</resources>
