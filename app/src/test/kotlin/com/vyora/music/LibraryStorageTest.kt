@@ -32,7 +32,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+// Plain Application: VyoraApp.onCreate starts the real library (and its one-time legacy import
+// in the background), which would race this test for the same SharedPreferences.
+@Config(sdk = [35], application = android.app.Application::class)
 class LibraryStorageTest {
     private val song = SimpleItem("abcdefghijk", "Hati-Hati di Jalan", "Tulus", "https://x/y.jpg", "https://www.youtube.com/watch?v=abcdefghijk", 242, "song")
     private val video = song.copy(id = "videoidxxxx", title = "Interaksi", isVideo = true)
