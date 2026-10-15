@@ -21,8 +21,7 @@ Versi terbaru: **1.4.1**. APK siap pasang ada di halaman
 |---|---|
 | ![Settings](docs/screenshots/settings.png) | ![Settings 2](docs/screenshots/settings_2.png) |
 
-Screenshot diambil otomatis dari `ScreenshotTest` (Robolectric). Di sana efek blur tidak
-dirender, jadi di HP asli latar Now Playing terlihat lebih lembut.
+
 
 ## Fitur
 
