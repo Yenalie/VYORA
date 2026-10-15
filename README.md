@@ -5,7 +5,7 @@ NewPipe Extractor, UI bergaya iOS 26 dengan Liquid Glass. Library disimpan di Ro
 bisa disinkronkan dua arah dengan akun YouTube Music.
 
 Versi terbaru: **1.4.1**. APK siap pasang ada di halaman
-[Releases](../../releases).
+[Releases](../../releases) atau langsung di folder [`release/`](release/).
 
 ## Tampilan
 
