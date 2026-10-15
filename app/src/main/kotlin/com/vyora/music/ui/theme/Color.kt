@@ -6,12 +6,6 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-/**
- * iOS 26 semantic colour set. Dark uses the true-black Apple Music base and the iOS dark grey
- * ramp, light uses the iOS light system colours. Every token below is read from
- * [LocalVyoraColors], so UI automatically follows the selected appearance, and any subtree
- * can be forced dark (Now Playing, artwork-tinted pages) with [VyoraDarkScope].
- */
 @Immutable
 data class VyoraColors(
     val isDark: Boolean,
@@ -44,9 +38,9 @@ fun darkVyoraColors(accent: Color = Color(DefaultAccentArgb)) = VyoraColors(
     isDark = true,
     accent = accent,
     background = Color(0xFF000000),
-    surface = Color(0xFF1C1C1E),          // systemGray6
-    surfaceElevated = Color(0xFF2C2C2E),  // systemGray5
-    surfaceSoft = Color(0xFF3A3A3C),      // systemGray4
+    surface = Color(0xFF1C1C1E),
+    surfaceElevated = Color(0xFF2C2C2E),
+    surfaceSoft = Color(0xFF3A3A3C),
     groupedBackground = Color(0xFF000000),
     groupedCell = Color(0xFF1C1C1E),
     text = Color(0xFFFFFFFF),
@@ -69,9 +63,9 @@ fun lightVyoraColors(accent: Color = Color(DefaultAccentArgb)) = VyoraColors(
     isDark = false,
     accent = accent,
     background = Color(0xFFFFFFFF),
-    surface = Color(0xFFF2F2F7),          // systemGray6
+    surface = Color(0xFFF2F2F7),
     surfaceElevated = Color(0xFFFFFFFF),
-    surfaceSoft = Color(0xFFE5E5EA),      // systemGray5
+    surfaceSoft = Color(0xFFE5E5EA),
     groupedBackground = Color(0xFFF2F2F7),
     groupedCell = Color(0xFFFFFFFF),
     text = Color(0xFF000000),
@@ -92,9 +86,6 @@ fun lightVyoraColors(accent: Color = Color(DefaultAccentArgb)) = VyoraColors(
 
 val LocalVyoraColors = staticCompositionLocalOf { darkVyoraColors() }
 
-// ---------------------------------------------------------------------------------------
-// Token accessors. They keep the original names so call sites stay readable.
-
 val VyoraAccent: Color @Composable @ReadOnlyComposable get() = LocalVyoraColors.current.accent
 val VyoraOnAccent: Color get() = Color.White
 val VyoraBackground: Color @Composable @ReadOnlyComposable get() = LocalVyoraColors.current.background
@@ -112,7 +103,6 @@ val VyoraScrim: Color @Composable @ReadOnlyComposable get() = LocalVyoraColors.c
 val VyoraAqua = Color(0xFF64D2FF)
 val VyoraAccentSecondary = Color(0xFFFF6482)
 
-// Liquid-glass tokens for in-content glass controls (round toolbar buttons, capsules, chips).
 val GlassFill: Color @Composable @ReadOnlyComposable get() = LocalVyoraColors.current.glassFill
 val GlassFillStrong: Color @Composable @ReadOnlyComposable get() = LocalVyoraColors.current.glassFillStrong
 val GlassFillPressed: Color @Composable @ReadOnlyComposable get() = LocalVyoraColors.current.glassFillPressed

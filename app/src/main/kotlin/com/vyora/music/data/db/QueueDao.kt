@@ -6,10 +6,6 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 
-/**
- * Blocking on purpose: the playback service saves from its own background thread and
- * restores before the player is built.
- */
 @Dao
 interface QueueDao {
     @Query("SELECT * FROM queue ORDER BY position")

@@ -1,11 +1,3 @@
-/*
- * Vendored from Kyant0/Capsule
- * https://github.com/Kyant0/Capsule — Copyright 2025 Kyant0, Apache License 2.0
- * capsule/src/main/java/com/kyant/capsule/core/CubicBezier.kt
- *
- * Vendored so the shape ships as source with this app. Package renamed
- * accordingly (com.kyant.capsule -> com.vyora.music.ui.glass.shapes).
- */
 package com.vyora.music.ui.glass.shapes.core
 
 import androidx.compose.runtime.Immutable

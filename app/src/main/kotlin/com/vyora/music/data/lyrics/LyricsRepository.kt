@@ -10,20 +10,12 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** One time-synced lyric line. [timeMs] is when the line starts. */
 data class LyricLine(val timeMs: Long, val text: String)
 
-/** Lyrics for a song: [synced] when timing is known, otherwise only [plain]. */
 data class Lyrics(val synced: List<LyricLine>, val plain: String?) {
     val isSynced: Boolean get() = synced.isNotEmpty()
 }
 
-/**
- * Time-synced lyrics from LRCLIB (https://lrclib.net), a free, open lyrics database with
- * no API key. YouTube titles are noisy ("Artist - Song (Official Video)"), so the title is
- * cleaned first, then an exact lookup is tried before falling back to a fuzzy search.
- * Results (including "not found") are cached per song id for the session.
- */
 object LyricsRepository {
     private const val TAG = "VYORA-Lyrics"
     private const val BASE = "https://lrclib.net/api"
@@ -33,7 +25,6 @@ object LyricsRepository {
         .readTimeout(10, TimeUnit.SECONDS)
         .build()
 
-    /** Most recently used 200 songs; older entries drop out so the cache can't grow forever. */
     private const val CACHE_MAX = 200
     private val cache = object : LinkedHashMap<String, Lyrics?>(64, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Lyrics?>?) = size > CACHE_MAX
@@ -41,7 +32,6 @@ object LyricsRepository {
 
     fun clearCache() = synchronized(cache) { cache.clear() }
 
-    /** Returns lyrics, or null when there are none. Network errors are not cached. */
     suspend fun lyricsFor(id: String, rawTitle: String, rawArtist: String, durationSec: Long): Lyrics? {
         synchronized(cache) { if (cache.containsKey(id)) return cache[id] }
         val outcome = withContext(Dispatchers.IO) {
@@ -101,7 +91,6 @@ object LyricsRepository {
 
     private val timeTag = Regex("""\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?]""")
 
-    /** "[01:02.34] text" -> LyricLine(62340, "text"). Lines with several tags repeat. */
     fun parseLrc(lrc: String): List<LyricLine> {
         val out = mutableListOf<LyricLine>()
         lrc.lineSequence().forEach { line ->
@@ -129,7 +118,6 @@ object LyricsRepository {
         RegexOption.IGNORE_CASE
     )
 
-    /** Strips YouTube noise and splits "Artist - Title" when the title carries the artist. */
     fun clean(rawTitle: String, rawArtist: String): Pair<String, String> {
         var title = rawTitle.replace(noise, " ")
             .replace(Regex("""(?i)\b(official\s+(music\s+)?video|lyrics?\s+video|official\s+audio)\b"""), " ")

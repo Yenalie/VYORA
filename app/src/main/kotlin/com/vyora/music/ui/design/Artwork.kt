@@ -25,10 +25,6 @@ import coil.request.ImageRequest
 import com.vyora.music.ui.theme.GlassFillStrong
 import com.vyora.music.ui.theme.VyoraTextFaint
 
-/**
- * Cover art on a glass placeholder. The placeholder icon shows while the image loads or
- * when there is none, so empty covers never render as a black hole in a glass layout.
- */
 @Composable
 fun Artwork(
     url: String?,
@@ -37,18 +33,12 @@ fun Artwork(
     placeholder: ImageVector = Icons.Default.MusicNote,
     placeholderSize: Dp = 22.dp,
     contentDescription: String? = null,
-    /**
-     * Memory-cache key of a smaller copy already on screen (e.g. the list thumbnail). It is
-     * shown while [url] loads, so swapping to a sharper image never flashes the placeholder.
-     */
     placeholderKey: String? = null,
 ) {
     Box(
         modifier.clip(shape).glass(shape = shape, fill = GlassFillStrong, sheen = false),
         contentAlignment = Alignment.Center,
     ) {
-        // Only until the picture arrives: a cover with transparent or dark edges (and the
-        // crossfade itself) must not show a music note through it.
         var loaded by remember(url) { mutableStateOf(false) }
         if (!loaded) Icon(placeholder, null, tint = VyoraTextFaint, modifier = Modifier.size(placeholderSize))
         val context = LocalContext.current

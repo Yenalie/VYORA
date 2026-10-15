@@ -1,12 +1,9 @@
-/**
- * VYORA full player sheet.
- *
- * Layout and behaviour modelled on Convx / Apple Music: artwork-tinted gradient, artwork that
- * shrinks while paused, a seek bar that thickens under the finger, and a drag-down-to-dismiss
- * sheet. Written for VYORA's PlayerManager; it shares no code with Convx's Player.kt.
- */
 package com.vyora.music.ui.player
 
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.filled.FormatQuote
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -62,6 +59,8 @@ import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.automirrored.filled.VolumeMute
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Airplay
+import androidx.compose.material.icons.filled.CastConnected
+import com.vyora.music.playback.cast.CastSupport
 import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Close
@@ -167,24 +166,12 @@ import com.vyora.music.ui.glass.LocalAppBackdrop
 import com.vyora.music.ui.glass.backdrop.backdrops.layerBackdrop
 import com.vyora.music.ui.glass.backdrop.backdrops.rememberLayerBackdrop
 import com.vyora.music.ui.theme.VyoraBackground
+import com.vyora.music.ui.theme.VyoraAccent
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
 private val SheetTopCorner = 28.dp
 
-/**
- * Slides up from the bottom as [sheet].progress goes 0 -> 1.
- *
- * The content stays composed (parked below the screen) for as long as a track is loaded, so
- * opening the player only moves a layer. Composing it on demand put the whole screen (cover
- * load, colour extraction, layout of ~30 nodes) into the first frame of the animation, which
- * is exactly where a hitch is most visible. Hidden, it is not drawn, not touchable and hidden
- * from accessibility services.
- *
- * The drag detector lives on the outer, NON-translated box. If it sat on the box that moves
- * with the finger, the pointer's local coordinates would move with it and the measured drag
- * delta would shrink toward zero (the sheet would feel like it was dragging through mud).
- */
 @Composable
 fun VyoraPlayerSheet(
     sheet: PlayerSheetState,
@@ -212,17 +199,14 @@ fun VyoraPlayerSheet(
                                 onDragStart = { tracker.resetTracking() },
                                 onVerticalDrag = { change, dy ->
                                     tracker.addPointerInputChange(change)
-                                    // Positive dy = finger moving down = sheet closing.
                                     sheet.dragBy(-dy / heightPx)
                                 },
                                 onDragEnd = { sheet.settle(tracker.calculateVelocity().y, heightPx, flingPx) },
                                 onDragCancel = { sheet.settle(0f, heightPx, flingPx) },
                             )
                         }
-                        // Swallow taps so nothing underneath reacts while the sheet is up.
                         .pointerInput(Unit) { detectTapGestures { } }
                 } else {
-                    // Parked off-screen: invisible to TalkBack and not part of hit testing.
                     Modifier.clearAndSetSemantics { }
                 },
             ),
@@ -233,8 +217,6 @@ fun VyoraPlayerSheet(
                 .graphicsLayer {
                     val p = sheet.progress.value
                     translationY = (1f - p) * size.height
-                    // Rounded top corners that flatten as the sheet reaches the top. No alpha
-                    // fade: alpha < 1 forces an offscreen buffer for the whole layer.
                     val corner = SheetTopCorner.toPx() * (1f - p)
                     shape = RoundedCornerShape(topStart = corner, topEnd = corner, bottomEnd = 0f, bottomStart = 0f)
                     clip = true
@@ -251,13 +233,6 @@ private const val MODE_ART = 0
 private const val MODE_LYRICS = 1
 private const val MODE_QUEUE = 2
 
-/**
- * iOS 26 Now Playing: living, deeply blurred artwork background; a grabber; big artwork that
- * shrinks while paused and swipes left/right to skip; title + Favorite / "⋯" glass circles;
- * thin scrubber; borderless rewind / play / forward glyphs; a volume slider; and the bottom
- * row of Lyrics, Audio Output and Queue. Lyrics and Queue replace the artwork with a compact
- * header, as on iPhone.
- */
 @Composable
 private fun FullPlayerContent(sheet: PlayerSheetState) {
     val appSettings by com.vyora.music.data.settings.SettingsRepository.settings.collectAsState()
@@ -274,9 +249,7 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
     var sleepMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    // Music videos play their picture as the artwork; its colour then drives the background.
     val videoItem = currentItem?.takeIf { it.isVideo && VideoArtworkPlayer.allowed(context, appSettings.videoArtwork) }
-    // The 16:9 frame stays while the sheet is closed; the video itself only plays when open.
     val videoId = videoItem?.id?.takeIf { sheet.isVisible }
     val coverTint by rememberArtworkTint(thumbnail)
     val videoTint by VideoAmbience.tint.collectAsState()
@@ -287,7 +260,6 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
         label = "playerTint",
     )
 
-    // The player's glass controls refract its own living artwork background.
     val playerBackdrop = rememberLayerBackdrop()
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -309,7 +281,6 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
                 .padding(horizontal = 26.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Grabber: the only "close" affordance on iOS; tap or drag down.
             Box(
                 Modifier
                     .padding(top = 8.dp)
@@ -387,7 +358,6 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
                                     softWrap = false,
                                     modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 2500),
                                 )
-                                // Apple Music: the artist line is a link to the artist page.
                                 val appActions = com.vyora.music.ui.components.LocalAppActions.current
                                 val artistName = com.vyora.music.data.library.primaryArtist(artist.orEmpty())
                                 Text(
@@ -423,7 +393,6 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
             VolumeSection(active = sheet.isVisible)
             Spacer(Modifier.height(14.dp))
 
-            // Bottom row: Lyrics, Audio Output, Queue. Active = white disc, dark glyph.
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 26.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -432,7 +401,16 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
                 BottomToggle(Icons.Default.Lyrics, stringResource(R.string.lyrics), mode == MODE_LYRICS) {
                     mode = if (mode == MODE_LYRICS) MODE_ART else MODE_LYRICS
                 }
-                BottomToggle(Icons.Default.Airplay, stringResource(R.string.output), false) { openOutputSwitcher(context) }
+                val castStatus by CastSupport.status.collectAsState()
+                var outputs by remember { mutableStateOf(false) }
+                BottomToggle(
+                    if (castStatus.connected) Icons.Default.CastConnected else Icons.Default.Airplay,
+                    stringResource(R.string.output),
+                    castStatus.connected,
+                ) {
+                    if (castStatus.available) outputs = true else openOutputSwitcher(context)
+                }
+                if (outputs) OutputPickerDialog(onDismiss = { outputs = false })
                 BottomToggle(Icons.AutoMirrored.Filled.QueueMusic, stringResource(R.string.queue), mode == MODE_QUEUE) {
                     mode = if (mode == MODE_QUEUE) MODE_ART else MODE_QUEUE
                 }
@@ -443,15 +421,6 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
     }
 }
 
-/**
- * The cover (or, for a music video, its latest frame), enlarged and blurred far past
- * recognition, under a tint gradient that keeps white text legible.
- *
- * With "Moving background" on, two copies of the picture turn slowly against each other
- * (Apple Music's flowing colour) while the sheet is open and music plays; pausing stops
- * them where they are. Off, the same picture stays still. Android 12+ blurs with a
- * RenderEffect; older versions get the same look from a tiny decode stretched to fill.
- */
 @Composable
 private fun LivingBackground(thumbnail: String?, videoFrame: ImageBitmap?, tint: Color, animate: Boolean) {
     Box(Modifier.fillMaxSize().background(lerp(tint, Color.Black, 0.45f)))
@@ -461,7 +430,6 @@ private fun LivingBackground(thumbnail: String?, videoFrame: ImageBitmap?, tint:
         if (canBlur || thumbnail == null) thumbnail
         else coil.request.ImageRequest.Builder(context).data(thumbnail).size(24).build()
     }
-    // One turn of the main layer per 40 s: slow enough to stay calm, fast enough to see.
     val phase = remember { androidx.compose.animation.core.Animatable(0f) }
     LaunchedEffect(animate) {
         if (!animate) return@LaunchedEffect
@@ -473,7 +441,6 @@ private fun LivingBackground(thumbnail: String?, videoFrame: ImageBitmap?, tint:
     val group = Modifier.fillMaxSize().clipToBounds().then(if (canBlur) Modifier.blur(90.dp) else Modifier)
     Crossfade(targetState = videoFrame, animationSpec = tween(700), label = "videoGlow") { frame ->
         androidx.compose.foundation.layout.BoxWithConstraints(group, contentAlignment = Alignment.Center) {
-            // Square copies wider than the screen's diagonal, so turning them never shows a corner.
             val side = kotlin.math.hypot(maxWidth.value, maxHeight.value).dp * 1.2f
             BackgroundCopy(frame, cover, phase, side, scale = 1.1f, speed = 1f, startAngle = 0f, alpha = 1f)
             BackgroundCopy(frame, cover, phase, side, scale = 0.85f, speed = -1.6f, startAngle = 140f, alpha = 0.6f)
@@ -484,7 +451,6 @@ private fun LivingBackground(thumbnail: String?, videoFrame: ImageBitmap?, tint:
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    // Light covers blur into a pale page; the scrim keeps white text readable.
                     0f to Color.Black.copy(alpha = 0.10f),
                     0.45f to Color.Black.copy(alpha = 0.28f),
                     1f to Color.Black.copy(alpha = 0.58f),
@@ -493,7 +459,6 @@ private fun LivingBackground(thumbnail: String?, videoFrame: ImageBitmap?, tint:
     )
 }
 
-/** One rotating, drifting copy of the background picture; read in the layer block only. */
 @Composable
 private fun BackgroundCopy(
     frame: ImageBitmap?,
@@ -523,10 +488,6 @@ private fun BackgroundCopy(
     }
 }
 
-/**
- * Artwork that springs smaller while paused and follows a horizontal swipe to skip. [wide]
- * (music videos) makes it 16:9; with a [videoId] the video plays over the thumbnail.
- */
 @Composable
 private fun SwipeArtwork(
     thumbnail: String?,
@@ -547,8 +508,6 @@ private fun SwipeArtwork(
     var dragX by remember { mutableFloatStateOf(0f) }
     val shownX by animateFloatAsState(dragX, spring(stiffness = Spring.StiffnessMediumLow), label = "artDrag")
     val haptics = LocalHapticFeedback.current
-    // Search gives 544px art; the big cover asks the CDN for 1080 and shows the smaller
-    // cached copy until the sharp one arrives.
     val sharp = remember(thumbnail) { com.vyora.music.data.youtube.YouTubeClient.artUrl(thumbnail, 1080) }
     val height by animateDpAsState(if (wide) side * 9f / 16f else side, spring(stiffness = Spring.StiffnessMediumLow), label = "artworkHeight")
     Box(
@@ -574,7 +533,6 @@ private fun SwipeArtwork(
                 translationX = shownX * 0.6f
                 rotationZ = shownX / size.width * 4f
             }
-            // The cover the mini player's thumbnail flies into (see ArtworkFlight.kt).
             .fullFlightTarget(sheet, corner = 14.dp, enabled = flightEnabled)
             .shadow(elevation, GlassShapes.Medium, clip = false, ambientColor = Color.Black, spotColor = Color.Black),
     ) {
@@ -594,7 +552,6 @@ private fun SwipeArtwork(
     }
 }
 
-/** Small artwork + title row used above Lyrics and Queue. Tapping the art returns to it. */
 @Composable
 private fun CompactHeader(
     thumbnail: String?,
@@ -626,7 +583,6 @@ private fun CompactHeader(
     }
 }
 
-/** Fades content out at the top and bottom edges, like the lyrics view on iPhone. */
 private fun Modifier.edgeFade(): Modifier = this
     .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
     .drawWithContent {
@@ -639,10 +595,6 @@ private fun Modifier.edgeFade(): Modifier = this
         )
     }
 
-/**
- * Time-synced lyrics (LRCLIB): big bold lines, the current one bright and the rest dimmed,
- * auto-scrolling with playback; tap a line to jump there. Falls back to plain lyrics.
- */
 @Composable
 private fun LyricsPanel() {
     val item by PlayerManager.currentItem.collectAsState()
@@ -652,6 +604,8 @@ private fun LyricsPanel() {
 
     var loading by remember(current.id) { mutableStateOf(true) }
     var lyrics by remember(current.id) { mutableStateOf<Lyrics?>(null) }
+    var selection by remember(current.id) { mutableStateOf<Set<Int>?>(null) }
+    var cardLines by remember(current.id) { mutableStateOf<List<String>?>(null) }
     LaunchedEffect(current.id) {
         loading = true
         val seconds = if (current.duration > 0) current.duration else durationMs / 1000
@@ -660,42 +614,120 @@ private fun LyricsPanel() {
     }
 
     val lyr = lyrics
-    when {
-        loading -> CenterNote(stringResource(R.string.lyrics_loading))
-        lyr == null -> CenterNote(stringResource(R.string.lyrics_unavailable))
-        lyr.isSynced -> SyncedLyrics(lyr.synced)
-        else -> Column(
-            Modifier
-                .fillMaxSize()
-                .edgeFade()
-                .verticalScroll(rememberScrollState())
-                .padding(vertical = 24.dp),
-        ) {
-            Text(
-                lyr.plain.orEmpty(),
-                color = Color.White.copy(alpha = 0.9f),
-                style = MaterialTheme.typography.headlineSmall.copy(lineHeight = 34.sp),
-            )
+    val lines = remember(lyr) {
+        when {
+            lyr == null -> emptyList()
+            lyr.isSynced -> lyr.synced.map { it.text }
+            else -> lyr.plain.orEmpty().lines().map { it.trimEnd() }
         }
+    }
+    val tooMany = stringResource(R.string.lyrics_card_max, LyricsCardRenderer.MAX_LINES)
+    val context = LocalContext.current
+    fun toggle(i: Int) {
+        if (lines.getOrNull(i).isNullOrBlank()) return
+        val now = selection.orEmpty()
+        selection = when {
+            i in now -> (now - i).ifEmpty { null }
+            now.size >= LyricsCardRenderer.MAX_LINES -> {
+                android.widget.Toast.makeText(context, tooMany, android.widget.Toast.LENGTH_SHORT).show()
+                now
+            }
+            else -> now + i
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        when {
+            loading -> CenterNote(stringResource(R.string.lyrics_loading))
+            lyr == null || lines.none { it.isNotBlank() } -> CenterNote(stringResource(R.string.lyrics_unavailable))
+            lyr.isSynced -> SyncedLyrics(lyr.synced, selection, onLongPress = ::toggle, onToggle = ::toggle)
+            else -> PlainLyrics(lines, selection, onLongPress = ::toggle, onToggle = ::toggle)
+        }
+        if (!loading && lines.any { it.isNotBlank() }) {
+            val sel = selection
+            if (sel == null) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 6.dp)
+                        .size(36.dp)
+                        .glassClickable(pressedScale = 0.86f) { selection = emptySet() }
+                        .liquidFill(shape = CircleShape, fill = Color.White.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.FormatQuote, stringResource(R.string.lyrics_card_title), tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(20.dp))
+                }
+            } else {
+                Row(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = { selection = null }) { Text(stringResource(R.string.cancel), color = Color.White) }
+                    Text(
+                        if (sel.isEmpty()) stringResource(R.string.lyrics_card_pick)
+                        else stringResource(R.string.lyrics_card_selected, sel.size),
+                        color = Color.White.copy(alpha = 0.75f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(
+                        enabled = sel.isNotEmpty(),
+                        onClick = { cardLines = sel.sorted().mapNotNull { lines.getOrNull(it) }.filter { it.isNotBlank() } },
+                    ) { Text(stringResource(R.string.lyrics_card_share), color = if (sel.isNotEmpty()) VyoraAccent else Color.White.copy(alpha = 0.4f)) }
+                }
+            }
+        }
+    }
+    cardLines?.let { picked ->
+        LyricsCardDialog(item = current, lines = picked, onDismiss = {
+            cardLines = null
+            selection = null
+        })
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
+private fun Modifier.lyricGestures(
+    index: Int,
+    selecting: Boolean,
+    onTap: () -> Unit,
+    onLongPress: (Int) -> Unit,
+    onToggle: (Int) -> Unit,
+): Modifier = combinedClickable(
+    interactionSource = null,
+    indication = null,
+    onLongClick = { if (!selecting) onLongPress(index) },
+    onClick = { if (selecting) onToggle(index) else onTap() },
+)
+
 @Composable
-private fun SyncedLyrics(lines: List<LyricLine>) {
+private fun SyncedLyrics(
+    lines: List<LyricLine>,
+    selection: Set<Int>?,
+    onLongPress: (Int) -> Unit,
+    onToggle: (Int) -> Unit,
+) {
     val positionMs by PlayerManager.positionMs.collectAsState()
-    // A little lead so the line lights up as it is sung, not after.
     val active = remember(lines, positionMs) {
         val t = positionMs + 250
         lines.indexOfLast { it.timeMs <= t }.coerceAtLeast(0)
     }
+    val selecting = selection != null
     val listState = rememberLazyListState()
     var userScrolling by remember { mutableStateOf(false) }
     LaunchedEffect(listState.isScrollInProgress) {
         if (listState.isScrollInProgress) userScrolling = true
         else { kotlinx.coroutines.delay(2500); userScrolling = false }
     }
-    LaunchedEffect(active) {
-        if (!userScrolling) listState.animateScrollToItem(active, scrollOffset = -120)
+    LaunchedEffect(active, selecting) {
+        if (!userScrolling && !selecting) listState.animateScrollToItem(active, scrollOffset = -120)
     }
     LazyColumn(
         state = listState,
@@ -703,12 +735,17 @@ private fun SyncedLyrics(lines: List<LyricLine>) {
         contentPadding = PaddingValues(top = 40.dp, bottom = 240.dp),
     ) {
         itemsIndexed(lines) { i, line ->
-            val isActive = i == active
-            val alpha by animateFloatAsState(if (isActive) 1f else 0.32f, tween(300), label = "lineAlpha")
-            val lineScale by animateFloatAsState(if (isActive) 1f else 0.97f, tween(300), label = "lineScale")
-            Text(
+            val chosen = selection?.contains(i) == true
+            val target = when {
+                selecting -> if (chosen) 1f else 0.38f
+                i == active -> 1f
+                else -> 0.32f
+            }
+            val alpha by animateFloatAsState(target, tween(300), label = "lineAlpha")
+            val lineScale by animateFloatAsState(if (!selecting && i == active) 1f else 0.97f, tween(300), label = "lineScale")
+            LyricText(
                 text = line.text.ifBlank { "♪" },
-                color = Color.White,
+                chosen = chosen,
                 style = MaterialTheme.typography.headlineMedium.copy(fontSize = 28.sp, lineHeight = 35.sp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -717,11 +754,62 @@ private fun SyncedLyrics(lines: List<LyricLine>) {
                         scaleX = lineScale; scaleY = lineScale
                         transformOrigin = TransformOrigin(0f, 0.5f)
                     }
-                    .glassClickable(pressedScale = 0.98f) { PlayerManager.seekTo(line.timeMs) }
-                    .padding(vertical = 10.dp),
+                    .lyricGestures(i, selecting, onTap = { PlayerManager.seekTo(line.timeMs) }, onLongPress = onLongPress, onToggle = onToggle),
             )
         }
     }
+}
+
+@Composable
+private fun PlainLyrics(
+    lines: List<String>,
+    selection: Set<Int>?,
+    onLongPress: (Int) -> Unit,
+    onToggle: (Int) -> Unit,
+) {
+    val selecting = selection != null
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().edgeFade(),
+        contentPadding = PaddingValues(top = 24.dp, bottom = 120.dp),
+    ) {
+        itemsIndexed(lines) { i, line ->
+            if (line.isBlank()) {
+                Spacer(Modifier.height(18.dp))
+            } else {
+                val chosen = selection?.contains(i) == true
+                LyricText(
+                    text = line,
+                    chosen = chosen,
+                    style = MaterialTheme.typography.headlineSmall.copy(lineHeight = 34.sp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer { alpha = if (!selecting || chosen) 0.92f else 0.4f }
+                        .lyricGestures(i, selecting, onTap = {}, onLongPress = onLongPress, onToggle = onToggle),
+                    vertical = 4.dp,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LyricText(
+    text: String,
+    chosen: Boolean,
+    style: androidx.compose.ui.text.TextStyle,
+    modifier: Modifier,
+    vertical: androidx.compose.ui.unit.Dp = 10.dp,
+) {
+    val fill by animateColorAsState(if (chosen) Color.White.copy(alpha = 0.16f) else Color.Transparent, tween(180), label = "lyricPick")
+    Text(
+        text = text,
+        color = Color.White,
+        style = style,
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(fill)
+            .padding(horizontal = if (chosen) 10.dp else 0.dp, vertical = vertical),
+    )
 }
 
 @Composable
@@ -731,10 +819,6 @@ private fun CenterNote(text: String) {
     }
 }
 
-/**
- * iOS 26 queue: Shuffle / Repeat / Autoplay (∞) pills, "Playing Next" (with Clear), then the
- * similar songs Autoplay lined up, slightly dimmed, in their own section.
- */
 @Composable
 private fun QueuePanel() {
     val shuffle by PlayerManager.shuffle.collectAsState()
@@ -850,7 +934,6 @@ private fun QueueRow(entry: QueueEntry, dimmed: Boolean) {
 private fun QueuePill(icon: ImageVector, label: String, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val fill by animateColorAsState(if (active) Color.White.copy(alpha = 0.92f) else Color.White.copy(alpha = 0.10f), tween(180), label = "pillFill")
     val content by animateColorAsState(if (active) Color.Black else Color.White, tween(180), label = "pillContent")
-    // Icon-only like iOS 26; the label is still read out by TalkBack, with on/off state.
     Box(
         modifier
             .height(40.dp)
@@ -866,7 +949,6 @@ private fun QueuePill(icon: ImageVector, label: String, active: Boolean, modifie
     }
 }
 
-/** Rewind / play-pause / forward as large white glyphs; a glass bubble appears on press. */
 @Composable
 private fun TransportRow() {
     val isPlaying by PlayerManager.isPlaying.collectAsState()
@@ -925,7 +1007,6 @@ private fun GlyphButton(description: String, size: androidx.compose.ui.unit.Dp, 
     }
 }
 
-/** Bottom-row button. Active = white filled circle with a dark glyph. */
 @Composable
 private fun BottomToggle(icon: ImageVector, description: String, active: Boolean, onClick: () -> Unit) {
     val fill by animateColorAsState(if (active) Color.White.copy(alpha = 0.92f) else Color.White.copy(alpha = 0.08f), tween(180), label = "bottomFill")
@@ -942,7 +1023,6 @@ private fun BottomToggle(icon: ImageVector, description: String, active: Boolean
     }
 }
 
-/** System media volume (STREAM_MUSIC), kept in sync with the hardware keys. */
 @Composable
 private fun VolumeSection(active: Boolean) {
     val context = LocalContext.current
@@ -1008,11 +1088,7 @@ private fun VolumeSection(active: Boolean) {
     }
 }
 
-/**
- * Audio output picker, the Android counterpart of AirPlay: the system output switcher on
- * Android 14+, the Media Output panel on 11-13, else Bluetooth settings.
- */
-private fun openOutputSwitcher(context: Context) {
+internal fun openOutputSwitcher(context: Context) {
     if (Build.VERSION.SDK_INT >= 34) {
         val shown = runCatching { MediaRouter2.getInstance(context).showSystemOutputSwitcher() }.getOrDefault(false)
         if (shown) return
@@ -1026,7 +1102,6 @@ private fun openOutputSwitcher(context: Context) {
     }
 }
 
-/** Seek bar plus elapsed / remaining labels. Isolated so 2 Hz progress ticks only recompose this. */
 @Composable
 private fun SeekSection() {
     val progress by PlayerManager.progress.collectAsState()
@@ -1035,9 +1110,6 @@ private fun SeekSection() {
 
     var dragFraction by remember { mutableStateOf<Float?>(null) }
     val smoothProgress = rememberSmoothProgress(progress)
-    // After a seek the fill keeps the released position for a couple of frames, until the
-    // smoothing animation has caught up with the new progress. Without it the bar flashes
-    // back to the old position for one frame when the finger lifts.
     var heldFraction by remember { mutableStateOf<Float?>(null) }
     LaunchedEffect(heldFraction) {
         if (heldFraction != null) {
@@ -1088,8 +1160,6 @@ private fun SeekSection() {
                     .height(thickness)
                     .clip(CircleShape)
                     .background(trackColor.copy(alpha = 0.22f))
-                    // Fill is drawn here, reading the animated value in the draw phase, so the
-                    // 60 fps glide never recomposes this composable.
                     .drawBehind {
                         val dragging = dragFraction
                         val fraction = (dragging ?: heldFraction ?: smoothProgress.value).coerceIn(0f, 1f)
@@ -1107,7 +1177,6 @@ private fun SeekSection() {
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.align(Alignment.CenterStart),
             )
-            // Where Apple Music puts its "Lossless" badge: the sleep timer, when one is set.
             SleepBadge(Modifier.align(Alignment.Center))
             Text(
                 "-" + formatTime((durationMs - shownPositionMs).coerceAtLeast(0L)),
@@ -1119,7 +1188,6 @@ private fun SeekSection() {
     }
 }
 
-/** Sleep timer choices, as a second glass menu from the same "⋯" button. */
 @Composable
 private fun androidx.compose.foundation.layout.BoxScope.SleepTimerMenu(expanded: Boolean, onDismiss: () -> Unit) {
     val context = LocalContext.current
@@ -1146,7 +1214,6 @@ private fun androidx.compose.foundation.layout.BoxScope.SleepTimerMenu(expanded:
     GlassMenu(expanded = expanded, onDismiss = onDismiss, actions = actions)
 }
 
-/** Moon + time left (or "End of song") while a sleep timer runs. */
 @Composable
 private fun SleepBadge(modifier: Modifier = Modifier) {
     val mode by SleepTimer.mode.collectAsState()
@@ -1177,4 +1244,3 @@ private fun formatTime(ms: Long): String {
     val total = ms.coerceAtLeast(0L) / 1000
     return "%d:%02d".format(total / 60, total % 60)
 }
-

@@ -1,12 +1,3 @@
-/*
- * Vendored from Kyant0/AndroidLiquidGlass (kmp branch)
- * https://github.com/Kyant0/AndroidLiquidGlass — Copyright 2025 Kyant0, Apache License 2.0
- * app/src/commonMain/kotlin/com/kyant/backdrop/catalog/utils/InteractiveHighlight.kt
- *
- * Not published as a library — ported straight from the catalog demo app that
- * showcases Kyant0/backdrop, source-only. Package renamed and RuntimeShader
- * imports repointed at this app's vendored com.vyora.music.ui.glass.backdrop.
- */
 package com.vyora.music.ui.glass.interaction
 
 import androidx.compose.animation.core.Animatable
@@ -31,11 +22,6 @@ import kotlinx.coroutines.launch
 class InteractiveHighlight(
     val animationScope: CoroutineScope,
     val position: (size: Size, offset: Offset) -> Offset = { _, offset -> offset },
-    // Glow radius = size.minDimension * radiusScale. Fine on the small components
-    // this was designed for (mini player pill, nav bar row) where minDimension is
-    // naturally small; on a tall, narrow container (the side panel) minDimension
-    // is still the panel's full width, so the default blows the glow up to
-    // several rows across and visually buries whatever's under the finger.
     val radiusScale: Float = 1.5f,
 ) {
 

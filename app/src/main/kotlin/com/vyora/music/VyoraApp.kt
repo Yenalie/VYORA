@@ -6,29 +6,23 @@ import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.vyora.music.data.account.SyncEngine
+import com.vyora.music.data.download.Downloads
+import com.vyora.music.data.download.OfflineArtInterceptor
 import com.vyora.music.data.library.LibraryManager
 import com.vyora.music.data.library.SearchHistory
 import com.vyora.music.data.settings.SettingsRepository
 import com.vyora.music.data.update.UpdateManager
 
-/**
- * Starts the library database and the YouTube account sync, and sets up Coil.
- *
- * Coil: Without it Coil uses its default disk cache (2% of the device
- * storage, up to 250 MB), and with 544px list covers plus 1080px player / album covers that
- * fills up fast. Here the disk cache is capped at [DISK_CACHE_MB] and old covers are evicted
- * first (LRU), so storage stays flat however much the user browses.
- */
 class VyoraApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
-        // Room-backed stores first, then the account (which may start a background sync).
         LibraryManager.init(this)
         SearchHistory.init(this)
         SyncEngine.init(this)
-        // Settings are needed for the update switch; init is idempotent.
         SettingsRepository.init(this)
         UpdateManager.init(this)
+        Downloads.init(this)
+        com.vyora.music.data.discord.DiscordAccount.init(this)
     }
 
     override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
@@ -43,6 +37,7 @@ class VyoraApp : Application(), ImageLoaderFactory {
                 .maxSizeBytes(DISK_CACHE_MB * 1024L * 1024L)
                 .build()
         }
+        .components { add(OfflineArtInterceptor(this@VyoraApp)) }
         .crossfade(true)
         .build()
 

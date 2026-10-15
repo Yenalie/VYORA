@@ -13,14 +13,6 @@ import java.io.File
 import java.util.concurrent.Executors
 import org.json.JSONObject
 
-/**
- * Keeps the queue across process death, like Apple Music: open the app the next day and the
- * last song is in the mini player, ready to resume where it stopped.
- *
- * Stored in Room (tables `queue` and `queue_state`), replaced in one transaction and written
- * on one background thread, so saves land in order and a load always sees the last save.
- * The 1.2/1.3 `files/queue.json` is read once and deleted.
- */
 object QueueStore {
     private const val TAG = "VYORA-Queue"
     private const val MAX_ITEMS = 500
@@ -32,7 +24,6 @@ object QueueStore {
 
     fun save(context: Context, items: List<MediaItem>, index: Int, positionMs: Long) {
         val dao = VyoraDatabase.get(context).queue()
-        // Snapshot on the caller's thread: MediaItems belong to the player thread.
         val rows = items.take(MAX_ITEMS).mapNotNull { media ->
             MediaItems.toSimpleItem(media)?.let { media to it }
         }.mapIndexed { i, (media, item) -> QueueEntity.of(i, item, MediaItems.isAutoplay(media)) }
@@ -60,7 +51,6 @@ object QueueStore {
         io.execute { runCatching { dao.clear() } }
     }
 
-    /** Runs on [io]. Moves the old JSON queue into Room, then deletes the file. */
     private fun importLegacy(context: Context) {
         val file = File(context.filesDir, LEGACY_FILE)
         if (!file.exists()) return

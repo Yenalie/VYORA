@@ -20,16 +20,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/**
- * The moving artwork of a music video: a second, silent ExoPlayer that plays the video-only
- * rendition and follows the song's position. It never touches audio focus or the media
- * session, and it lives only while Now Playing is on screen.
- */
 @OptIn(UnstableApi::class)
 class VideoArtworkPlayer(context: Context) {
     private val player: ExoPlayer = ExoPlayer.Builder(context)
         .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(YouTubeDataSource.videoFactory(context)))
-        // Small buffers: it is only a picture, and it is dropped when the sheet closes.
         .setLoadControl(
             DefaultLoadControl.Builder()
                 .setBufferDurationsMs(MIN_BUFFER_MS, MAX_BUFFER_MS, START_BUFFER_MS, START_BUFFER_MS)
@@ -50,7 +44,6 @@ class VideoArtworkPlayer(context: Context) {
     private var retried = false
 
     private val _hasFrame = MutableStateFlow(false)
-    /** True once the first frame of the current video is on screen. */
     val hasFrame: StateFlow<Boolean> = _hasFrame.asStateFlow()
 
     init {
@@ -60,7 +53,6 @@ class VideoArtworkPlayer(context: Context) {
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                // An expired URL: re-resolve once; anything else just leaves the cover.
                 val id = videoId ?: return
                 if (retried) return
                 retried = true
@@ -84,7 +76,6 @@ class VideoArtworkPlayer(context: Context) {
         player.prepare()
     }
 
-    /** Keeps the picture on the song: same play state, re-seeks only on visible drift. */
     fun follow(songPositionMs: Long, playing: Boolean) {
         if (videoId == null) return
         if (player.playWhenReady != playing) player.playWhenReady = playing
@@ -112,7 +103,6 @@ class VideoArtworkPlayer(context: Context) {
         private const val START_BUFFER_MS = 1_000
         private const val MAX_DRIFT_MS = 300L
 
-        /** Whether the setting allows video right now (Wi-Fi only = any unmetered network). */
         fun allowed(context: Context, mode: VideoArtwork): Boolean = when (mode) {
             VideoArtwork.OFF -> false
             VideoArtwork.ALWAYS -> true

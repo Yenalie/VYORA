@@ -25,6 +25,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.Downloading
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Radio
@@ -62,6 +65,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.vyora.music.R
+import com.vyora.music.data.download.DownloadStatus
+import com.vyora.music.data.download.Downloads
 import com.vyora.music.data.library.LibraryManager
 import com.vyora.music.data.youtube.SimpleItem
 import com.vyora.music.data.youtube.YouTubeConfig
@@ -77,7 +82,6 @@ import com.vyora.music.ui.theme.VyoraScrim
 import com.vyora.music.ui.theme.VyoraSurfaceElevated
 import com.vyora.music.ui.theme.VyoraText
 
-/** One row of a glass context menu. */
 data class MenuAction(
     val label: String,
     val icon: ImageVector,
@@ -85,7 +89,6 @@ data class MenuAction(
     val onClick: () -> Unit,
 )
 
-/** A menu waiting to be shown: where it was opened from and which layer its glass refracts. */
 class MenuRequest(
     val anchor: Rect,
     val backdrop: Backdrop,
@@ -93,11 +96,6 @@ class MenuRequest(
     val onDismiss: () -> Unit,
 )
 
-/**
- * Drives the single, app-wide context menu. Menus are drawn by [GlassMenuHost] ABOVE the
- * app layer (not in a separate popup window), so their liquid glass can really refract the
- * screen behind them, exactly like the tab bar and the mini player.
- */
 @Stable
 class GlassMenuState {
     var request by mutableStateOf<MenuRequest?>(null)
@@ -116,16 +114,8 @@ class GlassMenuState {
 
 val LocalGlassMenu = staticCompositionLocalOf { GlassMenuState() }
 
-/**
- * Backdrop that menus opened from this area should refract. The root provides the whole app
- * layer; the full player overrides it with its own artwork background.
- */
 val LocalMenuBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 
-/**
- * Generic glass context menu anchored to the parent Box. Call it inside the Box that holds
- * the trigger (a "⋯" button, a row, a card).
- */
 @Composable
 fun BoxScope.GlassMenu(
     expanded: Boolean,
@@ -141,18 +131,12 @@ fun BoxScope.GlassMenu(
     }
 }
 
-/**
- * iOS-style context menu for a song (long press or "⋯"): Play Next, Play Last, Favorite and
- * Share, on real liquid glass.
- */
 @Composable
 fun BoxScope.SongMenu(
     item: SimpleItem,
     expanded: Boolean,
     onDismiss: () -> Unit,
-    /** Set inside a VYORA playlist: adds "Remove from Playlist". */
     playlistId: String? = null,
-    /** Extra rows at the end (Now Playing adds the sleep timer). */
     extraActions: List<MenuAction> = emptyList(),
 ) {
     val context = LocalContext.current
@@ -170,8 +154,23 @@ fun BoxScope.SongMenu(
     val playLast = stringResource(R.string.play_last)
     val favorite = stringResource(if (isLiked) R.string.unfavorite else R.string.favorite)
     val createStation = stringResource(R.string.create_station)
+    val downloads by Downloads.entries.collectAsState()
+    val downloadStatus = downloads[item.id]?.status
+    val downloadLabel = stringResource(
+        when (downloadStatus) {
+            null -> R.string.download
+            DownloadStatus.QUEUED, DownloadStatus.DOWNLOADING -> R.string.download_cancel
+            DownloadStatus.COMPLETED -> R.string.download_remove
+            DownloadStatus.FAILED -> R.string.download_retry
+        }
+    )
+    val downloadStarted = stringResource(R.string.toast_download_started)
+    val downloadIcon = when (downloadStatus) {
+        DownloadStatus.COMPLETED -> Icons.Default.DownloadDone
+        DownloadStatus.QUEUED, DownloadStatus.DOWNLOADING -> Icons.Default.Downloading
+        else -> Icons.Default.FileDownload
+    }
 
-    // Apple Music order: playlist actions, queue actions, then favourite / navigate / share.
     val actions = listOfNotNull(
         MenuAction(addToPlaylist, Icons.AutoMirrored.Filled.PlaylistAdd) { app.addToPlaylist(item) },
         playlistId?.let { pid ->
@@ -192,12 +191,22 @@ fun BoxScope.SongMenu(
             MenuAction(goToArtist, Icons.Default.Person) { app.openArtist(name, null, item.artistId) }
         },
         MenuAction(createStation, Icons.Default.Radio) { PlayerManager.startRadio(item) },
+        if (item.isSong) {
+            MenuAction(downloadLabel, downloadIcon, accent = downloadStatus == DownloadStatus.COMPLETED) {
+                when (downloadStatus) {
+                    null, DownloadStatus.FAILED -> {
+                        Downloads.download(context, item)
+                        Toast.makeText(context, downloadStarted, Toast.LENGTH_SHORT).show()
+                    }
+                    else -> Downloads.remove(context, item.id)
+                }
+            }
+        } else null,
         MenuAction(shareTitle, Icons.Default.IosShare) { shareSong(context, item, shareTitle) },
     ) + extraActions
     GlassMenu(expanded = expanded, onDismiss = onDismiss, actions = actions)
 }
 
-/** System share sheet with "Title · Artist" and the YouTube Music link. */
 fun shareSong(context: android.content.Context, item: SimpleItem, chooserTitle: String) {
     val url = "${YouTubeConfig.MUSIC_ORIGIN}/watch?v=${item.id}"
     val text = listOf(item.title, item.artist).filter { it.isNotBlank() }.joinToString(" · ") + "\n" + url
@@ -211,11 +220,6 @@ fun shareSong(context: android.content.Context, item: SimpleItem, chooserTitle: 
 private val MenuWidth = 250.dp
 private val MenuShape = GlassShapes.Large
 
-/**
- * Renders the open menu: a light dim over the app, then the glass panel springing out of
- * its anchor (iOS 26 style). Tap outside or Back to close. Place it last in the root Box,
- * outside the app's recorded backdrop layer.
- */
 @Composable
 fun GlassMenuHost(state: GlassMenuState) {
     val request = state.request
@@ -240,7 +244,6 @@ fun GlassMenuHost(state: GlassMenuState) {
         val menuW = with(density) { MenuWidth.toPx() }
         var menuH by remember { mutableIntStateOf(0) }
 
-        // Dim + tap-outside-to-close.
         Box(
             Modifier
                 .fillMaxSize()
@@ -271,7 +274,6 @@ fun GlassMenuHost(state: GlassMenuState) {
                         transformOrigin = TransformOrigin(if (alignRight) 1f else 0f, if (fitsBelow) 0f else 1f)
                     }
                     .liquidFill(shape = MenuShape, fill = VyoraSurfaceElevated.copy(alpha = 0.55f), overlay = true)
-                    // Swallow taps on the panel's padding so they don't close the menu.
                     .pointerInput(Unit) { detectTapGestures { } }
                     .padding(vertical = 4.dp),
             ) {

@@ -13,30 +13,17 @@ import org.schabi.newpipe.extractor.playlist.PlaylistInfoItem
 import org.schabi.newpipe.extractor.search.SearchInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 
-/**
- * YouTube Music search categories. [ytFilter] is NewPipe's content-filter id
- * (YoutubeSearchQueryHandlerFactory.MUSIC_*). Using these instead of a plain
- * search keeps podcasts, live streams and random videos out of the results and
- * gives every category its own complete, pageable list.
- */
 enum class SearchFilter(val ytFilter: String) {
     SONGS("music_songs"),
     ARTISTS("music_artists"),
     ALBUMS("music_albums"),
     PLAYLISTS("music_playlists"),
-    /** Music videos, covers, live versions: many songs only exist here. */
     VIDEOS("music_videos")
 }
 
-/** One page of results plus the cursor for the next one (null = no more). */
 data class ResultPage(
     val items: List<SimpleItem>,
     val nextPage: Page? = null,
-    /**
-     * YouTube's spelling suggestion for the query, if any. When [corrected] is true the
-     * results are already for the suggestion ("Showing results for ..."), otherwise it is
-     * only a "Did you mean ...?" hint.
-     */
     val suggestion: String? = null,
     val corrected: Boolean = false,
 )
@@ -62,9 +49,6 @@ object YouTubeClient {
         }
     }
 
-    // ---------------------------------------------------------------- search
-
-    /** First page when [page] is null, otherwise the page [page] points to. */
     suspend fun search(query: String, filter: SearchFilter, page: Page? = null): Result<ResultPage> =
         withContext(Dispatchers.IO) {
             try {
@@ -103,7 +87,6 @@ object YouTubeClient {
         is ChannelInfoItem -> SimpleItem(
             id = item.url.substringAfterLast("/"),
             title = item.name,
-            // Localised in the UI (ItemRow) from [SimpleItem.count].
             artist = "",
             thumbnail = artUrl(bestThumb(item.thumbnails), 544),
             url = item.url,
@@ -126,10 +109,6 @@ object YouTubeClient {
         else -> null
     }
 
-    /**
-     * [forceThumb] replaces the track's own picture: album tracks come with 16:9 video
-     * frames, but the player should show the square album cover.
-     */
     private fun streamToSong(
         item: StreamInfoItem,
         fallbackThumb: String? = null,
@@ -141,7 +120,6 @@ object YouTubeClient {
         return SimpleItem(
             id = id,
             title = item.name,
-            // Blank when unknown: rows simply hide the line instead of showing English "Unknown".
             artist = item.uploaderName?.removeSuffix(YouTubeConfig.TOPIC_SUFFIX)?.takeIf { it.isNotBlank() }.orEmpty(),
             thumbnail = forceThumb ?: artUrl(bestThumb(item.thumbnails), 544) ?: fallbackThumb,
             url = item.url,
@@ -152,11 +130,6 @@ object YouTubeClient {
         )
     }
 
-    /**
-     * Music videos get moving artwork. The "Videos" search tab is videos by definition and
-     * "Songs" never are; elsewhere (radio, playlists) a track is a video when it was not
-     * uploaded by an auto-generated "- Topic" channel and its picture is a video frame.
-     */
     private fun videoFlag(item: StreamInfoItem, filter: SearchFilter?): Boolean = when (filter) {
         SearchFilter.VIDEOS -> true
         SearchFilter.SONGS -> false
@@ -169,15 +142,9 @@ object YouTubeClient {
         return item.thumbnails.any { it.url.contains(YouTubeConfig.VIDEO_THUMB_HOST) }
     }
 
-    /**
-     * Largest picture up to [MAX_THUMB_PX] tall. Video frames (i.ytimg.com) otherwise come
-     * as 1280x720 "maxres" JPEGs, far bigger than a 48dp row or a 260dp tile ever needs,
-     * and every one of them lands in the image disk cache. Music covers are resized
-     * separately by [artUrl].
-     */
     private fun bestThumb(list: List<org.schabi.newpipe.extractor.Image>): String? =
         list.filter { it.height > 0 }.let { known ->
-            if (known.isEmpty()) list.firstOrNull()?.url // sizes unknown (-1): take what's there
+            if (known.isEmpty()) list.firstOrNull()?.url
             else (known.filter { it.height <= MAX_THUMB_PX }.maxByOrNull { it.height } ?: known.minByOrNull { it.height })?.url
         }
 
@@ -186,11 +153,6 @@ object YouTubeClient {
     private val sizedArt = Regex("=w\\d+-h\\d+")
     private val squareArt = Regex("=s\\d+(?=[-?]|$)")
 
-    /**
-     * YouTube Music hands out 60/120 px artwork; Google's image CDN can resize on the fly,
-     * so ask for [px] instead. Lists get 544, the player/album header ask for more.
-     * Video thumbnails (i.ytimg.com) are left alone.
-     */
     fun artUrl(url: String?, px: Int): String? {
         if (url.isNullOrBlank()) return url
         if (!url.contains("googleusercontent.com") && !url.contains("ggpht.com")) return url
@@ -202,18 +164,13 @@ object YouTubeClient {
         }
     }
 
-    /** "Album – Manusia" / "EP – X" / "Single – X" -> the real title. */
     private fun cleanAlbumTitle(name: String): String =
         name.replace(Regex("^(Album|EP|Single)\\s+[–-]\\s+"), "")
 
-    // -------------------------------------------------------------- playlists
-
     fun playlistUrl(id: String) = "${YouTubeConfig.WEB_ORIGIN}/playlist?list=$id"
 
-    /** YouTube Music album ids ("OLAK5uy_..."). */
     fun isAlbumId(id: String) = id.startsWith(YouTubeConfig.ALBUM_ID_PREFIX)
 
-    /** Albums and playlists share the same extractor; [id] is the `list=` value. */
     suspend fun getPlaylist(id: String): Result<PlaylistDetail> = withContext(Dispatchers.IO) {
         try {
             val info = PlaylistInfo.getInfo(ServiceList.YouTube, playlistUrl(id))
@@ -223,7 +180,6 @@ object YouTubeClient {
             val songs = streams
                 .mapNotNull { streamToSong(it, cover, forceThumb = if (isAlbum) cover else null, isVideo = !isAlbum && looksLikeVideo(it)) }
                 .distinctBy { it.id }
-            // Album pages come without an uploader; the artist is whoever made most tracks.
             val owner = info.uploaderName?.takeIf { it.isNotBlank() }
                 ?: songs.groupingBy { it.artist }.eachCount().maxByOrNull { it.value }?.key.orEmpty()
             Result.success(
@@ -258,17 +214,9 @@ object YouTubeClient {
             }
         }
 
-    /** "https://www.youtube.com/channel/UC..." -> "UC...". */
     fun channelIdOf(url: String?): String? =
         url?.substringAfter("/channel/", "")?.substringBefore('/')?.substringBefore('?')?.takeIf { it.startsWith("UC") }
 
-    // ------------------------------------------------------------------- radio
-
-    /**
-     * Songs similar to [videoId]: YouTube Music's own "radio" mix for the track (the RDAMVM
-     * list behind "Start radio"). Used by Autoplay and "Create Station". The seed itself is
-     * dropped. Mix thumbnails are 16:9 video frames; the square crop shows the cover.
-     */
     suspend fun radio(videoId: String): Result<List<SimpleItem>> = withContext(Dispatchers.IO) {
         try {
             val info = PlaylistInfo.getInfo(ServiceList.YouTube, SimpleItem.watchUrl(videoId) + "&list=" + YouTubeConfig.RADIO_LIST_PREFIX + videoId)
@@ -283,7 +231,6 @@ object YouTubeClient {
         }
     }
 
-    /** Hour-long mixes and live streams make poor Autoplay picks. */
     private const val MAX_RADIO_SONG_SEC = 15L * 60
 
     private fun extractVideoId(url: String): String {

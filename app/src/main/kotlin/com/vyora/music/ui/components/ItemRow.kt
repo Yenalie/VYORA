@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.MusicNote
@@ -64,21 +65,6 @@ import com.vyora.music.ui.theme.VyoraText
 import com.vyora.music.ui.theme.VyoraTextFaint
 import com.vyora.music.ui.theme.VyoraTextMuted
 
-/**
- * iOS 26 Apple Music style list row for any [SimpleItem]. Deliberately NOT a glass card:
- * in iOS 26 Liquid Glass is reserved for navigation and controls (tab bar, mini player,
- * buttons, menus), while content lists stay plain so the artwork carries the colour.
- *
- * Layout: 48dp artwork with small continuous corners, title + secondary line, trailing
- * "⋯" (songs) or chevron (albums/playlists/artists), and an inset hairline separator that
- * starts at the text, like UITableView. Pressing shows the flat grey cell highlight iOS
- * uses instead of scaling. Long press opens the glass song menu.
- *
- * The playing song gets the Apple Music treatment: an accent EQ glyph in place of the
- * track number, or a dimmed artwork with a white EQ glyph on top.
- *
- * [index] replaces the artwork with a track number (album / playlist track lists).
- */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ItemRow(
@@ -89,7 +75,6 @@ fun ItemRow(
     showSeparator: Boolean = true,
     contentColor: Color = VyoraText,
     secondaryColor: Color = VyoraTextMuted,
-    /** Inside a VYORA playlist the song menu offers "Remove from Playlist". */
     playlistId: String? = null,
 ) {
     val current by PlayerManager.currentItem.collectAsState()
@@ -103,7 +88,6 @@ fun ItemRow(
     val pressed by source.collectIsPressedAsState()
     val highlight by animateColorAsState(
         targetValue = if (pressed) VyoraHighlight else Color.Transparent,
-        // iOS cells highlight instantly on touch and fade out on release.
         animationSpec = tween(durationMillis = if (pressed) 0 else 220),
         label = "rowHighlight",
     )
@@ -151,7 +135,6 @@ fun ItemRow(
                             else -> Icons.Default.MusicNote
                         },
                         contentDescription = item.title,
-                        // Album / playlist covers fly into their page when opened.
                         modifier = Modifier
                             .sharedArtwork(if (item.isCollection) artworkKey(item.id) else null)
                             .fillMaxSize(),
@@ -178,7 +161,6 @@ fun ItemRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                // iOS style subtitles: "Artist", "Album · Tulus", "Playlist · Someone".
                 val kindAlbum = stringResource(R.string.kind_album)
                 val kindPlaylist = stringResource(R.string.kind_playlist)
                 val meta = when (item.type) {
@@ -187,16 +169,30 @@ fun ItemRow(
                     ItemType.PLAYLIST -> listOf(kindPlaylist, item.artist).filter { it.isNotBlank() }.joinToString(" · ")
                     else -> item.artist.takeIf { it.isNotBlank() }
                 }
-                if (meta != null) {
+                val downloads by com.vyora.music.data.download.Downloads.entries.collectAsState()
+                val offline = isSong && downloads[item.id]?.status == com.vyora.music.data.download.DownloadStatus.COMPLETED
+                if (meta != null || offline) {
                     Spacer(Modifier.height(1.dp))
-                    Text(meta, style = MaterialTheme.typography.bodyMedium, color = secondaryColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (offline) {
+                            Icon(
+                                Icons.Default.DownloadDone,
+                                contentDescription = stringResource(R.string.downloaded),
+                                tint = secondaryColor,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            if (meta != null) Spacer(Modifier.width(4.dp))
+                        }
+                        if (meta != null) {
+                            Text(meta, style = MaterialTheme.typography.bodyMedium, color = secondaryColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
                 }
             }
             if (isSong) {
                 Box(contentAlignment = Alignment.Center) {
                     Box(
                         Modifier
-                            // 48dp: the Android minimum touch target (the glyph stays 20dp).
                             .size(48.dp)
                             .glassClickable(pressedScale = 0.85f) { menu = true },
                         contentAlignment = Alignment.Center,
@@ -212,17 +208,14 @@ fun ItemRow(
                 )
             }
         }
-        // Inset hairline aligned with the title, hidden under the last row.
         if (showSeparator) {
             Hairline(Modifier.align(Alignment.BottomStart), startIndent = textStart)
         }
     }
 }
 
-/** Slight rounding so the press highlight doesn't look like a hard block inside padded lists. */
 private val RowHighlightShape = RoundedCornerShape(10.dp)
 
-/** 215 -> "3:35", 3725 -> "1:02:05". */
 fun formatDuration(totalSeconds: Long): String {
     val h = totalSeconds / 3600
     val m = (totalSeconds % 3600) / 60

@@ -21,11 +21,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
-/** Which Android effect does the equalizing on this device. */
 enum class EqEngine {
-    /** DynamicsProcessing: our 10 bands exactly, with input gain and a limiter. */
     DYNAMICS,
-    /** The old Equalizer effect (usually 5 bands); our curve is resampled onto its bands. */
     LEGACY,
 }
 
@@ -34,20 +31,6 @@ data class EqCapabilities(
     val virtualizerSupported: Boolean,
 )
 
-/**
- * Applies the Equalizer settings to the player's audio session.
- *
- * Why songs used to turn muffled or quiet ("mendem") with the old setup:
- *  - presets boosted up to +6 dB, Bass Boost and Loudness stacked on top, with nothing
- *    taking the level back down, so loud passages clipped (harsh, then pumping);
- *  - the platform Bass Boost is a fixed vendor filter that on many phones smears the
- *    low mids, which sounds like a blanket over the speaker.
- *
- * Now the curve, bass shelf and loudness go through a single DynamicsProcessing stage:
- * input gain is lowered by the largest boost (headroom), and a limiter at -1 dBFS stops
- * the remaining peaks from clipping. Devices without DynamicsProcessing use the legacy
- * Equalizer with the same headroom shift.
- */
 object AudioEffects {
     private const val TAG = "VYORA-AudioFx"
     private const val PRIORITY = 0
@@ -63,11 +46,9 @@ object AudioEffects {
     val capabilities: StateFlow<EqCapabilities?> = _capabilities.asStateFlow()
 
     private val _probed = MutableStateFlow(false)
-    /** True once [capabilities] is known (null afterwards means no equalizer at all). */
     val probed: StateFlow<Boolean> = _probed.asStateFlow()
 
     private val _inControl = MutableStateFlow(true)
-    /** False while another app (a system sound enhancer, say) has taken over our effects. */
     val inControl: StateFlow<Boolean> = _inControl.asStateFlow()
 
     private var sessionId = 0
@@ -77,7 +58,6 @@ object AudioEffects {
     private var virtualizer: Virtualizer? = null
     private var observer: Job? = null
 
-    /** Finds out what the device supports without needing playback. */
     fun probe(context: Context) {
         if (_probed.value) return
         val am = context.applicationContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -96,7 +76,6 @@ object AudioEffects {
         _probed.value = true
     }
 
-    /** Attach to [audioSessionId]; called again whenever the player's session changes. */
     fun attach(audioSessionId: Int) {
         if (audioSessionId <= 0 || audioSessionId == sessionId) return
         releaseEffects()
@@ -144,10 +123,10 @@ object AudioEffects {
         val config = DynamicsProcessing.Config.Builder(
             DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
             CHANNELS,
-            /* preEqInUse = */ true, EqBands.COUNT,
-            /* mbcInUse = */ false, 0,
-            /* postEqInUse = */ false, 0,
-            /* limiterInUse = */ true,
+             true, EqBands.COUNT,
+             false, 0,
+             false, 0,
+             true,
         ).build()
         return DynamicsProcessing(PRIORITY, session, config)
     }
@@ -182,7 +161,6 @@ object AudioEffects {
         dp.enabled = s.enabled
     }
 
-    /** Old Equalizer: the curve at the device's bands, shifted down by the headroom. */
     private fun applyLegacy(eq: Equalizer, s: EqualizerSettings, gains: FloatArray, inputDb: Float) {
         val range = eq.bandLevelRange
         val minDb = range[0] / 100f

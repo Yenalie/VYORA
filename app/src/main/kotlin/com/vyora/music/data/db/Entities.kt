@@ -8,10 +8,6 @@ import androidx.room.PrimaryKey
 import com.vyora.music.data.youtube.ItemType
 import com.vyora.music.data.youtube.SimpleItem
 
-/**
- * One row per song, video, album or playlist the library refers to. Every other table points
- * here, so a song liked, played and saved in two playlists is stored once.
- */
 @Entity(tableName = "items")
 data class ItemEntity(
     @PrimaryKey val id: String,
@@ -40,7 +36,6 @@ data class ItemEntity(
     }
 }
 
-/** Favourite songs. [synced] = the like is known to be on the YouTube account too. */
 @Entity(
     tableName = "liked",
     foreignKeys = [ForeignKey(entity = ItemEntity::class, parentColumns = ["id"], childColumns = ["item_id"], onDelete = ForeignKey.CASCADE)],
@@ -52,7 +47,6 @@ data class LikedEntity(
     val synced: Boolean = false,
 )
 
-/** Recently played, one row per song (replaying a song only moves it to the top). */
 @Entity(
     tableName = "history",
     foreignKeys = [ForeignKey(entity = ItemEntity::class, parentColumns = ["id"], childColumns = ["item_id"], onDelete = ForeignKey.CASCADE)],
@@ -63,7 +57,6 @@ data class HistoryEntity(
     @ColumnInfo(name = "played_at") val playedAt: Long,
 )
 
-/** YouTube albums and playlists added to the library. [synced]: also saved on the account. */
 @Entity(
     tableName = "saved_collections",
     foreignKeys = [ForeignKey(entity = ItemEntity::class, parentColumns = ["id"], childColumns = ["item_id"], onDelete = ForeignKey.CASCADE)],
@@ -75,10 +68,6 @@ data class SavedEntity(
     val synced: Boolean = false,
 )
 
-/**
- * A playlist in the library. [remoteId] is the YouTube playlist id ("PL...") when the playlist
- * lives on the signed-in account; null for playlists that exist only on this phone.
- */
 @Entity(tableName = "playlists", indices = [Index(value = ["remote_id"], unique = true)])
 data class PlaylistEntity(
     @PrimaryKey val id: String,
@@ -87,7 +76,6 @@ data class PlaylistEntity(
     @ColumnInfo(name = "remote_id") val remoteId: String? = null,
 )
 
-/** Songs of a playlist, in order. [setVideoId] is YouTube's handle for removing that entry. */
 @Entity(
     tableName = "playlist_songs",
     primaryKeys = ["playlist_id", "item_id"],
@@ -104,7 +92,6 @@ data class PlaylistSongEntity(
     @ColumnInfo(name = "set_video_id") val setVideoId: String? = null,
 )
 
-/** "Recent Searches". [key] is the lower-cased query, so "Tulus" and "tulus" are one row. */
 @Entity(tableName = "search_history", indices = [Index("searched_at")])
 data class SearchEntity(
     @PrimaryKey val key: String,
@@ -112,7 +99,6 @@ data class SearchEntity(
     @ColumnInfo(name = "searched_at") val searchedAt: Long,
 )
 
-/** The play queue, restored after the app was closed. Rows keep their own copy of the song. */
 @Entity(tableName = "queue")
 data class QueueEntity(
     @PrimaryKey val position: Int,
@@ -142,7 +128,6 @@ data class QueueEntity(
     }
 }
 
-/** Single row (id 0): which queue entry was playing and where. */
 @Entity(tableName = "queue_state")
 data class QueueStateEntity(
     @PrimaryKey val id: Int = 0,
@@ -150,23 +135,16 @@ data class QueueStateEntity(
     @ColumnInfo(name = "position_ms") val positionMs: Long,
 )
 
-/**
- * A library change still to be sent to the YouTube account (made offline, or the request
- * failed). Replayed in order by the sync engine, then deleted.
- */
 @Entity(tableName = "sync_actions", indices = [Index("target")])
 data class SyncActionEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val kind: String,
-    /** Video id, playlist id (local) or collection id, depending on [kind]. */
     val target: String,
-    /** Second argument: the video id for playlist edits, the new name for renames. */
     val extra: String? = null,
     @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
     val attempts: Int = 0,
 )
 
-/** Values of [SyncActionEntity.kind]. Stored in the database, never rename. */
 object SyncKind {
     const val LIKE = "like"
     const val UNLIKE = "unlike"
@@ -179,7 +157,6 @@ object SyncKind {
     const val PLAYLIST_REMOVE = "pl_remove"
 }
 
-/** A playlist song row joined with its item, for building playlists in one query. */
 data class PlaylistSongRow(
     @ColumnInfo(name = "playlist_id") val playlistId: String,
     @ColumnInfo(name = "set_video_id") val setVideoId: String?,

@@ -31,10 +31,6 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * Not a real test: renders the real screens to PNG (/tmp/shots) so the UI can be reviewed
- * without a device. Run: ./gradlew testDebugUnitTest --tests '*ScreenshotTest*' -Dshots.only=all
- */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [35], qualifiers = "w393dp-h852dp-night-xxhdpi")
@@ -44,7 +40,6 @@ class ScreenshotTest {
     private val service = object : ExternalResource() {
         override fun before() {
             val app = ApplicationProvider.getApplicationContext<android.app.Application>()
-            // -Dshots.glass=off renders the tour with Liquid Glass switched off.
             if (System.getProperty("shots.glass") == "off") {
                 SettingsRepository.init(app)
                 SettingsRepository.update { it.copy(glass = it.glass.copy(enabled = false)) }
@@ -98,7 +93,6 @@ class ScreenshotTest {
         }
     }
 
-    /** Clicks the on-screen node with [text] that sits lowest (e.g. the mini player). */
     private fun clickLastText(text: String, lowest: Boolean = true) {
         val h = compose.activity.window.decorView.height
         val nodes = compose.onAllNodesWithText(text, useUnmergedTree = true).fetchSemanticsNodes()
@@ -107,7 +101,6 @@ class ScreenshotTest {
         compose.onAllNodesWithText(text, useUnmergedTree = true)[pick].performClick()
     }
 
-    /** Clicks the visible node with content description [desc] nearest the top. */
     private fun clickTopDesc(desc: String) {
         val h = compose.activity.window.decorView.height
         val nodes = compose.onAllNodesWithContentDescription(desc, useUnmergedTree = true).fetchSemanticsNodes()
@@ -116,7 +109,6 @@ class ScreenshotTest {
         compose.onAllNodesWithContentDescription(desc, useUnmergedTree = true)[pick].performClick()
     }
 
-    /** Needs the network (real YouTube Music data): only with -Dshots.only=all|play. */
     @Test fun tour() {
         org.junit.Assume.assumeTrue(System.getProperty("shots.only").orEmpty().isNotBlank())
         waitReal(9000)
@@ -131,7 +123,6 @@ class ScreenshotTest {
             clickText("Sign in to YouTube Music"); waitReal(1200); shot("05b_account")
             clickText("Sign in with cookies"); waitReal(800); shot("05c_cookie_dialog")
             clickText("Cancel"); waitReal(500)
-            // Signed-in layout with a stand-in account (no real session, so sync reports an error).
             if (System.getProperty("shots.account") == "1") {
                 compose.runOnUiThread {
                     com.vyora.music.data.account.AccountStore.save("SAPISID=test", com.vyora.music.data.account.YouTubeAccount("Yena", "@yena", null))
@@ -149,7 +140,6 @@ class ScreenshotTest {
 
     private fun playTour() {
         step("play") {
-            // -Dshots.video=1 plays music videos (16:9 artwork) instead of songs.
             val filter = if (System.getProperty("shots.video") == "1") SearchFilter.VIDEOS else SearchFilter.SONGS
             val songs = runBlocking { YouTubeClient.search("Tulus", filter).getOrThrow().items.take(6) }
             compose.runOnUiThread { PlayerManager.setQueue(songs, 0) }

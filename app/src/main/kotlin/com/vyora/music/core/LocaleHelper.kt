@@ -7,7 +7,6 @@ import android.content.res.Configuration
 import android.os.LocaleList
 import java.util.Locale
 
-/** Per-app language without AppCompat: wraps the Activity base context with the chosen locale. */
 object LocaleHelper {
     fun wrap(base: Context, tag: String): Context {
         if (tag.isBlank()) {

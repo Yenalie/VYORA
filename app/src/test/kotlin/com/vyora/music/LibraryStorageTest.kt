@@ -32,8 +32,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-// Plain Application: VyoraApp.onCreate starts the real library (and its one-time legacy import
-// in the background), which would race this test for the same SharedPreferences.
 @Config(sdk = [35], application = android.app.Application::class)
 class LibraryStorageTest {
     private val song = SimpleItem("abcdefghijk", "Hati-Hati di Jalan", "Tulus", "https://x/y.jpg", "https://www.youtube.com/watch?v=abcdefghijk", 242, "song")
@@ -48,8 +46,6 @@ class LibraryStorageTest {
     }
 
     @After fun close() = db.close()
-
-    // ----------------------------------------------------------------------- formats
 
     @Test fun jsonRoundTripKeepsEveryField() {
         assertEquals(listOf(song, album, video), SimpleItemJson.decode(SimpleItemJson.encode(listOf(song, album, video))))
@@ -84,8 +80,6 @@ class LibraryStorageTest {
         assertEquals(listOf("c1", "c2", "c0"), UserPlaylist("p", "n", songs, 0).covers)
     }
 
-    // ---------------------------------------------------------------------- database
-
     @Test fun likedNewestFirstAndOrphansCleaned() = runBlocking {
         val dao = db.library()
         dao.upsertItems(listOf(ItemEntity.of(song), ItemEntity.of(video)))
@@ -113,7 +107,6 @@ class LibraryStorageTest {
         dao.upsertItems(songs.map(ItemEntity::of))
         dao.insertPlaylist(PlaylistEntity("vy_1", "Jalan", 10))
         songs.reversed().forEach { dao.insertPlaylistSong(PlaylistSongEntity("vy_1", it.id, dao.lastPosition("vy_1") + 1)) }
-        // Adding a song twice is ignored.
         assertEquals(-1L, dao.insertPlaylistSong(PlaylistSongEntity("vy_1", "p1", 9)))
         val rows = dao.playlistSongsFlow().first()
         assertEquals(listOf("p3", "p2", "p1"), rows.map { it.item.id })
@@ -171,7 +164,6 @@ class LibraryStorageTest {
         assertEquals(listOf("Tulus", "Hindia"), dao.searchesFlow().first())
         assertTrue(ctx.getSharedPreferences("vyora_library", Context.MODE_PRIVATE).all.isEmpty())
 
-        // Second run is a no-op even if old data reappears.
         dao.clearHistory()
         ctx.getSharedPreferences("vyora_library", Context.MODE_PRIVATE).edit().putString("recent_songs", "ccccccccccc###Tiga###X###").commit()
         LegacyImport.runOnce(ctx, db)

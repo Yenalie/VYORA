@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.DownloadForOffline
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Mic
@@ -55,10 +56,6 @@ import com.vyora.music.ui.theme.VyoraText
 import com.vyora.music.ui.theme.VyoraTextFaint
 import com.vyora.music.ui.theme.VyoraTextMuted
 
-/**
- * Apple Music "Library": large title, a list of categories (accent glyph, label, count,
- * chevron, hairline) and a two-column "Recently Added" grid below.
- */
 @Composable
 fun LibraryScreen(
     onPlay: (List<SimpleItem>, Int) -> Unit = { _, _ -> },
@@ -74,8 +71,9 @@ fun LibraryScreen(
     val bottomInset = LocalBottomBarInset.current
     val playlists by LibraryManager.playlists.collectAsState()
     val saved by LibraryManager.savedCollections.collectAsState()
+    val downloadEntries by com.vyora.music.data.download.Downloads.entries.collectAsState()
+    val downloadedCount = downloadEntries.values.count { it.status == com.vyora.music.data.download.DownloadStatus.COMPLETED }
     val artistCount = remember(liked, playlists, saved) { libraryArtists(liked, playlists, saved).size }
-    // Newest first from both lists, interleaved so saved albums and favorites both show.
     val added = remember(liked, saved) {
         val out = mutableListOf<SimpleItem>()
         val a = saved.iterator(); val b = liked.iterator()
@@ -87,7 +85,6 @@ fun LibraryScreen(
     }
     val songsInAdded = added.filter { it.type == ItemType.SONG }
 
-    // Tapping the tab again scrolls back to the top.
     val listState = rememberLazyListState()
     OnTabReselect("library") { listState.scrollToTopSmooth() }
 
@@ -106,9 +103,7 @@ fun LibraryScreen(
             )
         }
         item(key = "categories") {
-            // iOS 26 Apple Music: a plain list (no card), red glyphs, inset hairlines.
             Column(Modifier.fillMaxWidth()) {
-                // Apple Music order: Playlists, Artists, Albums, Songs, then history.
                 CategoryRow(Icons.AutoMirrored.Filled.QueueMusic, stringResource(R.string.library_playlists), playlists.size) {
                     onOpenPage(LibraryPages.PLAYLISTS)
                 }
@@ -121,8 +116,11 @@ fun LibraryScreen(
                 CategoryRow(Icons.Default.Star, stringResource(R.string.favorite_songs), liked.size) {
                     onOpenCollection(Collections.LIKED)
                 }
-                CategoryRow(Icons.Default.History, stringResource(R.string.recently_played), recent.size, last = true) {
+                CategoryRow(Icons.Default.History, stringResource(R.string.recently_played), recent.size) {
                     onOpenCollection(Collections.RECENT)
+                }
+                CategoryRow(Icons.Default.DownloadForOffline, stringResource(R.string.downloads), downloadedCount, last = true) {
+                    onOpenCollection(Collections.DOWNLOADS)
                 }
             }
         }

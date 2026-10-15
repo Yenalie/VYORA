@@ -28,13 +28,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-/**
- * Thin UI-side facade over a [MediaController] connected to [PlaybackService].
- *
- * The queue, shuffle/repeat logic and stream resolution all live in the service
- * (ExoPlayer's own playlist). This class only mirrors player state into
- * StateFlows for Compose and forwards user actions.
- */
 object PlayerManager {
     private const val TAG = "VYORA-Player"
 
@@ -46,7 +39,6 @@ object PlayerManager {
     private var progressJob: Job? = null
     private var controllerConnectionId = 0L
 
-    /** A setQueue() call made before the controller finished connecting. */
     private var pendingQueue: PendingQueue? = null
 
     private class PendingQueue(val items: List<SimpleItem>, val startIndex: Int, val shuffle: Boolean?)
@@ -73,13 +65,10 @@ object PlayerManager {
     val positionMs: StateFlow<Long> = _positionMs.asStateFlow()
     private val _shuffle = MutableStateFlow(false)
     val shuffle: StateFlow<Boolean> = _shuffle.asStateFlow()
-    /** Same numbering as [Player.REPEAT_MODE_OFF] / ONE / ALL (0, 1, 2). */
     private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
     val repeatMode: StateFlow<Int> = _repeatMode.asStateFlow()
-    /** Songs that will play after the current one, in real playback (shuffle-aware) order. */
     private val _upNext = MutableStateFlow<List<QueueEntry>>(emptyList())
     val upNext: StateFlow<List<QueueEntry>> = _upNext.asStateFlow()
-    /** String resource id of the last playback problem, shown as a localized toast. */
     private val _playbackError = MutableStateFlow<Int?>(null)
     val playbackError: StateFlow<Int?> = _playbackError.asStateFlow()
 
@@ -105,7 +94,6 @@ object PlayerManager {
         future.addListener({
             try {
                 val controller = future.get()
-                // Ignore a connection that completed after release/re-initialize.
                 if (connectionId != controllerConnectionId || controllerFuture !== future) {
                     controller.release()
                     return@addListener
@@ -117,7 +105,6 @@ object PlayerManager {
                 controller.addListener(listener)
                 Log.d(TAG, "MediaController connected")
 
-                // The service (and its queue) may have outlived the Activity: resync the UI.
                 syncFromController(controller)
 
                 pendingQueue?.let { pending ->
@@ -146,7 +133,6 @@ object PlayerManager {
                     if (d != C.TIME_UNSET && d > 0L) _durationMs.value = d
                 }
                 Player.STATE_ENDED -> {
-                    // Queue finished with repeat off.
                     _isPlaying.value = false
                     _positionMs.value = 0L
                     _progress.value = 0f
@@ -157,7 +143,6 @@ object PlayerManager {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             publishCurrent(mediaItem)
             publishUpNext(controller)
-            // Repeat-one re-enters the same item; don't reshuffle "recent" for that.
             if (mediaItem != null && reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
                 mediaItem.toSimpleItem()?.let { LibraryManager.addToRecent(it) }
             }
@@ -181,7 +166,6 @@ object PlayerManager {
             _playbackError.value = when (error.errorCode) {
                 PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
                 PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> R.string.error_offline
-                // The service silently refreshes expired stream links once; no toast for that.
                 PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> return
                 else -> R.string.error_cannot_play
             }
@@ -198,7 +182,6 @@ object PlayerManager {
         val d = controller.duration
         if (d != C.TIME_UNSET && d > 0L) _durationMs.value = d
         _positionMs.value = controller.currentPosition.coerceAtLeast(0L)
-        // A queue restored from the last session starts mid-song: show that on the bar.
         val known = _durationMs.value
         if (known > 0L) _progress.value = (_positionMs.value.toFloat() / known).coerceIn(0f, 1f)
         if (controller.isPlaying) startProgressUpdates()
@@ -215,10 +198,6 @@ object PlayerManager {
         _durationMs.value = (item?.duration ?: 0L) * 1000L
     }
 
-    /**
-     * Replaces the queue and starts playing [startIndex].
-     * [shuffle] = null keeps the current shuffle mode; true/false sets it.
-     */
     fun setQueue(items: List<SimpleItem>, startIndex: Int = 0, shuffle: Boolean? = null) {
         _playbackError.value = null
         val controller = mediaController
@@ -261,7 +240,6 @@ object PlayerManager {
         _upNext.value = result
     }
 
-    /** Inserts [item] right after the current song ("Play Next"). Starts playback if idle. */
     fun playNext(item: SimpleItem) {
         val controller = mediaController
         if (controller == null || controller.mediaItemCount == 0) {
@@ -271,10 +249,6 @@ object PlayerManager {
         controller.addMediaItem(controller.currentMediaItemIndex + 1, item.toMediaItem())
     }
 
-    /**
-     * Adds [item] after the user's own queue ("Play Last"), but before songs Autoplay added,
-     * like Apple Music. Starts playback if idle.
-     */
     fun addToQueue(item: SimpleItem) {
         val controller = mediaController
         if (controller == null || controller.mediaItemCount == 0) {
@@ -288,7 +262,6 @@ object PlayerManager {
         else controller.addMediaItem(item.toMediaItem())
     }
 
-    /** Apple Music "Clear": removes the songs queued after the current one (not Autoplay). */
     fun clearUpNext() {
         val controller = mediaController ?: return
         val current = controller.currentMediaItemIndex
@@ -297,18 +270,12 @@ object PlayerManager {
         }
     }
 
-    /**
-     * "Create Station": plays [item] now and follows it with YouTube Music's radio for it.
-     * These songs are a regular queue (not Autoplay), so they stay if Autoplay is off.
-     */
     fun startRadio(item: SimpleItem) {
         setQueue(listOf(item), 0, shuffle = false)
         scope.launch {
             val songs = YouTubeClient.radio(item.id).getOrNull().orEmpty()
             val controller = mediaController ?: return@launch
-            // The user may have started something else in the meantime.
             if (controller.currentMediaItem?.mediaId != item.id || songs.isEmpty()) return@launch
-            // Autoplay may have topped the one-song queue up already; the station replaces that.
             for (i in controller.mediaItemCount - 1 downTo controller.currentMediaItemIndex + 1) {
                 if (MediaItems.isAutoplay(controller.getMediaItemAt(i))) controller.removeMediaItem(i)
             }
@@ -318,7 +285,6 @@ object PlayerManager {
 
     private const val RADIO_SIZE = 25
 
-    /** Jumps to a queue entry from [upNext]. */
     fun playQueueEntry(entry: QueueEntry) {
         val controller = mediaController ?: return
         if (entry.index !in 0 until controller.mediaItemCount) return
@@ -347,14 +313,12 @@ object PlayerManager {
         if (controller.isPlaying) {
             controller.pause()
         } else {
-            // After the queue ended, play() alone does nothing: restart from the top.
             if (controller.playbackState == Player.STATE_ENDED) controller.seekTo(0, 0L)
             else if (controller.playbackState == Player.STATE_IDLE && controller.mediaItemCount > 0) controller.prepare()
             controller.play()
         }
     }
 
-    /** A queue restored from the last session is not prepared yet; skipping must still play. */
     private fun prepareIfIdle(controller: MediaController) {
         if (controller.playbackState == Player.STATE_IDLE && controller.mediaItemCount > 0) controller.prepare()
     }
@@ -365,7 +329,6 @@ object PlayerManager {
         prepareIfIdle(controller)
         if (controller.hasNextMediaItem()) controller.seekToNextMediaItem()
         else {
-            // Wrap to the start of the play order (the shuffled one when shuffle is on).
             val first = controller.currentTimeline.getFirstWindowIndex(controller.shuffleModeEnabled)
             controller.seekTo(if (first == C.INDEX_UNSET) 0 else first, 0L)
         }
@@ -376,7 +339,6 @@ object PlayerManager {
         val controller = mediaController ?: return
         if (controller.mediaItemCount == 0) return
         prepareIfIdle(controller)
-        // >3s into a track restarts it; otherwise go to the previous one (follows shuffle order).
         controller.seekToPrevious()
         controller.play()
     }
@@ -395,15 +357,12 @@ object PlayerManager {
         }
     }
 
-    /** Exact position right now (the [positionMs] flow only ticks every 500 ms). */
     fun currentPositionMs(): Long = mediaController?.currentPosition?.coerceAtLeast(0L) ?: _positionMs.value
 
     fun seekTo(positionMs: Long) {
         val controller = mediaController ?: return
         val target = positionMs.coerceAtLeast(0L)
         controller.seekTo(target)
-        // Reflect it immediately; the 500 ms progress poll would otherwise leave the seek
-        // bar at the old position for a beat after the user lets go.
         _positionMs.value = target
         val duration = _durationMs.value
         if (duration > 0L) _progress.value = (target.toFloat() / duration).coerceIn(0f, 1f)
@@ -431,7 +390,6 @@ object PlayerManager {
         progressJob = null
     }
 
-    /** Safe to call before a later initialize(); the coroutine scope is recreated. */
     fun release() {
         ++controllerConnectionId
         pendingQueue = null
@@ -452,8 +410,4 @@ object PlayerManager {
     private fun MediaItem.toSimpleItem(): SimpleItem? = MediaItems.toSimpleItem(this)
 }
 
-/**
- * One row of the "Playing Next" list: [index] is the item's position in the player queue,
- * [autoplay] marks similar songs added by Autoplay (shown in their own section).
- */
 data class QueueEntry(val index: Int, val item: SimpleItem, val autoplay: Boolean = false)

@@ -81,13 +81,6 @@ internal data class ArtistPage(
     val videos: List<SimpleItem>,
 )
 
-/**
- * Builds the page from YouTube Music searches. Which channel is "this" artist: the one the
- * caller came from ([artistId], from a song), else the most-followed channel with exactly
- * this name. Rows that carry a channel id must match it, so a same-name artist (the
- * Norwegian band "Tulus") stays out; rows without one fall back to the credited name.
- * Top Songs is topped up from the artist's YouTube Music radio, which is mostly their own.
- */
 internal suspend fun loadArtistPage(name: String, artistId: String?, seedArt: String?): ArtistPage = coroutineScope {
     val songs = async { YouTubeClient.search(name, SearchFilter.SONGS) }
     val albums = async { YouTubeClient.search(name, SearchFilter.ALBUMS) }
@@ -123,7 +116,6 @@ internal suspend fun loadArtistPage(name: String, artistId: String?, seedArt: St
     )
 }
 
-/** True when [artistField] credits [name] (alone or as one of several artists). */
 internal fun creditsArtist(artistField: String, name: String): Boolean {
     val n = name.trim().lowercase()
     if (n.isBlank()) return false
@@ -132,16 +124,10 @@ internal fun creditsArtist(artistField: String, name: String): Boolean {
         .any { it.trim() == n }
 }
 
-/**
- * Apple Music artist page (iOS 26): a full-bleed hero with the name over it and the round
- * accent Play button, then "Top Songs", "Albums" and "Music Videos" shelves.
- * Built from YouTube Music searches, filtered to rows that really credit this artist.
- */
 @Composable
 fun ArtistScreen(
     name: String,
     seedArt: String?,
-    /** YouTube channel id when the caller knows it (from a song); else the page finds it. */
     artistId: String? = null,
     onBack: () -> Unit,
     onPlay: (List<SimpleItem>, Int, Boolean) -> Unit,
@@ -192,7 +178,6 @@ fun ArtistScreen(
                         )
                         if (songs.isNotEmpty()) {
                             Spacer(Modifier.width(12.dp))
-                            // Apple Music: one round accent Play button on the hero.
                             Box(
                                 Modifier
                                     .size(52.dp)
@@ -279,7 +264,6 @@ fun ArtistScreen(
             }
         }
 
-        // Floating glass back button over the hero, like every pushed page.
         GlassIconButton(
             icon = Icons.Rounded.ArrowBackIosNew,
             contentDescription = stringResource(R.string.back),
@@ -291,7 +275,6 @@ fun ArtistScreen(
     }
 }
 
-/** "Albums" shelf of square tiles that open the album page. */
 @Composable
 fun CollectionShelf(title: String, items: List<SimpleItem>, onOpen: (SimpleItem) -> Unit, modifier: Modifier = Modifier) {
     Column(modifier.padding(top = Spacing.Section)) {
@@ -308,7 +291,6 @@ fun CollectionShelf(title: String, items: List<SimpleItem>, onOpen: (SimpleItem)
     }
 }
 
-/** Album / playlist tile: square cover, title, secondary owner line. */
 @Composable
 fun CollectionTile(item: SimpleItem, modifier: Modifier = Modifier, width: Dp = 160.dp, onClick: () -> Unit) {
     Column(modifier.then(if (width != Dp.Unspecified) Modifier.width(width) else Modifier).glassClickable(pressedScale = 0.96f, onClick = onClick)) {
@@ -329,7 +311,6 @@ fun CollectionTile(item: SimpleItem, modifier: Modifier = Modifier, width: Dp = 
     }
 }
 
-/** 16:9 music-video tile. Long press opens the song menu. */
 @Composable
 private fun VideoTile(item: SimpleItem, onClick: () -> Unit) {
     var menu by remember { mutableStateOf(false) }

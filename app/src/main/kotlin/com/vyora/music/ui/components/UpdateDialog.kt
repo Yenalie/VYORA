@@ -35,7 +35,6 @@ import com.vyora.music.ui.theme.VyoraGroupedCell
 import com.vyora.music.ui.theme.VyoraText
 import com.vyora.music.ui.theme.VyoraTextMuted
 
-/** App-wide update dialog, driven by [UpdateManager]. Put it once at the app root. */
 @Composable
 fun UpdateDialogHost() {
     val visible by UpdateManager.prompt.collectAsState()

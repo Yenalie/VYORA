@@ -11,7 +11,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Shapes trimmed from real music.youtube.com responses. */
 class InnerTubeParserTest {
     private fun run(text: String, browseId: String? = null, pageType: String? = null) = JSONObject().put("text", text).apply {
         if (browseId != null) put(

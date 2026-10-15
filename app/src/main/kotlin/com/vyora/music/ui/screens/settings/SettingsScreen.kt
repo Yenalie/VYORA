@@ -27,7 +27,10 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material.icons.filled.FolderDelete
+import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material.icons.filled.Tune
@@ -82,7 +85,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Settings root, iOS inset-grouped style. Sub pages: account, glass, equalizer, language, about. */
 @Composable
 fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
     val settings by SettingsRepository.settings.collectAsState()
@@ -95,11 +97,9 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
     LaunchedEffect(Unit) { cacheBytes = withContext(Dispatchers.IO) { cacheUsage(context) } }
 
     SettingsPage(title = stringResource(R.string.settings), onBack = onBack) {
-        // ------------------------------------------------------------------- account
         item(key = "account") {
             SettingsGroup { AccountSummaryRow(onClick = { onOpen("account") }) }
         }
-        // ---------------------------------------------------------------- appearance
         item(key = "appearance") {
             SettingsGroup(header = stringResource(R.string.settings_appearance)) {
                 SettingsControlRow(title = stringResource(R.string.settings_theme)) {
@@ -155,7 +155,6 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                 )
             }
         }
-        // ---------------------------------------------------------------------- audio
         item(key = "audio") {
             SettingsGroup(
                 header = stringResource(R.string.settings_audio),
@@ -199,7 +198,6 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                 }
             }
         }
-        // ------------------------------------------------------------------- playback
         item(key = "playback") {
             SettingsGroup(
                 header = stringResource(R.string.settings_playback),
@@ -232,7 +230,6 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                 )
             }
         }
-        // -------------------------------------------------------------------- general
         item(key = "general") {
             SettingsGroup(header = stringResource(R.string.settings_general)) {
                 SettingsNavRow(
@@ -250,7 +247,6 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                 )
             }
         }
-        // -------------------------------------------------------------------- storage
         item(key = "storage") {
             SettingsGroup(header = stringResource(R.string.settings_storage)) {
                 SettingsRow(
@@ -298,7 +294,43 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                 )
             }
         }
-        // -------------------------------------------------------------------- updates
+        item(key = "downloads") {
+            val downloads by com.vyora.music.data.download.Downloads.entries.collectAsState()
+            var offlineBytes by remember { mutableStateOf(0L) }
+            LaunchedEffect(downloads.size) {
+                offlineBytes = withContext(Dispatchers.IO) { com.vyora.music.data.download.Downloads.usedBytes(context) }
+            }
+            SettingsGroup(header = stringResource(R.string.downloads)) {
+                SettingsSwitchRow(
+                    title = stringResource(R.string.download_wifi_only),
+                    icon = Icons.Default.Wifi, iconTint = SystemColors.Blue,
+                    checked = settings.downloadWifiOnly,
+                    onCheckedChange = { v -> SettingsRepository.update { it.copy(downloadWifiOnly = v) } },
+                )
+                SettingsRow(
+                    title = stringResource(R.string.downloads_remove_all),
+                    subtitle = stringResource(
+                        R.string.downloads_usage,
+                        downloads.size,
+                        Formatter.formatShortFileSize(context, offlineBytes),
+                    ),
+                    icon = Icons.Default.FolderDelete, iconTint = SystemColors.Gray,
+                    divider = false,
+                    onClick = { if (downloads.isNotEmpty()) confirm = ConfirmAction.DOWNLOADS },
+                )
+            }
+        }
+        item(key = "integrations") {
+            SettingsGroup(header = stringResource(R.string.settings_integrations)) {
+                SettingsNavRow(
+                    title = stringResource(R.string.discord_title),
+                    icon = Icons.Default.Gamepad, iconTint = Color(0xFF5865F2),
+                    value = stringResource(if (settings.discordPresence) R.string.on else R.string.off),
+                    onClick = { onOpen("discord") },
+                    divider = false,
+                )
+            }
+        }
         item(key = "updates") {
             UpdatesGroup(autoCheck = settings.autoUpdateCheck)
         }
@@ -322,13 +354,20 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
 
     confirm?.let { action ->
         ConfirmDialog(
-            message = stringResource(if (action == ConfirmAction.RESET) R.string.confirm_reset else R.string.confirm_clear_history),
+            message = stringResource(
+                when (action) {
+                    ConfirmAction.RESET -> R.string.confirm_reset
+                    ConfirmAction.HISTORY -> R.string.confirm_clear_history
+                    ConfirmAction.DOWNLOADS -> R.string.confirm_remove_downloads
+                }
+            ),
             onDismiss = { confirm = null },
             onConfirm = {
                 confirm = null
                 when (action) {
                     ConfirmAction.RESET -> SettingsRepository.resetAll()
                     ConfirmAction.HISTORY -> LibraryManager.clearRecent()
+                    ConfirmAction.DOWNLOADS -> com.vyora.music.data.download.Downloads.removeAll(context)
                 }
                 toast()
             },
@@ -336,9 +375,8 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
     }
 }
 
-private enum class ConfirmAction { HISTORY, RESET }
+private enum class ConfirmAction { HISTORY, RESET, DOWNLOADS }
 
-/** Settings > Updates: manual check with live status, and the background-check switch. */
 @Composable
 private fun UpdatesGroup(autoCheck: Boolean) {
     val context = LocalContext.current
@@ -381,11 +419,9 @@ private fun UpdatesGroup(autoCheck: Boolean) {
     }
 }
 
-/** Songs plus covers on disk. */
 private fun cacheUsage(context: Context): Long =
     runCatching { MediaCache.usedBytes(context) }.getOrDefault(0L) + (context.imageLoader.diskCache?.size ?: 0L)
 
-/** "512 MB", "1 GB": the binary sizes the setting is named after. */
 private fun cacheSizeLabel(size: CacheSize): String =
     if (size.megabytes >= 1024) "${size.megabytes / 1024} GB" else "${size.megabytes} MB"
 
@@ -417,7 +453,6 @@ fun ConfirmDialog(message: String, onDismiss: () -> Unit, onConfirm: () -> Unit)
     )
 }
 
-/** Accent swatches: filled circles, the selected one gets a ring and a check. */
 @Composable
 private fun AccentSwatches(selected: AccentChoice, onSelect: (AccentChoice) -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

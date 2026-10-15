@@ -16,7 +16,6 @@ interface SyncDao {
     @Query("SELECT COUNT(*) FROM sync_actions")
     fun pendingCount(): Flow<Int>
 
-    /** Targets with a change still on its way to YouTube; the pull must not undo those. */
     @Query("SELECT DISTINCT target FROM sync_actions")
     suspend fun pendingTargets(): List<String>
 
@@ -26,7 +25,6 @@ interface SyncDao {
     @Query("UPDATE sync_actions SET attempts = attempts + 1 WHERE id = :id")
     suspend fun bumpAttempts(id: Long)
 
-    /** A like followed by an unlike (or the reverse) cancels out before it is ever sent. */
     @Query("DELETE FROM sync_actions WHERE target = :target AND kind IN (:kinds)")
     suspend fun deleteFor(target: String, kinds: List<String>): Int
 

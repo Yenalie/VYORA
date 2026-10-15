@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.Page
 
-/** [ALL] is a summary view; every other tab maps 1:1 to a YouTube Music filter. */
 enum class SearchTab(val filter: SearchFilter?) {
     ALL(null),
     SONGS(SearchFilter.SONGS),
@@ -33,40 +32,24 @@ data class TabState(
 )
 
 data class SearchUiState(
-    /** What is currently typed in the text field. */
     val query: String = "",
-    /** The query the results below belong to; blank = nothing searched yet. */
     val submittedQuery: String = "",
     val tab: SearchTab = SearchTab.ALL,
     val tabs: Map<SearchTab, TabState> = emptyMap(),
-    /** YouTube's spelling fix for [submittedQuery]; see [corrected]. */
     val suggestion: String? = null,
-    /** True: results are already for [suggestion]. False: it is only "did you mean". */
     val corrected: Boolean = false,
-    /** Set when an artist row was tapped: that artist's songs are pulled to the top. */
     val artistFocus: String? = null,
-    /**
-     * What the user actually typed when we switched to YouTube's spelling suggestion
-     * ourselves ("nadin amizha" -> "nadin amizah"); null when no switch happened.
-     */
     val typedQuery: String? = null,
-    /** True when the user asked for the literal query, never auto-correct it. */
     val exact: Boolean = false,
 ) {
     fun tabState(tab: SearchTab): TabState = tabs[tab] ?: TabState()
 }
 
-/**
- * Holds search results so they survive navigating to an album/playlist and back.
- * Each category is fetched and paged independently; the "All" tab just shows the
- * first few rows of each, so switching to "See all" reuses what is already loaded.
- */
 class SearchViewModel : ViewModel() {
 
     private val _state = MutableStateFlow(SearchUiState())
     val state: StateFlow<SearchUiState> = _state.asStateFlow()
 
-    /** Bumped on every new search so late responses from an old query are dropped. */
     private var generation = 0
     private val jobs = mutableMapOf<SearchTab, Job>()
 
@@ -78,7 +61,6 @@ class SearchViewModel : ViewModel() {
         _state.update { it.copy(query = query) }
     }
 
-    /** Searches [override] if given (and shows it in the text field), else the typed query. */
     fun submit(
         override: String? = null,
         tab: SearchTab = SearchTab.ALL,
@@ -86,7 +68,6 @@ class SearchViewModel : ViewModel() {
         exact: Boolean = false,
         typedQuery: String? = null,
     ) {
-        // Collapse runs of spaces: "tulus  hati" and "tulus hati" are the same search.
         val q = (override ?: _state.value.query).trim().replace(Regex("\\s+"), " ")
         if (q.isBlank()) return
         generation++
@@ -96,11 +77,9 @@ class SearchViewModel : ViewModel() {
             exact = exact, typedQuery = typedQuery,
         )
         ensureLoaded(tab)
-        // The spelling hint comes with the songs page, so always fetch that one too.
         if (tab != SearchTab.ALL && tab != SearchTab.SONGS) ensureLoaded(SearchTab.SONGS)
     }
 
-    /** Songs by the focused artist first, keeping YouTube's order inside each group. */
     private fun focus(items: List<SimpleItem>): List<SimpleItem> {
         val name = _state.value.artistFocus?.trim()?.lowercase() ?: return items
         return items.sortedByDescending { item ->
@@ -138,12 +117,10 @@ class SearchViewModel : ViewModel() {
                 onSuccess = { more ->
                     setTab(tab) { cur ->
                         val merged = (cur.items + focus(more.items)).distinctBy { it.id }
-                        // No new rows means the cursor is stuck: stop paging instead of looping.
                         val next = if (merged.size == cur.items.size) null else more.nextPage
                         cur.copy(items = merged, nextPage = next, status = LoadStatus.LOADED)
                     }
                 },
-                // Keep what we have and the same cursor so scrolling again can retry.
                 onFailure = { setTab(tab) { it.copy(status = LoadStatus.LOADED) } }
             )
         }
@@ -172,10 +149,6 @@ class SearchViewModel : ViewModel() {
                     if (tab == SearchTab.SONGS && page.suggestion != null) {
                         val st = _state.value
                         if (!page.corrected && !st.exact && st.typedQuery == null && st.artistFocus == null) {
-                            // YouTube only *suggested* a fix, so the other categories were run
-                            // with the typo and come back thin or wrong (no artists, random
-                            // albums). Do what Apple Music does: search the fixed spelling and
-                            // offer the literal one as a link.
                             submit(page.suggestion, st.tab, typedQuery = st.submittedQuery)
                             return@launch
                         }
@@ -206,10 +179,8 @@ class SearchViewModel : ViewModel() {
     }
 
     companion object {
-        /** The four real categories, in display order. */
         val SEARCH_TABS = listOf(SearchTab.SONGS, SearchTab.ARTISTS, SearchTab.ALBUMS, SearchTab.PLAYLISTS, SearchTab.VIDEOS)
 
-        /** Loose comparison for "is this artist exactly what was typed". */
         fun normalize(s: String) = s.lowercase().filter { it.isLetterOrDigit() }
     }
 }

@@ -6,7 +6,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 
-/** A published GitHub release that carries an installable APK. */
 data class ReleaseInfo(
     val version: AppVersion,
     val tag: String,
@@ -18,10 +17,6 @@ data class ReleaseInfo(
     val pageUrl: String,
 )
 
-/**
- * Reads the latest release of [REPO] from the public GitHub API. No token is used: the
- * unauthenticated limit (60 requests / hour / IP) is far above one check every few hours.
- */
 object ReleaseApi {
     const val REPO = "Yenalie/VYORA"
     const val RELEASES_PAGE = "https://github.com/$REPO/releases"
@@ -33,7 +28,6 @@ object ReleaseApi {
         .followRedirects(true)
         .build()
 
-    /** Blocking; call off the main thread. Null when the latest release has no APK. */
     @Throws(IOException::class)
     fun latest(): ReleaseInfo? {
         val request = Request.Builder()
@@ -48,7 +42,6 @@ object ReleaseApi {
         }
     }
 
-    /** Parses a `releases/latest` response. Drafts and pre-releases are ignored. */
     fun parse(json: String): ReleaseInfo? {
         val root = JSONObject(json)
         if (root.optBoolean("draft") || root.optBoolean("prerelease")) return null
@@ -59,7 +52,6 @@ object ReleaseApi {
         for (i in 0 until assets.length()) {
             val asset = assets.optJSONObject(i) ?: continue
             if (!asset.optString("name").endsWith(".apk", ignoreCase = true)) continue
-            // Prefer the "-release" build when a release carries more than one APK.
             if (best == null || asset.optString("name").contains("release", ignoreCase = true)) best = asset
         }
         val apk = best ?: return null
@@ -75,7 +67,6 @@ object ReleaseApi {
         )
     }
 
-    /** Release notes are Markdown; the in-app dialog shows them as plain text. */
     internal fun cleanNotes(body: String): String = body
         .replace("\r\n", "\n")
         .lines()

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
@@ -75,7 +76,6 @@ import com.vyora.music.ui.theme.VyoraText
 import com.vyora.music.ui.theme.VyoraTextFaint
 import com.vyora.music.ui.theme.VyoraTextMuted
 
-/** Library sub-pages opened from the category list. */
 object LibraryPages {
     const val PLAYLISTS = "library/playlists"
     const val ALBUMS = "library/albums"
@@ -83,7 +83,6 @@ object LibraryPages {
     fun playlist(id: String) = "userplaylist/$id"
 }
 
-/** Pushed page scaffold shared by every Library sub-page: back button, large title, list. */
 @Composable
 private fun PushedListPage(
     title: String,
@@ -113,8 +112,6 @@ private fun PushedListPage(
         content()
     }
 }
-
-// ------------------------------------------------------------------ Playlists
 
 @Composable
 fun PlaylistsScreen(onBack: () -> Unit, onOpenPlaylist: (String) -> Unit) {
@@ -159,7 +156,6 @@ fun PlaylistsScreen(onBack: () -> Unit, onOpenPlaylist: (String) -> Unit) {
     }
 }
 
-/** A VYORA playlist: mosaic cover, title, Play / Shuffle, editable song list. */
 @Composable
 fun UserPlaylistScreen(
     id: String,
@@ -175,13 +171,14 @@ fun UserPlaylistScreen(
     val bottomInset = LocalBottomBarInset.current
 
     if (playlist == null) {
-        // Deleted (or not loaded yet): nothing to show but the way back.
         Box(Modifier.fillMaxSize().statusBarsPadding().padding(14.dp)) {
             GlassIconButton(Icons.Rounded.ArrowBackIosNew, stringResource(R.string.back), onBack, size = 44.dp, iconSize = 20.dp)
         }
         return
     }
     val songs = playlist.songs
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val downloadAllMsg = stringResource(R.string.toast_download_all_started)
 
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -197,7 +194,11 @@ fun UserPlaylistScreen(
                         GlassMenu(
                             expanded = menu,
                             onDismiss = { menu = false },
-                            actions = listOf(
+                            actions = listOfNotNull(
+                                if (songs.isNotEmpty()) MenuAction(stringResource(R.string.download_all), Icons.Default.FileDownload) {
+                                    com.vyora.music.data.download.Downloads.downloadAll(context, songs)
+                                    android.widget.Toast.makeText(context, downloadAllMsg, android.widget.Toast.LENGTH_SHORT).show()
+                                } else null,
                                 MenuAction(stringResource(R.string.playlist_rename), Icons.Default.Edit) { renaming = true },
                                 MenuAction(stringResource(R.string.playlist_delete), Icons.Default.Delete, accent = true) { deleting = true },
                             ),
@@ -258,8 +259,6 @@ fun UserPlaylistScreen(
     }
 }
 
-// ------------------------------------------------------------------ Albums
-
 @Composable
 fun AlbumsScreen(onBack: () -> Unit, onOpen: (SimpleItem) -> Unit) {
     val saved by LibraryManager.savedCollections.collectAsState()
@@ -286,9 +285,6 @@ fun AlbumsScreen(onBack: () -> Unit, onOpen: (SimpleItem) -> Unit) {
     }
 }
 
-// ------------------------------------------------------------------ Artists
-
-/** Artists in the library = everyone credited on favorites, playlists and saved albums. */
 data class LibraryArtist(val name: String, val art: String?, val id: String?)
 
 fun libraryArtists(liked: List<SimpleItem>, playlists: List<UserPlaylist>, saved: List<SimpleItem>): List<LibraryArtist> {
@@ -297,7 +293,6 @@ fun libraryArtists(liked: List<SimpleItem>, playlists: List<UserPlaylist>, saved
         val name = primaryArtist(item.artist)
         if (name.isBlank()) return@forEach
         val known = art[name]
-        // First picture wins; the channel id is filled in by whichever row has one.
         if (known == null) art[name] = LibraryArtist(name, item.thumbnail, item.artistId)
         else if (known.id == null && item.artistId != null) art[name] = known.copy(id = item.artistId)
     }
@@ -326,7 +321,6 @@ fun ArtistsScreen(onBack: () -> Unit, onOpenArtist: (String, String?, String?) -
                         Artwork(art, Modifier.size(56.dp), shape = CircleShape, placeholder = Icons.Default.Person, contentDescription = name)
                     },
                     title = name,
-                    // Song thumbnails are not the artist photo; the artist page fetches the real one.
                     onClick = { onOpenArtist(name, null, id) },
                     separator = i < artists.lastIndex,
                 )
@@ -335,7 +329,6 @@ fun ArtistsScreen(onBack: () -> Unit, onOpenArtist: (String, String?, String?) -
     }
 }
 
-/** Plain iOS list row: 56dp leading, title / subtitle, chevron, inset hairline. */
 @Composable
 fun LibraryListRow(
     leading: @Composable () -> Unit,

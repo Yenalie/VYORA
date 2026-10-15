@@ -98,6 +98,9 @@ com.vyora.music
 | Pengaturan | SharedPreferences `vyora_settings` (ditulis tertunda 300 ms) |
 | Cache lagu & video artwork | `cache/media_cache` (LRU, ukuran diatur di Pengaturan) |
 | Cache gambar | `cache/image_cache` (LRU 80 MB) |
+| Lagu yang diunduh | `files/offline_audio` (tanpa eviction, indeks di `exoplayer_internal.db`) |
+| Artwork lagu yang diunduh | `files/offline_art` |
+| Sesi Discord | SharedPreferences `vyora_discord` (AES-GCM, kunci di Android Keystore, tidak ikut backup) |
 
 Skema Room tiap versi diekspor ke `app/schemas/`. Menaikkan versi database wajib disertai
 `Migration` (jangan pakai destructive fallback, ini library pengguna). Data dari VYORA 1.x
@@ -112,3 +115,14 @@ lagu), playlist orang lain dan album yang disimpan. Riwayat putar tidak dikirim.
 saat offline diantre dan dikirim saat online. Sinkron otomatis saat aplikasi dibuka jika
 terakhir lebih dari 30 menit lalu.
 
+## Unduhan, Cast, dan Discord
+
+- Unduhan memakai Media3 `DownloadManager` (`data/download/Downloads.kt`) dengan foreground service
+  `VyoraDownloadService`. Audio offline selalu kualitas tinggi dan dibaca dulu oleh `YouTubeDataSource`
+  sebelum ke jaringan.
+- Cast memakai Media3 `CastPlayer` dengan receiver bawaan Google. Audio dialirkan lewat `CastProxy`,
+  server HTTP lokal ber-token di jaringan Wi-Fi yang sama, karena URL stream YouTube terikat ke perangkat.
+- Discord Rich Presence (`data/discord/`) terhubung ke gateway Discord dengan sesi akun pengguna dan
+  mengirim aktivitas tipe Listening. Ini bukan API resmi, jadi tampil hanya teks tanpa artwork.
+- Kartu lirik digambar di `ui/player/LyricsCard.kt` (1080x1920) lalu disimpan ke `Pictures/VYORA`
+  atau dibagikan lewat FileProvider `${applicationId}.files`.

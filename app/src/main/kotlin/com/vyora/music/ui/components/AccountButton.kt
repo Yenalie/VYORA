@@ -23,10 +23,6 @@ import com.vyora.music.ui.design.glassClickable
 import com.vyora.music.ui.design.liquidFill
 import com.vyora.music.ui.theme.GlassFillStrong
 
-/**
- * Apple Music's round account button in the large title: the YouTube profile photo while
- * signed in, a person glyph otherwise. Opens Settings.
- */
 @Composable
 fun AccountButton(onClick: () -> Unit, size: Dp = 44.dp) {
     val account by AccountStore.account.collectAsState()

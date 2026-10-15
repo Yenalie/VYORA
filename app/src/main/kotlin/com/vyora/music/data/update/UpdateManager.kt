@@ -35,19 +35,16 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import okhttp3.Request
 
-/** Where the in-app updater is. Every state that knows about a release carries it. */
 sealed interface UpdateState {
     data object Idle : UpdateState
     data object Checking : UpdateState
     data object UpToDate : UpdateState
     data class Available(val release: ReleaseInfo) : UpdateState
-    /** [progress] is 0..1, or -1 while the size is unknown. */
     data class Downloading(val release: ReleaseInfo, val progress: Float) : UpdateState
     data class ReadyToInstall(val release: ReleaseInfo, val file: File) : UpdateState
     data class Failed(val reason: UpdateError, val release: ReleaseInfo?) : UpdateState
 }
 
-/** The release this state is about, if any. */
 val UpdateState.release: ReleaseInfo?
     get() = when (this) {
         is UpdateState.Available -> release
@@ -58,26 +55,12 @@ val UpdateState.release: ReleaseInfo?
     }
 
 enum class UpdateError {
-    /** GitHub could not be reached. */
     NETWORK,
-    /** The APK download broke off. */
     DOWNLOAD,
-    /** The file is not a newer VYORA build. */
     INVALID_APK,
-    /** Signed with another key: Android would refuse to install it over this one. */
     SIGNATURE,
 }
 
-/**
- * In-app updates from GitHub Releases.
- *
- * - On launch (at most every [LAUNCH_CHECK_INTERVAL_MS]) and from a periodic background job
- *   ([UpdateWorker]) the latest release is compared with this build's versionName.
- * - A newer one posts a notification (once per version) and opens the update dialog in
- *   the app. "Later" hides the dialog for that version; Settings still shows it.
- * - "Update" downloads the APK into the cache, checks it is a newer VYORA build signed with
- *   the same key, then hands it to the system installer.
- */
 object UpdateManager {
     private const val TAG = "VYORA-Update"
     private const val PREFS = "vyora_update"
@@ -91,14 +74,12 @@ object UpdateManager {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var job: Job? = null
-    /** The install-permission screen was opened; install once the user comes back with it. */
     @Volatile private var installAfterPermission = false
 
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val state: StateFlow<UpdateState> = _state.asStateFlow()
 
     private val _prompt = MutableStateFlow(false)
-    /** Whether the update dialog is showing. */
     val prompt: StateFlow<Boolean> = _prompt.asStateFlow()
 
     val currentVersion: AppVersion? get() = AppVersion.parse(BuildConfig.VERSION_NAME)
@@ -113,9 +94,6 @@ object UpdateManager {
         return release.version > current
     }
 
-    // ------------------------------------------------------------------------- checking
-
-    /** Quiet check when the app opens. Shows the dialog for a version not dismissed yet. */
     fun checkOnLaunch(context: Context) {
         if (!SettingsRepository.current.autoUpdateCheck) return
         val prefs = prefs(context)
@@ -124,7 +102,6 @@ object UpdateManager {
         check(context, manual = false)
     }
 
-    /** [manual]: from Settings, so the dialog opens even for a dismissed version. */
     fun check(context: Context, manual: Boolean) {
         val app = context.applicationContext
         if (job?.isActive == true) return
@@ -149,7 +126,6 @@ object UpdateManager {
         }
     }
 
-    /** Background check from [UpdateWorker]. Returns false on a network error (retry). */
     internal fun checkInBackground(context: Context): Boolean {
         val release = runCatching { ReleaseApi.latest() }.getOrElse {
             Log.w(TAG, "Background update check failed", it)
@@ -165,31 +141,24 @@ object UpdateManager {
         return true
     }
 
-    // ------------------------------------------------------------------------- dialog
-
     fun showPrompt() {
         if (_state.value.release != null) _prompt.value = true
     }
 
-    /** "Later": hide the dialog and don't open it by itself again for this version. */
     fun dismiss(context: Context) {
         _prompt.value = false
         _state.value.release?.let { prefs(context).edit { putString(KEY_DISMISSED, it.version.toString()) } }
     }
 
-    /** Close the dialog without remembering anything (e.g. while a download runs). */
     fun hidePrompt() {
         _prompt.value = false
     }
 
-    /** From a notification tap: open the dialog, checking first if nothing is known yet. */
     fun handleIntent(context: Context, intent: Intent?) {
         if (intent?.getBooleanExtra(EXTRA_SHOW_UPDATE, false) != true) return
         intent.removeExtra(EXTRA_SHOW_UPDATE)
         if (_state.value.release != null) showPrompt() else check(context, manual = true)
     }
-
-    // ------------------------------------------------------------------------- download
 
     fun download(context: Context) {
         val app = context.applicationContext
@@ -199,7 +168,6 @@ object UpdateManager {
         job = scope.launch {
             _state.value = UpdateState.Downloading(release, if (release.apkSize > 0) 0f else -1f)
             val dir = File(app.cacheDir, "updates").apply { mkdirs() }
-            // Older downloads are useless once a newer one is being fetched.
             dir.listFiles()?.forEach { it.delete() }
             val target = File(dir, "VYORA-${release.version}.apk")
             val part = File(dir, target.name + ".part")
@@ -256,7 +224,6 @@ object UpdateManager {
         _state.value = if (release != null) UpdateState.Available(release) else UpdateState.Idle
     }
 
-    /** Null when [apk] is a newer VYORA build Android will accept over this one. */
     private fun verify(context: Context, apk: File): UpdateError? {
         val pm = context.packageManager
         val flags = if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else 0
@@ -269,15 +236,12 @@ object UpdateManager {
             }.getOrNull()
             val mine = installed?.signerDigests().orEmpty()
             val theirs = archive.signerDigests()
-            // Only judge when both sides could be read; otherwise let the installer decide.
             if (mine.isNotEmpty() && theirs.isNotEmpty() && mine.intersect(theirs).isEmpty()) {
                 return UpdateError.SIGNATURE
             }
         }
         return null
     }
-
-    // ------------------------------------------------------------------------- install
 
     fun install(context: Context) {
         val ready = _state.value as? UpdateState.ReadyToInstall ?: return
@@ -286,14 +250,13 @@ object UpdateManager {
             return
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
-            // "Install unknown apps" has to be allowed once for VYORA.
             installAfterPermission = true
             val settings = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             runCatching { context.startActivity(settings) }
             return
         }
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.updates", ready.file)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", ready.file)
         val intent = Intent(Intent.ACTION_VIEW)
             .setDataAndType(uri, "application/vnd.android.package-archive")
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -301,7 +264,6 @@ object UpdateManager {
             .onFailure { Log.w(TAG, "No installer", it) }
     }
 
-    /** Back in the app: continue an install that was waiting for the permission. */
     fun onResume(context: Context) {
         if (!installAfterPermission) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) return
@@ -309,14 +271,11 @@ object UpdateManager {
         install(context)
     }
 
-    /** The auto-check switch in Settings changed. */
     fun setAutoCheck(context: Context, enabled: Boolean) {
         SettingsRepository.update { it.copy(autoUpdateCheck = enabled) }
         UpdateWorker.schedule(context, enabled)
         if (!enabled) cancelNotification(context)
     }
-
-    // ------------------------------------------------------------------------- notification
 
     private fun createChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -364,8 +323,6 @@ object UpdateManager {
     private fun cancelNotification(context: Context) {
         NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID)
     }
-
-    // ------------------------------------------------------------------------- helpers
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

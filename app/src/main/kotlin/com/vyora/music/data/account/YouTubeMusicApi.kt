@@ -14,13 +14,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** The session was refused (signed out elsewhere, cookies expired): sign in again. */
 class SessionExpiredException(message: String) : IOException(message)
 
-/**
- * Signed-in calls to YouTube Music's web API (the same requests music.youtube.com makes),
- * authenticated with the browser session cookies captured at sign-in.
- */
 object YouTubeMusicApi {
     private const val MAX_PAGES = 40
     private val JSON = "application/json; charset=utf-8".toMediaType()
@@ -30,15 +25,9 @@ object YouTubeMusicApi {
         .readTimeout(YouTubeConfig.READ_TIMEOUT_SEC, TimeUnit.SECONDS)
         .build()
 
-    // ------------------------------------------------------------------------- reading
-
     suspend fun account(cookie: String, authUser: Int = 0): YouTubeAccount? =
         InnerTubeParser.account(post("account/account_menu", JSONObject(), cookie, authUser))?.copy(authUser = authUser)
 
-    /**
-     * Every page of a library list. [complete] is false when the list was cut at
-     * [MAX_PAGES]; the sync then never deletes local rows missing from it.
-     */
     data class FullList<T>(val items: List<T>, val complete: Boolean)
 
     suspend fun likedSongs(): FullList<RemoteSong> = allPages(browse(YouTubeConfig.BROWSE_LIKED_SONGS), InnerTubeParser::songs)
@@ -49,10 +38,6 @@ object YouTubeMusicApi {
 
     data class PlaylistContent(val title: String?, val editable: Boolean, val songs: FullList<RemoteSong>)
 
-    /**
-     * A playlist page. Songs are only read in full for playlists the user owns; for anyone
-     * else's (saved) playlist the library keeps a link, not a copy.
-     */
     suspend fun playlist(playlistId: String, onlyIfEditable: Boolean = false): PlaylistContent {
         val first = browse(YouTubeConfig.BROWSE_PLAYLIST_PREFIX + playlistId)
         val editable = InnerTubeParser.isEditable(first)
@@ -60,13 +45,10 @@ object YouTubeMusicApi {
         return PlaylistContent(title = InnerTubeParser.playlistTitle(first), editable = editable, songs = songs)
     }
 
-    // ------------------------------------------------------------------------- writing
-
     suspend fun like(videoId: String) { post("like/like", JSONObject().put("target", JSONObject().put("videoId", videoId))) }
 
     suspend fun unlike(videoId: String) { post("like/removelike", JSONObject().put("target", JSONObject().put("videoId", videoId))) }
 
-    /** Saving an album or someone's playlist to the library is a "like" of that playlist. */
     suspend fun savePlaylist(playlistId: String) { post("like/like", JSONObject().put("target", JSONObject().put("playlistId", playlistId))) }
 
     suspend fun unsavePlaylist(playlistId: String) { post("like/removelike", JSONObject().put("target", JSONObject().put("playlistId", playlistId))) }
@@ -94,8 +76,6 @@ object YouTubeMusicApi {
     private suspend fun editPlaylist(playlistId: String, action: JSONObject) {
         post("browse/edit_playlist", JSONObject().put("playlistId", playlistId).put("actions", JSONArray().put(action)))
     }
-
-    // ---------------------------------------------------------------------- transport
 
     private suspend fun browse(browseId: String): JSONObject = post("browse", JSONObject().put("browseId", browseId))
 
@@ -142,7 +122,6 @@ object YouTubeMusicApi {
                 !response.isSuccessful -> throw IOException("HTTP ${response.code} on $endpoint")
             }
             val json = runCatching { JSONObject(text) }.getOrElse { throw IOException("Bad JSON from $endpoint") }
-            // A signed-out session still answers 200, with a "logged out" flag.
             if (json.optJSONObject("responseContext")?.let(::isLoggedOut) == true && endpoint != "account/account_menu") {
                 throw SessionExpiredException("Logged out")
             }
@@ -175,7 +154,6 @@ object YouTubeMusicApi {
     }
 }
 
-/** The "SAPISIDHASH" header web clients sign their requests with. */
 internal object InnerTubeAuth {
     fun authorization(cookie: String, nowSeconds: Long = System.currentTimeMillis() / 1000, origin: String = YouTubeConfig.MUSIC_ORIGIN): String? {
         val cookies = parseCookies(cookie)
@@ -189,7 +167,6 @@ internal object InnerTubeAuth {
             if (i <= 0) null else part.substring(0, i).trim() to part.substring(i + 1).trim()
         }.toMap()
 
-    /** A browser session is usable once it has the cookie the signature needs. */
     fun hasSession(cookie: String?): Boolean {
         if (cookie.isNullOrBlank()) return false
         val c = parseCookies(cookie)

@@ -28,23 +28,11 @@ import com.vyora.music.data.youtube.YouTubeClient
 import com.vyora.music.playback.PlayerManager
 import com.vyora.music.ui.design.Artwork
 
-/**
- * iOS 26 "matched geometry" between the mini player and Now Playing: while the sheet moves,
- * one artwork flies from the mini player's thumbnail to the big cover (and back), and the
- * two real artworks hide. Everything is read in draw/layer blocks, so a drag never
- * recomposes anything.
- *
- * Coordinates are root coordinates. The big cover's spot is measured relative to the
- * sheet's moving box, then offset by the sheet's fixed container: that is where it will be
- * once the sheet is fully open, regardless of where the sheet is right now.
- */
 @Stable
 class ArtworkFlight {
-    /** Mini player thumbnail, as currently on screen. */
     var mini by mutableStateOf(Rect.Zero)
     var miniCornerPx by mutableFloatStateOf(0f)
 
-    /** Big cover at rest (sheet open). Zero while Now Playing shows Lyrics / Queue. */
     var full by mutableStateOf(Rect.Zero)
     var fullCornerPx by mutableFloatStateOf(0f)
 
@@ -53,13 +41,11 @@ class ArtworkFlight {
 
     val ready: Boolean get() = mini != Rect.Zero && full != Rect.Zero
 
-    /** True when the flying copy should be drawn instead of the real artworks. */
     fun inFlight(progress: Float) = ready && progress > 0.001f && progress < 0.999f
 }
 
 val LocalArtworkFlight = staticCompositionLocalOf<ArtworkFlight?> { null }
 
-/** On the mini player thumbnail: reports where it is and hides it during the flight. */
 @Composable
 fun Modifier.miniFlightSource(sheet: PlayerSheetState?, corner: Dp): Modifier {
     val flight = LocalArtworkFlight.current ?: return this
@@ -69,7 +55,6 @@ fun Modifier.miniFlightSource(sheet: PlayerSheetState?, corner: Dp): Modifier {
         .graphicsLayer { alpha = if (sheet != null && flight.inFlight(sheet.progress.value)) 0f else 1f }
 }
 
-/** On the Now Playing cover. [enabled] = false (Lyrics / Queue mode) disables the flight. */
 @Composable
 fun Modifier.fullFlightTarget(sheet: PlayerSheetState, corner: Dp, enabled: Boolean): Modifier {
     val flight = LocalArtworkFlight.current ?: return this
@@ -95,11 +80,6 @@ internal fun Modifier.sheetContainer(flight: ArtworkFlight?) =
 internal fun Modifier.sheetContent(flight: ArtworkFlight?) =
     if (flight == null) this else onGloballyPositioned { flight.sheetContent = it }
 
-/**
- * The flying copy. Laid out once at the big cover's size and moved with a layer transform
- * (scale + translate), so each frame is just a matrix change. Its path leads the sheet a
- * little (eased), the way the iOS cover arrives slightly before the sheet settles.
- */
 @Composable
 fun ArtworkFlightOverlay(sheet: PlayerSheetState, flight: ArtworkFlight) {
     val thumbnail by PlayerManager.currentThumbnail.collectAsState()
@@ -116,7 +96,6 @@ fun ArtworkFlightOverlay(sheet: PlayerSheetState, flight: ArtworkFlight) {
                     alpha = 0f
                     return@graphicsLayer
                 }
-                // Ease-out on the way up: the cover gets there a touch before the sheet.
                 val t = 1f - (1f - p) * (1f - p)
                 val from = flight.mini
                 val to = flight.full
@@ -132,7 +111,6 @@ fun ArtworkFlightOverlay(sheet: PlayerSheetState, flight: ArtworkFlight) {
                 translationX = pos.x
                 translationY = pos.y
                 alpha = 1f
-                // Corner radius in layer space so it looks right after scaling.
                 val corner = flight.miniCornerPx + (flight.fullCornerPx - flight.miniCornerPx) * t
                 shape = RoundedCornerShape(corner / s.coerceAtLeast(0.01f))
                 clip = true
@@ -143,5 +121,4 @@ fun ArtworkFlightOverlay(sheet: PlayerSheetState, flight: ArtworkFlight) {
     }
 }
 
-/** The player sheet, for components that need its progress in draw (mini player). */
 val LocalPlayerSheet = staticCompositionLocalOf<PlayerSheetState?> { null }

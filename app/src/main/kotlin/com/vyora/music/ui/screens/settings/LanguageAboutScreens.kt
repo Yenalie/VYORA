@@ -43,7 +43,6 @@ fun LanguageScreen(onBack: () -> Unit) {
                 AppLanguage.entries.forEachIndexed { i, lang ->
                     SettingsChoiceRow(
                         title = languageLabel(lang),
-                        // Native name stays readable whatever the current UI language is.
                         subtitle = if (lang == AppLanguage.SYSTEM) null else lang.tag.uppercase(),
                         selected = settings.language == lang,
                         divider = i < AppLanguage.entries.lastIndex,

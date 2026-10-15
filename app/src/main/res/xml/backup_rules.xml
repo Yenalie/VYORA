@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 11 and older: same policy as data_extraction_rules.xml. -->
 <full-backup-content>
     <exclude domain="sharedpref" path="vyora_account.xml" />
     <exclude domain="sharedpref" path="vyora_sync.xml" />
+    <exclude domain="sharedpref" path="vyora_discord.xml" />
+    <exclude domain="file" path="offline_audio/" />
+    <exclude domain="file" path="offline_art/" />
+    <exclude domain="database" path="exoplayer_internal.db" />
 </full-backup-content>

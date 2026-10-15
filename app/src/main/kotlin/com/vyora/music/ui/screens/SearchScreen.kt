@@ -110,7 +110,6 @@ import com.vyora.music.ui.theme.VyoraText
 import com.vyora.music.ui.theme.VyoraTextFaint
 import com.vyora.music.ui.theme.VyoraTextMuted
 
-/** How many rows each section shows on the "All" tab before "See all". */
 private val ALL_TAB_LIMITS = mapOf(
     SearchTab.SONGS to 5,
     SearchTab.ARTISTS to 3,
@@ -122,7 +121,6 @@ private val ALL_TAB_LIMITS = mapOf(
 @Composable
 fun SearchScreen(
     onPlay: (List<SimpleItem>, Int) -> Unit,
-    /** Album/playlist row tapped; the row is passed so the page can show its cover at once. */
     onOpenPlaylist: (SimpleItem) -> Unit,
     modifier: Modifier = Modifier,
     onOpenArtist: (SimpleItem) -> Unit = {},
@@ -141,7 +139,6 @@ fun SearchScreen(
         focusManager.clearFocus()
     }
 
-    // One place that decides what tapping a row does, whichever tab it is on.
     fun openItem(item: SimpleItem, queue: List<SimpleItem>, index: Int) {
         when (item.type) {
             ItemType.SONG -> onPlay(queue, index)
@@ -157,7 +154,6 @@ fun SearchScreen(
                 .statusBarsPadding()
                 .padding(start = Spacing.ScreenH, end = Spacing.ScreenH, top = 18.dp)
         ) {
-            // The big title steps aside once results are on screen, so the list gets the room.
             AnimatedVisibility(visible = !searching, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
                 LargeTitleHeader(
                     title = stringResource(R.string.search),
@@ -195,7 +191,6 @@ fun SearchScreen(
             } else if (!searching) {
                 Discovery(onMood = { submit(it) }, onFocusSearch = { runCatching { fieldFocus.requestFocus() } })
             } else {
-                // key(): every tab gets its own scroll position and load-more trigger.
                 key(state.tab) {
                     if (state.tab == SearchTab.ALL) {
                         AllTab(
@@ -219,10 +214,6 @@ fun SearchScreen(
     }
 }
 
-/**
- * iOS search field: grey rounded field with magnifier, placeholder, clear (x) button and a
- * "Cancel" text button that slides in while editing.
- */
 @Composable
 private fun GlassSearchField(
     focusRequester: FocusRequester,
@@ -239,7 +230,6 @@ private fun GlassSearchField(
             Modifier
                 .weight(1f)
                 .height(46.dp)
-                // iOS 26 search field: a liquid-glass capsule.
                 .liquidFill(shape = GlassShapes.Pill, fill = if (focused) GlassFillStrong else GlassFill)
                 .padding(start = 14.dp, end = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -288,7 +278,6 @@ private fun GlassSearchField(
     }
 }
 
-/** "Recent Searches" with a Clear action, shown while the empty field is focused. */
 @Composable
 private fun RecentSearches(queries: List<String>, onPick: (String) -> Unit) {
     val bottomInset = LocalBottomBarInset.current
@@ -302,7 +291,6 @@ private fun RecentSearches(queries: List<String>, onPick: (String) -> Unit) {
             )
         }
         item(key = "recent_group") {
-          // Plain iOS list, no card: glass stays on controls (search field, tab bar).
           Column(Modifier.fillMaxWidth()) {
           queries.forEachIndexed { i, q ->
             Column {
@@ -318,7 +306,6 @@ private fun RecentSearches(queries: List<String>, onPick: (String) -> Unit) {
                     Text(q, color = VyoraText, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     Icon(
                         Icons.Default.Close, stringResource(R.string.remove), tint = VyoraTextFaint,
-                        // 44dp hit area around a small glyph, so it is easy to hit but stays quiet.
                         modifier = Modifier.size(44.dp).glassClickable(pressedScale = 0.85f) { SearchHistory.remove(q) }.padding(12.dp),
                     )
                 }
@@ -330,8 +317,6 @@ private fun RecentSearches(queries: List<String>, onPick: (String) -> Unit) {
     }
 }
 
-// ------------------------------------------------------------------ tabs
-
 @Composable
 private fun AllTab(
     state: SearchUiState,
@@ -341,7 +326,6 @@ private fun AllTab(
 ) {
     val bottomInset = LocalBottomBarInset.current
     val sections = SearchViewModel.SEARCH_TABS.map { it to state.tabState(it) }
-    // iOS "Top Result": an artist whose name is exactly what was typed goes first, big.
     val wanted = SearchViewModel.normalize(state.corrected.takeIf { it }?.let { state.suggestion } ?: state.submittedQuery)
     val topArtist = state.tabState(SearchTab.ARTISTS).items.firstOrNull()
         ?.takeIf { wanted.isNotEmpty() && SearchViewModel.normalize(it.title) == wanted }
@@ -369,7 +353,6 @@ private fun AllTab(
             }
             sections.forEach { (tab, section) ->
                 val limit = ALL_TAB_LIMITS.getValue(tab)
-                // A category that finished empty is hidden rather than shown as a blank header.
                 if (section.status == LoadStatus.LOADED && section.items.isEmpty()) return@forEach
                 if (tab == SearchTab.ARTISTS && topArtist != null && section.items.size <= 1 && section.nextPage == null) return@forEach
 
@@ -388,7 +371,6 @@ private fun AllTab(
                         TextButton(onClick = { onRetry(tab) }) { Text(stringResource(R.string.try_again), color = VyoraAccent) }
                     }
                     else -> {
-                        // The top result isn't repeated in its own section.
                         val rows = if (tab == SearchTab.ARTISTS && topArtist != null) section.items.drop(1) else section.items
                         itemRows(tab, rows.take(limit), fullQueue = rows, onItem)
                     }
@@ -421,7 +403,6 @@ private fun SingleTab(
                     info.totalItemsCount > 0 && last >= info.totalItemsCount - 4
                 }
             }
-            // Re-keyed on size/status so it fires again if the new page still leaves us near the end.
             LaunchedEffect(nearEnd, tabState.items.size, tabState.status) {
                 if (nearEnd) onLoadMore()
             }
@@ -448,12 +429,9 @@ private fun LazyListScope.itemRows(
     onItem: (SimpleItem, List<SimpleItem>, Int) -> Unit
 ) {
     itemsIndexed(shown, key = { _, item -> "${tab.name}_${item.id}" }) { index, item ->
-        // Songs always queue the whole list so playback continues past the visible rows.
         ItemRow(item, onClick = { onItem(item, fullQueue, index) })
     }
 }
-
-// ------------------------------------------------------------------ pieces
 
 @Composable
 private fun TabChips(selected: SearchTab, onSelect: (SearchTab) -> Unit) {
@@ -464,13 +442,8 @@ private fun TabChips(selected: SearchTab, onSelect: (SearchTab) -> Unit) {
     }
 }
 
-/**
- * iOS-style spelling line under the chips. Corrected: a quiet note. Only a suggestion:
- * tappable, searches the suggestion.
- */
 @Composable
 private fun SpellingHint(state: SearchUiState, onPick: (String, Boolean) -> Unit) {
-    // We switched to the fixed spelling ourselves: say so, offer the literal query.
     val typed = state.typedQuery
     val shown = when {
         typed != null -> state.submittedQuery
@@ -557,7 +530,6 @@ private fun EmptyBlock() {
     )
 }
 
-/** [query] is a string resource too, so each language searches in its own words. */
 private data class Mood(val label: Int, val query: Int, val icon: ImageVector, val colors: List<Color>)
 
 private val Moods = listOf(
@@ -574,7 +546,6 @@ private val Moods = listOf(
 @Composable
 private fun Discovery(onMood: (String) -> Unit, onFocusSearch: () -> Unit) {
     val bottomInset = LocalBottomBarInset.current
-    // iOS: tap Search again -> back to the top, and once there, into the search field.
     val listState = rememberLazyListState()
     OnTabReselect("search") {
         if (listState.isAtTop) onFocusSearch() else listState.scrollToTopSmooth()
@@ -600,7 +571,6 @@ private fun Discovery(onMood: (String) -> Unit, onFocusSearch: () -> Unit) {
     }
 }
 
-/** Apple Music "Browse Categories" tile: rich colour, glyph tilted top-right, label bottom-left. */
 @Composable
 private fun MoodTile(label: String, icon: ImageVector, colors: List<Color>, modifier: Modifier, onClick: () -> Unit) {
     Box(

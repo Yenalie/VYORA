@@ -66,20 +66,14 @@ import com.vyora.music.ui.theme.VyoraText
 import com.vyora.music.ui.theme.VyoraTextFaint
 import com.vyora.music.ui.theme.VyoraTextMuted
 
-/**
- * App-wide actions any row or menu can trigger without knowing about navigation:
- * "Go to Artist" and "Add to a Playlist…". Provided once in MainActivity.
- */
 @Stable
 class AppActions(
-    /** [id] = YouTube channel id when known (keeps same-name artists apart). */
     val openArtist: (name: String, art: String?, id: String?) -> Unit = { _, _, _ -> },
     val addToPlaylist: (SimpleItem) -> Unit = {},
 )
 
 val LocalAppActions = staticCompositionLocalOf { AppActions() }
 
-/** Holds the song waiting for "Add to a Playlist…"; null when the picker is closed. */
 @Stable
 class PlaylistPickerState {
     var pending by mutableStateOf<SimpleItem?>(null)
@@ -89,13 +83,8 @@ class PlaylistPickerState {
     fun close() { pending = null }
 }
 
-/** Shared dialog chrome: grouped-cell colour and the large continuous corner iOS alerts use. */
 private val DialogShape = RoundedCornerShape(26.dp)
 
-/**
- * Apple Music "Add to a Playlist…": "New Playlist…" first, then the user's playlists with
- * their cover mosaic. Picking one adds the song and confirms with a short toast.
- */
 @Composable
 fun PlaylistPickerHost(state: PlaylistPickerState) {
     val item = state.pending ?: return
@@ -188,7 +177,6 @@ private fun PickerRow(
     }
 }
 
-/** Name prompt used for both "New Playlist" and "Rename". */
 @Composable
 fun PlaylistNameDialog(title: String, initial: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var name by remember { mutableStateOf(initial) }
@@ -230,10 +218,6 @@ fun PlaylistNameDialog(title: String, initial: String, onDismiss: () -> Unit, on
     )
 }
 
-/**
- * Playlist artwork the way Apple Music draws it: one cover when there is one song, a 2x2
- * mosaic of the first four covers otherwise, a music-list glyph when empty.
- */
 @Composable
 fun PlaylistCover(playlist: UserPlaylist, size: Dp, modifier: Modifier = Modifier) {
     val covers = playlist.covers

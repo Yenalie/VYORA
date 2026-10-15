@@ -21,8 +21,9 @@ import com.vyora.music.ui.theme.VYORATheme
 import com.vyora.music.ui.theme.resolveDarkTheme
 
 class MainActivity : ComponentActivity() {
+    private val notificationPermission =
+        registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
     override fun attachBaseContext(newBase: Context) {
-        // Per-app language: wrap the base context before any resource is resolved.
         super.attachBaseContext(LocaleHelper.wrap(newBase, SettingsRepository.languageTag(newBase)))
     }
 
@@ -34,7 +35,6 @@ class MainActivity : ComponentActivity() {
             ThemeMode.LIGHT -> false
             ThemeMode.DARK -> true
         }
-        // Window colour matches the in-app appearance before Compose draws its first frame.
         setTheme(if (startDark) R.style.Theme_Vyora_Dark else R.style.Theme_Vyora_Light)
         super.onCreate(savedInstanceState)
         applySystemBars(startDark)
@@ -51,8 +51,20 @@ class MainActivity : ComponentActivity() {
                 VyoraAppRoot(settings)
             }
         }
-        // Opened from the "update available" notification.
         UpdateManager.handleIntent(this, intent)
+        askForNotifications()
+    }
+
+    private fun askForNotifications() {
+        if (android.os.Build.VERSION.SDK_INT < 33) return
+        val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+            this, android.Manifest.permission.POST_NOTIFICATIONS,
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (granted) return
+        val prefs = getSharedPreferences("vyora_prompts", MODE_PRIVATE)
+        if (prefs.getBoolean("notifications_asked", false)) return
+        prefs.edit().putBoolean("notifications_asked", true).apply()
+        notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -63,8 +75,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Returning from "Install unknown apps" with the permission now granted.
         UpdateManager.onResume(this)
+        com.vyora.music.data.download.Downloads.resumePending(this)
     }
 
     override fun onStop() {
@@ -72,7 +84,6 @@ class MainActivity : ComponentActivity() {
         SettingsRepository.flush()
     }
 
-    /** Status / navigation bar icons follow the app appearance, not the system one. */
     private fun applySystemBars(dark: Boolean) {
         val transparent = android.graphics.Color.TRANSPARENT
         val style = if (dark) SystemBarStyle.dark(transparent) else SystemBarStyle.light(transparent, transparent)

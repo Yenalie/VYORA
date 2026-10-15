@@ -1,15 +1,5 @@
 name: Release
 
-# Push a tag like v1.5.0 and this builds, signs and publishes the APK as a GitHub release.
-# Installed apps find it through the in-app updater (GitHub "latest release" API).
-#
-# Repository secrets (Settings > Secrets and variables > Actions):
-#   VYORA_KEYSTORE_BASE64    base64 of the .jks file (base64 -w0 release-key.jks)
-#   VYORA_KEYSTORE_PASSWORD  store password
-#   VYORA_KEY_ALIAS          key alias
-#   VYORA_KEY_PASSWORD       key password
-# Always sign with the same key as earlier releases, or Android refuses to update over them.
-
 on:
   push:
     tags: [ 'v*' ]

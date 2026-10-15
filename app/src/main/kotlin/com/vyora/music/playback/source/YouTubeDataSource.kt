@@ -19,15 +19,6 @@ import com.vyora.music.data.youtube.SimpleItem
 import com.vyora.music.data.youtube.StreamResolver
 import java.io.IOException
 
-/**
- * Data sources for YouTube items. A queue entry's URI is the watch URL; the real stream URL
- * is looked up right before ExoPlayer opens it, then read through [MediaCache].
- *
- * The cache key is per video (and per audio quality), not per stream URL, because YouTube
- * URLs change every few hours. The itag of the cached file is stored with it, and the next
- * resolve asks for the same itag again so a cached half and a downloaded half always come
- * from the same file. If YouTube no longer offers that itag the stale bytes are dropped.
- */
 @OptIn(UnstableApi::class)
 object YouTubeDataSource {
     private const val CONNECT_TIMEOUT_MS = 15_000
@@ -35,17 +26,15 @@ object YouTubeDataSource {
     private const val META_ITAG = "vyora-itag"
     private const val KEY_AUDIO = "yt-audio"
     private const val KEY_VIDEO = "yt-video"
+    private const val NO_OFFLINE = "yt-none/"
+    val OFFLINE_QUALITY = AudioQuality.HIGH
 
-    /** What the playback service plays. */
     fun audioFactory(context: Context): DataSource.Factory = factory(context, Kind.AUDIO)
 
-    /** What the moving artwork plays (video only, no sound). */
     fun videoFactory(context: Context): DataSource.Factory = factory(context, Kind.VIDEO)
 
-    /** The URI to give the artwork player for [videoId]. */
     fun videoUri(videoId: String): Uri = Uri.parse(SimpleItem.watchUrl(videoId))
 
-    /** `https://www.youtube.com/watch?v=ID` -> `ID`; null for anything else. */
     fun videoIdOf(uri: Uri?): String? {
         val host = uri?.host ?: return null
         if (!host.endsWith("youtube.com")) return null
@@ -54,19 +43,33 @@ object YouTubeDataSource {
 
     private enum class Kind { AUDIO, VIDEO }
 
+    fun downloadUpstreamFactory(context: Context): DataSource.Factory =
+        ResolvingDataSource.Factory(http(), Resolver(OfflineCache.get(context), Kind.AUDIO, OFFLINE_QUALITY))
+
+    private fun http(): DataSource.Factory = DefaultHttpDataSource.Factory()
+        .setAllowCrossProtocolRedirects(true)
+        .setConnectTimeoutMs(CONNECT_TIMEOUT_MS)
+        .setReadTimeoutMs(READ_TIMEOUT_MS)
+
     private fun factory(context: Context, kind: Kind): DataSource.Factory {
-        // No User-Agent here: each request carries the one of the client its URL belongs to.
-        val http = DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(CONNECT_TIMEOUT_MS)
-            .setReadTimeoutMs(READ_TIMEOUT_MS)
         val cache = MediaCache.get(context)
-        return CacheDataSource.Factory()
+        val streaming = CacheDataSource.Factory()
             .setCache(cache)
-            .setUpstreamDataSourceFactory(ResolvingDataSource.Factory(http, Resolver(cache, kind)))
+            .setUpstreamDataSourceFactory(ResolvingDataSource.Factory(http(), Resolver(cache, kind)))
             .setCacheKeyFactory { spec -> cacheKey(spec, kind) }
-            // A broken cache file is skipped, not fatal: the song streams instead.
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+        if (kind != Kind.AUDIO) return streaming
+        return CacheDataSource.Factory()
+            .setCache(OfflineCache.get(context))
+            .setUpstreamDataSourceFactory(streaming)
+            .setCacheWriteDataSinkFactory(null)
+            .setCacheKeyFactory { spec -> offlineKey(spec) }
+            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+    }
+
+    private fun offlineKey(spec: DataSpec): String {
+        val id = videoIdOf(spec.uri) ?: return NO_OFFLINE + (spec.key ?: spec.uri.toString())
+        return if (OfflineCache.isComplete(id)) OfflineCache.keyFor(id) else NO_OFFLINE + id
     }
 
     private fun cacheKey(spec: DataSpec, kind: Kind): String {
@@ -77,10 +80,14 @@ object YouTubeDataSource {
         }
     }
 
-    private class Resolver(private val cache: Cache, private val kind: Kind) : ResolvingDataSource.Resolver {
+    private class Resolver(
+        private val cache: Cache,
+        private val kind: Kind,
+        private val fixedQuality: AudioQuality? = null,
+    ) : ResolvingDataSource.Resolver {
         @Throws(IOException::class)
         override fun resolveDataSpec(dataSpec: DataSpec): DataSpec {
-            val videoId = videoIdOf(dataSpec.uri) ?: return dataSpec // already a direct URL
+            val videoId = videoIdOf(dataSpec.uri) ?: return dataSpec
             val key = dataSpec.key
             val cachedItag = key?.let { cache.getContentMetadata(it).get(META_ITAG, -1L).toInt() }?.takeIf { it > 0 }
 
@@ -104,7 +111,7 @@ object YouTubeDataSource {
                 .build()
         }
 
-        private fun qualityOf(key: String?): AudioQuality =
+        private fun qualityOf(key: String?): AudioQuality = fixedQuality ?:
             key?.substringAfterLast('/')?.let { name -> AudioQuality.entries.firstOrNull { it.name == name } }
                 ?: SettingsRepository.current.audioQuality
     }

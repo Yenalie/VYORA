@@ -15,23 +15,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONObject
 
-/** The signed-in YouTube account as shown in Settings. */
 data class YouTubeAccount(
     val name: String,
-    /** "@handle" or e-mail, whichever YouTube returned. */
     val handle: String?,
     val photo: String?,
-    /** Which Google account of the browser session (X-Goog-AuthUser). */
     val authUser: Int = 0,
 )
 
-/**
- * The YouTube session: account info plus the cookies that act as the password.
- *
- * Everything is encrypted with an AES-GCM key held by the Android Keystore (it never leaves
- * the secure hardware and is not part of backups), so a copied app data folder or a cloud
- * backup does not carry a usable session. Excluded from backups in the backup rules too.
- */
 object AccountStore {
     private const val TAG = "VYORA-Account"
     private const val PREFS = "vyora_account"
@@ -50,7 +40,6 @@ object AccountStore {
 
     val isSignedIn: Boolean get() = cookie != null
 
-    /** Session cookie header ("SAPISID=...; SID=..."), only while signed in. */
     fun cookie(): String? = cookie
 
     @Synchronized
@@ -89,7 +78,6 @@ object AccountStore {
         _account.value = account
     }
 
-    /** Account details changed (name, photo) but the session is the same. */
     fun updateProfile(account: YouTubeAccount) {
         val current = cookie ?: return
         save(current, account)
@@ -102,8 +90,6 @@ object AccountStore {
     }
 
     private fun prefs() = appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-
-    // ------------------------------------------------------------------------- crypto
 
     private fun key(): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }

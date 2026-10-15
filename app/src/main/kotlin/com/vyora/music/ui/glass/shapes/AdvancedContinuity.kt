@@ -1,11 +1,3 @@
-/*
- * Vendored from Kyant0/Capsule
- * https://github.com/Kyant0/Capsule — Copyright 2025 Kyant0, Apache License 2.0
- * capsule/src/main/java/com/kyant/capsule/AdvancedContinuity.kt
- *
- * Vendored so the shape ships as source with this app. Package renamed
- * accordingly (com.kyant.capsule -> com.vyora.music.ui.glass.shapes).
- */
 package com.vyora.music.ui.glass.shapes
 
 import androidx.compose.runtime.Immutable
@@ -118,7 +110,6 @@ abstract class AdvancedContinuity : Continuity {
         bottomRight: Double,
         bottomLeft: Double
     ): PathSegments {
-        // capsule
         if ((topLeft + topRight == width || topLeft + bottomLeft == height) &&
             (topLeft == topRight && bottomRight == bottomLeft && topLeft == bottomRight)
         ) {
@@ -142,7 +133,6 @@ abstract class AdvancedContinuity : Continuity {
         bottomRight: Float,
         bottomLeft: Float
     ): Outline {
-        // capsule
         if ((topLeft + topRight == size.width || topLeft + bottomLeft == size.height) &&
             (topLeft == topRight && bottomRight == bottomLeft && topLeft == bottomRight)
         ) {

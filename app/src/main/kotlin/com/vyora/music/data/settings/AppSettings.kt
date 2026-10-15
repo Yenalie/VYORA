@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.update
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
-/** App accent palette (Apple Music red is the default). */
 enum class AccentChoice(val argb: Long) {
     RED(0xFFFA2D48),
     PINK(0xFFFF375F),
@@ -30,7 +29,6 @@ enum class GlassLook { LIQUID, FROSTED, TINTED }
 
 enum class AudioQuality { HIGH, NORMAL, LOW }
 
-/** Disk space for cached songs (Settings > Storage). */
 enum class CacheSize(val megabytes: Long) {
     MB_128(128),
     MB_256(256),
@@ -41,10 +39,8 @@ enum class CacheSize(val megabytes: Long) {
     val bytes: Long get() = megabytes * 1024L * 1024L
 }
 
-/** When music videos show their moving picture in Now Playing instead of the cover. */
 enum class VideoArtwork { ALWAYS, WIFI_ONLY, OFF }
 
-/** Supported UI languages. [tag] is a BCP-47 tag; empty means "follow the system". */
 enum class AppLanguage(val tag: String, val nativeName: String) {
     SYSTEM("", ""),
     ENGLISH("en", "English"),
@@ -57,17 +53,11 @@ enum class AppLanguage(val tag: String, val nativeName: String) {
 data class GlassSettings(
     val enabled: Boolean = true,
     val style: GlassLook = GlassLook.LIQUID,
-    /** Backdrop blur in dp (0..12). */
     val blur: Float = 4f,
-    /** Lens refraction strength (0..1). */
     val refraction: Float = 0.65f,
-    /** Lens thickness / bevel height (0..1). */
     val lensHeight: Float = 0.45f,
-    /** Vibrancy (saturation) multiplier (0.5..2.5). */
     val vibrancy: Float = 1.5f,
-    /** Specular rim highlight (0..1). */
     val highlight: Float = 0.7f,
-    /** Tint opacity of floating chrome (tab bar, mini player) (0.1..0.95). */
     val tint: Float = 0.5f,
     val chromaticAberration: Boolean = false,
     val depth: Boolean = false,
@@ -78,15 +68,10 @@ data class GlassSettings(
 
 data class EqualizerSettings(
     val enabled: Boolean = false,
-    /** Preset id, see [com.vyora.music.playback.audio.EqPreset]. "custom" means [customGains]. */
     val preset: String = "flat",
-    /** Custom gains in dB, one per band of [com.vyora.music.playback.audio.EqBands]. */
     val customGains: List<Float> = emptyList(),
-    /** 0..1 */
     val bassBoost: Float = 0f,
-    /** 0..1 */
     val virtualizer: Float = 0f,
-    /** Loudness gain in dB (0..10). */
     val loudness: Float = 0f,
 )
 
@@ -102,29 +87,21 @@ data class AppSettings(
     val skipSilence: Boolean = false,
     val pauseOnDisconnect: Boolean = true,
     val skipUnavailable: Boolean = true,
-    /** When the queue runs out, keep playing similar songs (Apple Music's ∞). */
     val autoplay: Boolean = true,
-    /** Blend the end of a song into the start of the next one over [crossfadeSeconds]. */
     val crossfade: Boolean = false,
     val crossfadeSeconds: Float = 6f,
     val equalizer: EqualizerSettings = EqualizerSettings(),
     val videoArtwork: VideoArtwork = VideoArtwork.ALWAYS,
     val mediaCache: CacheSize = CacheSize.MB_512,
-    /** Look for a new VYORA release on GitHub (on launch and twice a day in the background). */
     val autoUpdateCheck: Boolean = true,
+    val downloadWifiOnly: Boolean = false,
+    val discordPresence: Boolean = false,
 )
 
-/**
- * Process-wide settings store backed by SharedPreferences. Reads are synchronous on first
- * access (needed so the locale can be applied in Activity.attachBaseContext). Changes are
- * published through [settings] at once and written to disk shortly after, so dragging a
- * slider does not rewrite the file on every frame.
- */
 object SettingsRepository {
     private const val PREFS = "vyora_settings"
     private const val WRITE_DELAY_MS = 300L
 
-    /** Version of the stored equalizer data. 2 = custom gains are the 10 app bands. */
     private const val EQ_VERSION = 2
 
     private lateinit var prefs: SharedPreferences
@@ -141,7 +118,6 @@ object SettingsRepository {
         state.value = read(prefs)
     }
 
-    /** Language tag readable before [init] completes elsewhere (attachBaseContext). */
     fun languageTag(context: Context): String {
         init(context)
         return state.value.language.tag
@@ -158,7 +134,6 @@ object SettingsRepository {
         pendingWrite = writer.schedule({ write(prefs, state.value) }, WRITE_DELAY_MS, TimeUnit.MILLISECONDS)
     }
 
-    /** Writes a pending change now (the app is going to the background). */
     @Synchronized
     fun flush() {
         if (!::prefs.isInitialized) return
@@ -176,8 +151,6 @@ object SettingsRepository {
     fun resetGlass() = update { it.copy(glass = GlassSettings()) }
 
     fun resetAll() = update { AppSettings(language = it.language) }
-
-    // ------------------------------------------------------------------ persistence
 
     private inline fun <reified T : Enum<T>> SharedPreferences.enum(key: String, default: T): T =
         getString(key, null)?.let { name -> enumValues<T>().firstOrNull { it.name == name } } ?: default
@@ -228,6 +201,8 @@ object SettingsRepository {
             videoArtwork = p.enum("video_artwork", d.videoArtwork),
             mediaCache = p.enum("media_cache", d.mediaCache),
             autoUpdateCheck = p.getBoolean("update_auto", d.autoUpdateCheck),
+            downloadWifiOnly = p.getBoolean("download_wifi_only", d.downloadWifiOnly),
+            discordPresence = p.getBoolean("discord_presence", d.discordPresence),
         )
     }
 
@@ -272,5 +247,7 @@ object SettingsRepository {
         putString("video_artwork", s.videoArtwork.name)
         putString("media_cache", s.mediaCache.name)
         putBoolean("update_auto", s.autoUpdateCheck)
+        putBoolean("download_wifi_only", s.downloadWifiOnly)
+        putBoolean("discord_presence", s.discordPresence)
     }
 }

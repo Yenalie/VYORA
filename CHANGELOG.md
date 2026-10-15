@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.0
+- Kartu lirik: pilih sampai 6 baris lirik, lalu jadikan gambar dengan latar artwork, warna lagu, atau gelap. Bisa disimpan ke galeri atau langsung dibagikan
+- Unduh lagu untuk diputar offline, satu per satu atau semua lagu di Favorit dan playlist, dengan opsi hanya lewat Wi-Fi
+- Halaman Diunduh baru di Library, lengkap dengan progres unduhan
+- Putar ke Chromecast dan speaker Google Cast dari tombol output di Now Playing
+- Discord Rich Presence: tampilkan lagu yang sedang diputar di profil Discord
+- VYORA kini meminta izin notifikasi di Android 13 ke atas agar info pembaruan dan unduhan bisa muncul
+- Perbaikan dan perapian kode
+
 ## 1.5.0
 - Pembaruan otomatis di dalam aplikasi: VYORA memeriksa versi baru di GitHub saat dibuka dan dua kali sehari
 - Notifikasi saat ada versi baru, ketuk untuk langsung mengunduh dan memasang

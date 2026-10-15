@@ -1,11 +1,3 @@
-/*
- * Vendored from Kyant0/Capsule
- * https://github.com/Kyant0/Capsule — Copyright 2025 Kyant0, Apache License 2.0
- * capsule/src/main/java/com/kyant/capsule/continuities/G2Continuity.kt
- *
- * Vendored so the shape ships as source with this app. Package renamed
- * accordingly (com.kyant.capsule -> com.vyora.music.ui.glass.shapes).
- */
 package com.vyora.music.ui.glass.shapes.continuities
 
 import androidx.compose.runtime.Immutable
@@ -47,12 +39,6 @@ data class G2Continuity(
         val centerX = width * 0.5
         val centerY = height * 0.5
 
-        // mnemonics:
-        // T: top, R: right, B: bottom, L: left
-        // H: horizontal Bezier, V: vertical Bezier, C: arc, I: line
-
-        // non-capsule ratios of each half corner
-        // 0: full capsule, 1: safe rounded rectangle, (0, 1): progressive capsule
         val ratioTLV = ((centerY / topLeft - 1.0) / profile.extendedFraction).fastCoerceIn(0.0, 1.0)
         val ratioTLH = ((centerX / topLeft - 1.0) / profile.extendedFraction).fastCoerceIn(0.0, 1.0)
         val ratioTRH = ((centerX / topRight - 1.0) / profile.extendedFraction).fastCoerceIn(0.0, 1.0)
@@ -62,21 +48,16 @@ data class G2Continuity(
         val ratioBLH = ((centerX / bottomLeft - 1.0) / profile.extendedFraction).fastCoerceIn(0.0, 1.0)
         val ratioBLV = ((centerY / bottomLeft - 1.0) / profile.extendedFraction).fastCoerceIn(0.0, 1.0)
 
-        // constrained non-capsule ratios of each corner
         val ratioTL = min(ratioTLV, ratioTLH)
         val ratioTR = min(ratioTRH, ratioTRV)
         val ratioBR = min(ratioBRV, ratioBRH)
         val ratioBL = min(ratioBLH, ratioBLV)
 
-        // Bezier stuffs
-
-        // extended fractions of each corner
         val extFracTL = lerp(capsuleProfile.extendedFraction, profile.extendedFraction, ratioTL)
         val extFracTR = lerp(capsuleProfile.extendedFraction, profile.extendedFraction, ratioTR)
         val extFracBR = lerp(capsuleProfile.extendedFraction, profile.extendedFraction, ratioBR)
         val extFracBL = lerp(capsuleProfile.extendedFraction, profile.extendedFraction, ratioBL)
 
-        // resolved extended fractions of each half corner
         val extFracTLV = extFracTL * ratioTLV
         val extFracTLH = extFracTL * ratioTLH
         val extFracTRH = extFracTR * ratioTRH
@@ -86,7 +67,6 @@ data class G2Continuity(
         val extFracBLH = extFracBL * ratioBLH
         val extFracBLV = extFracBL * ratioBLV
 
-        // offsets of each half corner
         val offsetTLV = -topLeft * extFracTLV
         val offsetTLH = -topLeft * extFracTLH
         val offsetTRH = -topRight * extFracTRH
@@ -96,7 +76,6 @@ data class G2Continuity(
         val offsetBLH = -bottomLeft * extFracBLH
         val offsetBLV = -bottomLeft * extFracBLV
 
-        // Bezier curvature scales of each half corner
         val bezKScaleTLV = lerp(capsuleProfile.bezierCurvatureScale, profile.bezierCurvatureScale, ratioTLV)
         val bezKScaleTLH = lerp(capsuleProfile.bezierCurvatureScale, profile.bezierCurvatureScale, ratioTLH)
         val bezKScaleTRH = lerp(capsuleProfile.bezierCurvatureScale, profile.bezierCurvatureScale, ratioTRH)
@@ -106,21 +85,16 @@ data class G2Continuity(
         val bezKScaleBLH = lerp(capsuleProfile.bezierCurvatureScale, profile.bezierCurvatureScale, ratioBLH)
         val bezKScaleBLV = lerp(capsuleProfile.bezierCurvatureScale, profile.bezierCurvatureScale, ratioBLV)
 
-        // arc stuffs
-
-        // arc fractions of each corner
         val arcFracTL = lerp(capsuleProfile.arcFraction, profile.arcFraction, ratioTL)
         val arcFracTR = lerp(capsuleProfile.arcFraction, profile.arcFraction, ratioTR)
         val arcFracBR = lerp(capsuleProfile.arcFraction, profile.arcFraction, ratioBR)
         val arcFracBL = lerp(capsuleProfile.arcFraction, profile.arcFraction, ratioBL)
 
-        // arc curvature scales of each corner
         val arcKScaleTL = 1.0 + (profile.arcCurvatureScale - 1.0) * ratioTL
         val arcKScaleTR = 1.0 + (profile.arcCurvatureScale - 1.0) * ratioTR
         val arcKScaleBR = 1.0 + (profile.arcCurvatureScale - 1.0) * ratioBR
         val arcKScaleBL = 1.0 + (profile.arcCurvatureScale - 1.0) * ratioBL
 
-        // base Beziers of each half corner
         val bezierTLV = resolveBezier(G2ContinuityProfile(extFracTLV, arcFracTL, bezKScaleTLV, arcKScaleTL))
         val bezierTLH = resolveBezier(G2ContinuityProfile(extFracTLH, arcFracTL, bezKScaleTLH, arcKScaleTL))
         val bezierTRH = resolveBezier(G2ContinuityProfile(extFracTRH, arcFracTR, bezKScaleTRH, arcKScaleTR))
@@ -135,9 +109,7 @@ data class G2Continuity(
             var y = topLeft
             moveTo(x, y - offsetTLV)
 
-            // TL
             if (topLeft > 0.0) {
-                // TLV
                 with(bezierTLV) {
                     cubicTo(
                         x + p1.y * topLeft, y - p1.x * topLeft,
@@ -146,7 +118,6 @@ data class G2Continuity(
                     )
                 }
 
-                // TLC
                 arcToWithScaledRadius(
                     center = Point(topLeft, topLeft),
                     radius = topLeft,
@@ -155,7 +126,6 @@ data class G2Continuity(
                     sweepAngle = PI * 0.5 * arcFracTL
                 )
 
-                // TLH
                 x = topLeft
                 y = 0.0
                 with(bezierTLH) {
@@ -167,14 +137,11 @@ data class G2Continuity(
                 }
             }
 
-            // TI
             x = width - topRight
             y = 0.0
             lineTo(x + offsetTRH, y)
 
-            // TR
             if (topRight > 0.0) {
-                // TRH
                 with(bezierTRH) {
                     cubicTo(
                         x + p1.x * topRight, y + p1.y * topRight,
@@ -183,7 +150,6 @@ data class G2Continuity(
                     )
                 }
 
-                // TRC
                 arcToWithScaledRadius(
                     center = Point(width - topRight, topRight),
                     radius = topRight,
@@ -192,7 +158,6 @@ data class G2Continuity(
                     sweepAngle = PI * 0.5 * arcFracTR
                 )
 
-                // TRV
                 x = width
                 y = topRight
                 with(bezierTRV) {
@@ -204,14 +169,11 @@ data class G2Continuity(
                 }
             }
 
-            // RI
             x = width
             y = height - bottomRight
             lineTo(x, y + offsetBRV)
 
-            // BR
             if (bottomRight > 0.0) {
-                // BRV
                 with(bezierBRV) {
                     cubicTo(
                         x - p1.y * bottomRight, y + p1.x * bottomRight,
@@ -220,7 +182,6 @@ data class G2Continuity(
                     )
                 }
 
-                // BRC
                 arcToWithScaledRadius(
                     center = Point(width - bottomRight, height - bottomRight),
                     radius = bottomRight,
@@ -229,7 +190,6 @@ data class G2Continuity(
                     sweepAngle = PI * 0.5 * arcFracBR
                 )
 
-                // BRH
                 x = width - bottomRight
                 y = height
                 with(bezierBRH) {
@@ -241,14 +201,11 @@ data class G2Continuity(
                 }
             }
 
-            // BI
             x = bottomLeft
             y = height
             lineTo(x - offsetBLH, y)
 
-            // BL
             if (bottomLeft > 0.0) {
-                // BLH
                 with(bezierBLH) {
                     cubicTo(
                         x - p1.x * bottomLeft, y - p1.y * bottomLeft,
@@ -257,7 +214,6 @@ data class G2Continuity(
                     )
                 }
 
-                // BLC
                 arcToWithScaledRadius(
                     center = Point(bottomLeft, height - bottomLeft),
                     radius = bottomLeft,
@@ -266,7 +222,6 @@ data class G2Continuity(
                     sweepAngle = PI * 0.5 * arcFracBL
                 )
 
-                // BLV
                 x = 0.0
                 y = height - bottomLeft
                 with(bezierBLV) {
@@ -278,7 +233,6 @@ data class G2Continuity(
                 }
             }
 
-            // LI
             close()
         }
     }
@@ -312,7 +266,6 @@ data class G2Continuity(
             var y = radius
             moveTo(x, y)
 
-            // LC
             arcTo(
                 center = Point(radius, radius),
                 radius = radius,
@@ -320,7 +273,6 @@ data class G2Continuity(
                 sweepAngle = sweepRad
             )
 
-            // TLH
             x = radius
             y = 0.0
             with(bezierH) {
@@ -331,12 +283,10 @@ data class G2Continuity(
                 )
             }
 
-            // TI
             x = width - radius
             y = 0.0
             lineTo(x + offsetH, y)
 
-            // TRH
             with(bezierH) {
                 cubicTo(
                     x + p1.x, y + p1.y,
@@ -345,7 +295,6 @@ data class G2Continuity(
                 )
             }
 
-            // RC
             arcTo(
                 center = Point(width - radius, radius),
                 radius = radius,
@@ -353,7 +302,6 @@ data class G2Continuity(
                 sweepAngle = sweepRad
             )
 
-            // BRH
             x = width - radius
             y = height
             with(bezierH) {
@@ -364,12 +312,10 @@ data class G2Continuity(
                 )
             }
 
-            // BI
             x = radius
             y = height
             lineTo(x - offsetH, y)
 
-            // BLH
             with(bezierH) {
                 cubicTo(
                     x - p1.x, y - p1.y,
@@ -409,7 +355,6 @@ data class G2Continuity(
             var y = radius
             moveTo(x, y - offsetV)
 
-            // TLV
             with(bezierV) {
                 cubicTo(
                     x + p1.y, y - p1.x,
@@ -418,7 +363,6 @@ data class G2Continuity(
                 )
             }
 
-            // TC
             arcTo(
                 center = Point(radius, radius),
                 radius = radius,
@@ -426,7 +370,6 @@ data class G2Continuity(
                 sweepAngle = sweepRad
             )
 
-            // TRV
             x = width
             y = radius
             with(bezierV) {
@@ -437,12 +380,10 @@ data class G2Continuity(
                 )
             }
 
-            // RI
             x = width
             y = height - radius
             lineTo(x, y + offsetV)
 
-            // BRV
             with(bezierV) {
                 cubicTo(
                     x - p1.y, y + p1.x,
@@ -451,7 +392,6 @@ data class G2Continuity(
                 )
             }
 
-            // BC
             arcTo(
                 center = Point(width - radius, height - radius),
                 radius = radius,
@@ -459,7 +399,6 @@ data class G2Continuity(
                 sweepAngle = sweepRad
             )
 
-            // BLV
             x = 0.0
             y = height - radius
             with(bezierV) {
@@ -470,7 +409,6 @@ data class G2Continuity(
                 )
             }
 
-            // LI
             close()
         }
     }

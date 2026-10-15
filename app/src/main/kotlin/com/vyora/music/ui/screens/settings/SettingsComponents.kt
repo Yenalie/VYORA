@@ -81,11 +81,9 @@ import com.vyora.music.ui.theme.VyoraTextFaint
 import com.vyora.music.ui.theme.VyoraTextMuted
 import kotlin.math.roundToInt
 
-/** iOS system colours used for the settings icon tiles. */
 private val CellShape = RoundedCornerShape(22.dp)
 private val RowHorizontal = 16.dp
 
-/** Grouped settings page: back button, large title, inset-grouped list on the grouped bg. */
 @Composable
 fun SettingsPage(
     title: String,
@@ -116,7 +114,6 @@ fun SettingsPage(
     }
 }
 
-/** One inset-grouped section with optional header and footer, like UITableView .insetGrouped. */
 @Composable
 fun SettingsGroup(
     modifier: Modifier = Modifier,
@@ -151,7 +148,6 @@ fun SettingsGroup(
     }
 }
 
-/** iOS settings icon: white glyph on a coloured continuous-corner square. */
 @Composable
 fun SettingsIcon(icon: ImageVector, tint: Color) {
     Box(
@@ -162,7 +158,6 @@ fun SettingsIcon(icon: ImageVector, tint: Color) {
     }
 }
 
-/** Base row: optional icon, title + subtitle, trailing slot, flat grey press highlight. */
 @Composable
 fun SettingsRow(
     title: String,
@@ -217,7 +212,6 @@ fun SettingsRow(
     }
 }
 
-/** Disclosure row: value text and a chevron. */
 @Composable
 fun SettingsNavRow(
     title: String,
@@ -260,7 +254,6 @@ fun SettingsSwitchRow(
     )
 }
 
-/** Checkmark choice row (single selection inside a group). */
 @Composable
 fun SettingsChoiceRow(
     title: String,
@@ -280,7 +273,6 @@ fun SettingsChoiceRow(
     )
 }
 
-/** Centered text action (accent or destructive red), like iOS "Reset" buttons. */
 @Composable
 fun SettingsActionRow(
     title: String,
@@ -300,7 +292,6 @@ fun SettingsActionRow(
     )
 }
 
-/** Labelled slider row: title and live value on top, iOS slider below. */
 @Composable
 fun SettingsSliderRow(
     title: String,
@@ -330,9 +321,6 @@ fun SettingsSliderRow(
     }
 }
 
-// ---------------------------------------------------------------------------------- controls
-
-/** UISwitch: 51x31, green when on, white knob that springs across. */
 @Composable
 fun IosSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier) {
     val haptics = LocalHapticFeedback.current
@@ -368,7 +356,6 @@ fun IosSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier:
     }
 }
 
-/** UISlider: 4dp track (accent fill), 28dp white knob. Tap or drag anywhere on the track. */
 @Composable
 fun IosSlider(
     value: Float,
@@ -429,7 +416,6 @@ fun IosSlider(
     }
 }
 
-/** UISegmentedControl with a sliding selected pill. */
 @Composable
 fun <T> SegmentedControl(
     options: List<T>,
@@ -497,7 +483,6 @@ fun <T> SegmentedControl(
     }
 }
 
-/** Container row for a full-width control (segmented control, swatches). */
 @Composable
 fun SettingsControlRow(divider: Boolean = true, title: String? = null, content: @Composable () -> Unit) {
     Box(Modifier.fillMaxWidth()) {

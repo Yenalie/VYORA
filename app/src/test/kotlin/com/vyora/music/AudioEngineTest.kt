@@ -19,8 +19,6 @@ class AudioEngineTest {
         kind: TrackKind = TrackKind.ORIGINAL, progressive: Boolean = true,
     ) = AudioCandidate(itag, "https://x/$itag", bitrate, codec, "audio/webm", drc, kind, progressive, -1)
 
-    // ------------------------------------------------------------- stream choice
-
     @Test fun neverPicksStableVolumeWhenNormalExists() {
         val list = listOf(audio(251, 160_000, drc = true), audio(251, 158_000), audio(140, 130_000, "mp4a.40.2"))
         val pick = StreamSelector.pickAudio(list, AudioQuality.HIGH)!!
@@ -36,7 +34,6 @@ class AudioEngineTest {
     @Test fun keepsCachedItagWhenStillValid() {
         val list = listOf(audio(251, 160_000), audio(140, 130_000, "mp4a.40.2"))
         assertEquals(140, StreamSelector.pickAudio(list, AudioQuality.HIGH, preferredItag = 140)!!.itag)
-        // A cached DRC itag is not kept: the clean rendition wins.
         val drcOnlyCached = listOf(audio(250, 70_000, drc = true), audio(251, 160_000))
         assertEquals(251, StreamSelector.pickAudio(drcOnlyCached, AudioQuality.HIGH, preferredItag = 250)!!.itag)
     }
@@ -58,8 +55,6 @@ class AudioEngineTest {
         assertEquals(135, StreamSelector.pickVideo(list)!!.itag)
     }
 
-    // ----------------------------------------------------------------- equalizer
-
     @Test fun presetsHaveTenBands() {
         EqPreset.entries.forEach { assertEquals(it.name, EqBands.COUNT, it.gains.size) }
     }
@@ -70,9 +65,7 @@ class AudioEngineTest {
         val input = EqBands.inputGainDb(s, gains)
         assertTrue("input gain must go down when bands are boosted", input < 0f)
         assertTrue(gains.first() > EqPreset.BASS.gains.first())
-        // Flat and no loudness: untouched.
         assertEquals(0f, EqBands.inputGainDb(EqualizerSettings(enabled = true)), 0f)
-        // Loudness raises the input (the limiter keeps it from clipping).
         assertEquals(4f, EqBands.inputGainDb(EqualizerSettings(enabled = true, loudness = 4f)), 0f)
     }
 
@@ -84,8 +77,8 @@ class AudioEngineTest {
     @Test fun legacyFiveBandGainsMigrate() {
         val migrated = EqBands.migrateLegacy(listOf(6f, 4f, 0f, 0f, 0f))
         assertEquals(EqBands.COUNT, migrated.size)
-        assertEquals(6f, migrated[0], 0.01f) // 31 Hz below the old 60 Hz band: same value
-        assertEquals(6f, migrated[1], 0.2f)  // 62 Hz ~ the old 60 Hz band
+        assertEquals(6f, migrated[0], 0.01f)
+        assertEquals(6f, migrated[1], 0.2f)
         assertEquals(0f, migrated[9], 0.01f)
     }
 

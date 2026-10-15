@@ -57,7 +57,6 @@ fun VYORATheme(
     }
 }
 
-/** Forces the dark palette for a subtree that always sits on dark artwork (Now Playing). */
 @Composable
 fun VyoraDarkScope(content: @Composable () -> Unit) {
     val current = LocalVyoraColors.current

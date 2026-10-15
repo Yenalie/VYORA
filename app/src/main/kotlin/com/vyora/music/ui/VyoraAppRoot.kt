@@ -121,7 +121,6 @@ import com.vyora.music.ui.theme.VyoraSurfaceElevated
 import com.vyora.music.ui.theme.VyoraText
 import kotlinx.coroutines.flow.MutableSharedFlow
 
-/** Haptics switch in Settings: swap the platform haptics for a no-op. */
 private object NoHaptics : HapticFeedback {
     override fun performHapticFeedback(hapticFeedbackType: HapticFeedbackType) = Unit
 }
@@ -137,14 +136,11 @@ fun VyoraAppRoot(settings: AppSettings) {
     val currentTitle by PlayerManager.currentTitle.collectAsState()
     val currentThumbnail by PlayerManager.currentThumbnail.collectAsState()
     val coverTint by rememberArtworkTint(currentThumbnail)
-    // A music video playing as artwork tints the app with its own colours.
     val videoTint by VideoAmbience.tint.collectAsState()
     val artworkTint = videoTint ?: coverTint
     val playbackError by PlayerManager.playbackError.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // --- Liquid glass ---------------------------------------------------------------
-    // One layer records the app content; every glass surface (the nav bar) samples it.
     val colors = LocalVyoraColors.current
     val glassConfig = remember(settings.glass, colors) {
         val g = settings.glass
@@ -155,7 +151,6 @@ fun VyoraAppRoot(settings: AppSettings) {
                 GlassLook.FROSTED -> GlassStyle.BLUR
                 GlassLook.TINTED -> GlassStyle.TRANSPARENT
             },
-            // Near-black tint on dark, near-white on light, so the bar sits on either page.
             surfaceTintColor = colors.chromeTint,
             surfaceOpacity = g.tint,
             blurRadius = g.blur,
@@ -169,12 +164,10 @@ fun VyoraAppRoot(settings: AppSettings) {
             navBarEnabled = g.navBar,
             miniPlayerEnabled = g.miniPlayer,
             contentEnabled = g.content,
-            // Light bar: a soft grey selection puck instead of the near-white default.
             puckColor = if (colors.isDark) Color.Unspecified else ControlColors.NavPuckLight,
         )
     }
     val glassActive = glassConfig.anyComponentEnabled && isGlassAllowed()
-    // Remembered so rememberLayerBackdrop (keyed on it) is not rebuilt every recomposition.
     val pageBackground = colors.background
     val backdropDraw = remember<ContentDrawScope.() -> Unit>(pageBackground) {
         {
@@ -183,47 +176,32 @@ fun VyoraAppRoot(settings: AppSettings) {
         }
     }
     val appBackdrop = rememberLayerBackdrop(onDraw = backdropDraw)
-    // In-page liquid glass (buttons, chips, cards inside the NavHost) can't sample appBackdrop:
-    // they are part of that very layer. They sample the ambient background layer instead,
-    // which is a sibling underneath the pages, so there is no feedback loop.
     val contentBackdrop = rememberLayerBackdrop()
     val glassMenu = remember { GlassMenuState() }
-    // Re-recording the whole screen per frame is the most expensive thing the glass does,
-    // so hold the last capture while scrolling and during route transitions.
     val backdropFreeze = rememberBackdropFreeze()
     val navTransitionFreeze = rememberNavTransitionFreeze(currentRoute)
     val navScrollConnection = rememberFloatingTabBarScrollConnection()
 
     val playerSheet = rememberPlayerSheetState()
     val artworkFlight = remember { com.vyora.music.ui.player.ArtworkFlight() }
-    // Pulling the mini player up drives the sheet by screen fractions; flick speed in dp/s.
     val screenHeightPx = androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.height.coerceAtLeast(1)
     val sheetFlingPx = with(LocalDensity.current) { 700.dp.toPx() }
     val recedeCornerPx = with(LocalDensity.current) { 28.dp.toPx() }
     val chromeDropPx = with(LocalDensity.current) { 28.dp.toPx() }
 
-    // Every new page starts with the full tab bar, like iOS: a bar folded by scrolling on
-    // one screen shouldn't stay folded on the next.
     LaunchedEffect(currentRoute) { navScrollConnection.expand() }
 
-    // While the full player is on screen (and while it slides) it covers the glass bar, so
-    // re-recording the whole app for the backdrop would only burn GPU time in the middle of
-    // the animation. Hold the last capture; it refreshes as soon as the sheet is gone.
     val backdropFrozen = remember(backdropFreeze, navTransitionFreeze, playerSheet) {
         { backdropFreeze.frozen() || navTransitionFreeze.frozen() || playerSheet.isVisible }
     }
 
-    // Android system Back / gesture collapses the full player to the mini player first.
-    // When the player is already collapsed, normal NavHost back navigation remains untouched.
     BackHandler(enabled = playerSheet.isExpanded) {
         playerSheet.collapse()
     }
 
-    // Android 13+ requires a runtime grant, otherwise the media notification
-    // (and its lockscreen controls) never shows. Playback works either way.
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* No-op: the service posts the notification whenever it is allowed. */ }
+    ) { }
 
     LaunchedEffect(Unit) {
         PlayerManager.initialize(context)
@@ -245,21 +223,12 @@ fun VyoraAppRoot(settings: AppSettings) {
         }
     }
 
-    // The mini player docks into the nav bar only once something is loaded.
     val hasSong = currentTitle != null
 
-    // Where the floating tab bar + mini player belong (iOS 26 Apple Music rules):
-    //  - tab roots and pushed pages (album, playlist, collection): visible;
-    //  - Settings and its sub pages: hidden, they behave like a full-screen modal;
-    //  - while the keyboard is up: hidden, so the bar doesn't ride on top of the keyboard
-    //    and cover search results.
     val chromeRoute = currentRoute?.startsWith("settings") != true
     val imeVisible = WindowInsets.isImeVisible
     val showChrome = chromeRoute && !imeVisible
 
-    // Height of the floating bottom UI, so screens can pad their scroll content. Pages
-    // without the bar only need to clear the system navigation bar. The keyboard case keeps
-    // the bar's inset so search results don't jump while the IME animates.
     val density = LocalDensity.current
     var bottomBarHeightPx by remember(hasSong) { mutableIntStateOf(0) }
     val systemNavInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -271,14 +240,10 @@ fun VyoraAppRoot(settings: AppSettings) {
     )
     val searchTab = VyoraTab("search", stringResource(R.string.search), Icons.Rounded.Search)
     val tabReselect = remember { MutableSharedFlow<String>(extraBufferCapacity = 1) }
-    // The tab a pushed page belongs to = the last tab root we were on (same rule the bar
-    // uses to keep that tab highlighted).
     var ownerTab by remember { mutableStateOf("home") }
     if (currentRoute != null && currentRoute in TabRoots) ownerTab = currentRoute
     val navigateToTab: (VyoraTab) -> Unit = navigate@{ tab ->
         val route = navController.currentDestination?.route
-        // iOS tab bar rules: tapping the tab you're on scrolls it to the top; tapping it
-        // from a page pushed inside it (album, collection) pops back to the tab's root.
         if (route == tab.route) {
             navScrollConnection.expand()
             tabReselect.tryEmit(tab.route)
@@ -291,9 +256,6 @@ fun VyoraAppRoot(settings: AppSettings) {
             navController.popBackStack(tab.route, inclusive = false)
             return@navigate
         }
-        // Mark the glass backdrop freeze *before* the navigation starts so the
-        // first frames of the transition already reuse the last capture instead of
-        // re-recording the whole tree (the main source of lag/freeze on tab switch).
         navTransitionFreeze.markTransitionStarted()
         navController.navigate(tab.route) {
             launchSingleTop = true
@@ -302,7 +264,6 @@ fun VyoraAppRoot(settings: AppSettings) {
         }
     }
 
-    // One way to open an album/playlist page from anywhere (search, artist, library).
     val openCollectionPage: (com.vyora.music.data.youtube.SimpleItem) -> Unit = { item ->
         navController.navigate(
             "playlist/${Uri.encode(item.id)}" +
@@ -312,7 +273,6 @@ fun VyoraAppRoot(settings: AppSettings) {
         )
     }
     val openArtistPage: (String, String?, String?) -> Unit = { name, art, id ->
-        // Close Now Playing first when "Go to Artist" comes from the player.
         if (playerSheet.isExpanded) playerSheet.collapse()
         navController.navigate(
             "artist/${Uri.encode(name)}?art=${Uri.encode(art.orEmpty())}&id=${Uri.encode(id.orEmpty())}"
@@ -338,16 +298,9 @@ fun VyoraAppRoot(settings: AppSettings) {
         LocalHapticFeedback provides if (settings.haptics) LocalHapticFeedback.current else NoHaptics,
     ) {
     Box(modifier = Modifier.fillMaxSize().background(VyoraBackground)) {
-        // Content fills the whole screen; the bars further down float on top of it.
-        // This is the layer the glass samples. graphicsLayer BEFORE layerBackdrop so the
-        // recording layer encloses the backdrop node, and a second one INSIDE so the
-        // content is a single cached RenderNode (Convx's measured frame-time fix).
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                // As Now Playing rises the app recedes behind it: shrinks a little and gets
-                // rounded corners, the iOS card-stack depth cue. Read in the layer block, so
-                // the drag never recomposes the app.
                 .graphicsLayer {
                     val p = playerSheet.progress.value.coerceIn(0f, 1f)
                     if (p > 0f) {
@@ -371,25 +324,17 @@ fun VyoraAppRoot(settings: AppSettings) {
                 .nestedScroll(backdropFreeze.connection)
                 .nestedScroll(navScrollConnection)
         ) {
-        // Ambient colour pools live INSIDE the recorded layer, so the glass bar refracts them.
         AmbientBackground(
             artworkTint = if (hasSong && settings.ambientBackground) artworkTint else null,
             modifier = Modifier.layerBackdrop(contentBackdrop),
         )
         CompositionLocalProvider(LocalBottomBarInset provides bottomInset, LocalAppBackdrop provides contentBackdrop) {
-        // SharedTransitionLayout lets an album cover fly from its search row into the
-        // album header (see ui/design/SharedArtwork.kt).
         SharedTransitionLayout(Modifier.fillMaxSize()) {
         CompositionLocalProvider(LocalSharedTransitionScope provides this) {
         NavHost(
             navController = navController,
             startDestination = "home",
             modifier = Modifier.fillMaxSize(),
-            // Tabs: a short cross-fade (heavier tab transitions were the main cause of lag
-            // with the glass backdrop). Albums: a soft fade so the flying cover is the
-            // motion. Other pushed pages (collections, Settings): the iOS push, the new
-            // page slides in from the trailing edge while the old one drifts back a bit.
-            // All of it stays inside the 400ms backdrop freeze window.
             enterTransition = {
                 when (navKind(targetState.destination.route)) {
                     NavKind.PUSH -> slideInHorizontally(PushSpec) { it } + fadeIn(tween(160))
@@ -536,6 +481,15 @@ fun VyoraAppRoot(settings: AppSettings) {
             screen("settings/equalizer") { EqualizerScreen(onBack = { navController.popBackStack() }) }
             screen("settings/language") { LanguageScreen(onBack = { navController.popBackStack() }) }
             screen("settings/about") { AboutScreen(onBack = { navController.popBackStack() }) }
+            screen("settings/discord") {
+                com.vyora.music.ui.screens.settings.DiscordScreen(
+                    onBack = { navController.popBackStack() },
+                    onLogin = { navController.navigate("settings/discord/login") },
+                )
+            }
+            screen("settings/discord/login") {
+                com.vyora.music.ui.screens.settings.DiscordLoginScreen(onDone = { navController.popBackStack() })
+            }
             screen(
                 route = "collection/{kind}",
                 arguments = listOf(navArgument("kind") { type = NavType.StringType })
@@ -552,15 +506,12 @@ fun VyoraAppRoot(settings: AppSettings) {
         }
         }
 
-            // Status-bar scrim: content scrolling up fades out under the clock and icons
-            // instead of colliding with them.
             Box(
                 Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .background(
                         Brush.verticalGradient(
-                            // iOS 26 scroll-edge effect: a soft, tall fade under the status bar.
                             0f to VyoraBackground.copy(alpha = 0.85f),
                             0.55f to VyoraBackground.copy(alpha = 0.45f),
                             1f to Color.Transparent,
@@ -570,7 +521,6 @@ fun VyoraAppRoot(settings: AppSettings) {
                     .height(30.dp)
             )
 
-            // Dims the receding app while the player sheet comes up.
             Box(
                 Modifier
                     .fillMaxSize()
@@ -580,7 +530,6 @@ fun VyoraAppRoot(settings: AppSettings) {
                     }
             )
 
-            // Slides down out of the way (and back up) instead of popping.
             AnimatedVisibility(
                 visible = showChrome,
                 modifier = Modifier.align(Alignment.BottomCenter),
@@ -590,11 +539,7 @@ fun VyoraAppRoot(settings: AppSettings) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        // Measured before the paddings below, so it includes them. maxOf keeps
-                        // the tallest state (expanded bar + mini player) as the scroll inset.
                         .onSizeChanged { bottomBarHeightPx = maxOf(bottomBarHeightPx, it.height) }
-                        // The bar and mini player sink and fade as the sheet takes over, so the
-                        // mini player looks like it grows into Now Playing.
                         .graphicsLayer {
                             val p = playerSheet.progress.value.coerceIn(0f, 1f)
                             alpha = (1f - p * 1.6f).coerceIn(0f, 1f)
@@ -610,8 +555,6 @@ fun VyoraAppRoot(settings: AppSettings) {
                         onNavigate = navigateToTab,
                         scrollConnection = navScrollConnection,
                         modifier = Modifier.fillMaxWidth(),
-                        // The mini player lives inside the bar (wide pill above the tabs, slim
-                        // strip when the bar collapses on scroll), like Convx.
                         accessory = if (hasSong) {
                             { isInline, contentColor, accessoryModifier ->
                                 VyoraMiniAccessory(
@@ -630,25 +573,19 @@ fun VyoraAppRoot(settings: AppSettings) {
                 }
             }
 
-        // Full player: slides over everything (including the bar) and drags down to close.
-        // Now Playing always sits on dark artwork, like iOS, whatever the app appearance.
         VyoraDarkScope { VyoraPlayerSheet(sheet = playerSheet) }
 
-        // The cover flying between the mini player and Now Playing while the sheet moves.
         com.vyora.music.ui.player.ArtworkFlightOverlay(playerSheet, artworkFlight)
 
-        // Context menus: drawn above everything, on liquid glass refracting the app layer.
         GlassMenuHost(glassMenu)
         com.vyora.music.ui.components.PlaylistPickerHost(playlistPicker)
 
-        // "New version available" dialog (launch check, Settings, or the notification).
         UpdateDialogHost()
 
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = if (showChrome) bottomInset else systemNavInset)
         ) { data ->
-            // Glass toast instead of the stock Material snackbar.
             Text(
                 data.visuals.message,
                 color = VyoraText,
@@ -667,7 +604,6 @@ fun VyoraAppRoot(settings: AppSettings) {
 
 private val TabRoots = setOf("home", "search", "library")
 
-/** How a destination is entered; picks the transition in [VyoraAppRoot]'s NavHost. */
 private enum class NavKind { TAB, ALBUM, PUSH }
 
 private fun navKind(route: String?): NavKind = when {
@@ -678,13 +614,8 @@ private fun navKind(route: String?): NavKind = when {
     else -> NavKind.TAB
 }
 
-/** iOS push timing: quick start, long gentle landing; done inside the 400ms freeze window. */
 private val PushSpec = tween<androidx.compose.ui.unit.IntOffset>(380, easing = androidx.compose.animation.core.CubicBezierEasing(0.2f, 0.9f, 0.1f, 1f))
 
-/**
- * composable() that also exposes its AnimatedContentScope to the screen, so shared
- * elements inside (album covers) know which transition they belong to.
- */
 private fun androidx.navigation.NavGraphBuilder.screen(
     route: String,
     arguments: List<androidx.navigation.NamedNavArgument> = emptyList(),

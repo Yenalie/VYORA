@@ -22,7 +22,6 @@ class HomeFeedTest {
     @Test fun favoritesWeighDouble() {
         val recent = listOf(song("1", "A"), song("2", "A"), song("3", "B"))
         val liked = listOf(song("4", "B"), song("5", "C"))
-        // A = 2, B = 1 + 2 = 3, C = 2
         assertEquals("B", HomeFeed.seedArtists(recent, liked).first())
     }
 

@@ -61,7 +61,6 @@ import com.vyora.music.ui.theme.VyoraText
 import com.vyora.music.ui.theme.VyoraTextFaint
 import com.vyora.music.ui.theme.VyoraTextMuted
 
-/** Shared squircle shapes (continuous corners, like iOS), so every surface matches. */
 object GlassShapes {
     val Tiny = ContinuousRoundedRectangle(6.dp)
     val Small = ContinuousRoundedRectangle(10.dp)
@@ -70,18 +69,12 @@ object GlassShapes {
     val Pill = ContinuousCapsule()
 }
 
-/** iOS layout metrics. */
 object Spacing {
     val ScreenH = 20.dp
     val Section = 30.dp
-    /** Artwork size in a standard song row. */
     val RowArt = 48.dp
 }
 
-/**
- * Liquid-glass material for in-content controls: translucent fill, soft top sheen and a
- * specular rim bright on top and fading toward the bottom. Cheap (no RenderEffect).
- */
 @Composable
 fun Modifier.glass(
     shape: Shape = GlassShapes.Medium,
@@ -114,7 +107,6 @@ fun Modifier.glass(
     )
 }
 
-/** iOS-like press response: dips slightly while touched and springs back. */
 @Composable
 fun Modifier.pressScale(interactionSource: MutableInteractionSource, pressedScale: Float = 0.96f): Modifier {
     val pressed by interactionSource.collectIsPressedAsState()
@@ -129,10 +121,6 @@ fun Modifier.pressScale(interactionSource: MutableInteractionSource, pressedScal
     }
 }
 
-/**
- * Clickable with the press-scale response and no Material ripple. [onLongClick] opens a
- * context menu, with the light haptic tick iOS gives on long press.
- */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Modifier.glassClickable(
@@ -154,7 +142,6 @@ fun Modifier.glassClickable(
         )
 }
 
-/** Round glass toolbar button (back, more, close...), the iOS 26 toolbar look. */
 @Composable
 fun GlassIconButton(
     icon: ImageVector,
@@ -177,10 +164,6 @@ fun GlassIconButton(
     }
 }
 
-/**
- * Apple Music's Play / Shuffle buttons: a grey glass capsule with accent icon and label.
- * On a tinted page (album colour) pass [content] = white so it reads on any colour.
- */
 @Composable
 fun GlassButton(
     text: String,
@@ -209,7 +192,6 @@ fun GlassButton(
     }
 }
 
-/** Scope / filter pill. Selected = accent fill, otherwise grey glass. */
 @Composable
 fun GlassChip(
     label: String,
@@ -236,7 +218,6 @@ fun GlassChip(
     }
 }
 
-/** iOS large title (34pt bold) with an optional trailing control on the baseline row. */
 @Composable
 fun LargeTitleHeader(
     title: String,
@@ -264,10 +245,6 @@ fun LargeTitleHeader(
     }
 }
 
-/**
- * Apple Music shelf header: bold title followed by a chevron when the shelf opens a full
- * page ("Recently Played ›"). The whole title is the tap target.
- */
 @Composable
 fun SectionTitle(
     title: String,
@@ -309,7 +286,6 @@ fun SectionTitle(
     }
 }
 
-/** iOS hairline separator. [startIndent] aligns it with the row's text, like UITableView. */
 @Composable
 fun Hairline(modifier: Modifier = Modifier, startIndent: Dp = 0.dp) {
     Box(
@@ -321,7 +297,6 @@ fun Hairline(modifier: Modifier = Modifier, startIndent: Dp = 0.dp) {
     )
 }
 
-/** iOS empty state: large grey glyph, bold title, secondary body and an accent text action. */
 @Composable
 fun GlassEmptyState(
     icon: ImageVector,

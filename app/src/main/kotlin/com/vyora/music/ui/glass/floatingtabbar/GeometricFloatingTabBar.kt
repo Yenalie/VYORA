@@ -39,12 +39,6 @@ import kotlin.math.roundToInt
 internal val LocalGeometricFloatingTabBar = staticCompositionLocalOf { false }
 internal val LocalFloatingTabBarCollapseProgress = staticCompositionLocalOf<(() -> Float)?> { null }
 
-/**
- * Continuous geometric fold for the floating tab bar.
- * One coordinate system and one clock — content is measured at resting width;
- * only the surface shrinks. This is what makes the size change smooth (no dual
- * AnimatedContent composition of heavy glass).
- */
 @Composable
 internal fun SharedTransitionScope.GeometricFloatingTabBar(
     scope: FloatingTabBarScopeImpl,
@@ -60,9 +54,6 @@ internal fun SharedTransitionScope.GeometricFloatingTabBar(
     shapes: FloatingTabBarShapes,
     sizes: FloatingTabBarSizes,
 ) {
-    // Springs, not tweens: when the user reverses scroll mid-fold the bar turns around with
-    // its current velocity instead of restarting a fixed 320ms curve (that restart was the
-    // visible hitch). Clamped to 0..1 because the geometry below must never extrapolate.
     val foldRaw = animateFloatAsState(
         if (isInline) 1f else 0f,
         spring(dampingRatio = 0.9f, stiffness = 320f),
@@ -76,8 +67,6 @@ internal fun SharedTransitionScope.GeometricFloatingTabBar(
     val fold = remember(foldRaw) { derivedStateOf { foldRaw.value.coerceIn(0f, 1f) } }
     val search = remember(searchRaw) { derivedStateOf { searchRaw.value.coerceIn(0f, 1f) } }
     val collapseProgress = remember(fold) { { fold.value } }
-    // Held as a lambda and read during draw: the glass inside the bar reuses its last
-    // capture for exactly the frames the bar's bounds are moving.
     val frozenWhileFolding = remember(fold, search) {
         {
             val f = fold.value
@@ -92,8 +81,6 @@ internal fun SharedTransitionScope.GeometricFloatingTabBar(
     val ownsSelectedSlot = selected?.key == selectedTabKey
     val sharedScope = this
 
-    // Resting pill width, worked out exactly as ExpandedTabs sizes itself, so the two
-    // can never disagree about where the pill ends.
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
     val tabWidthPx = with(density) { sizes.tabWidth.toPx() }
@@ -102,27 +89,20 @@ internal fun SharedTransitionScope.GeometricFloatingTabBar(
     val restPillWidth = (tabWidthPx * tabsCount + padStartPx + padEndPx).roundToInt()
     val selectedRestCenter = padStartPx + tabWidthPx * (selectedIndex + 0.5f)
 
-    // This visibility scope only satisfies the existing content contract. It
-    // never changes visibility and does not participate in the fold.
     AnimatedVisibility(visible = true) {
         val visibility = this
         Layout(
             modifier = Modifier.fillMaxWidth(),
             content = {
-                // 0: the single navigation surface. It is the only glass the pill has:
-                // ExpandedTabs draws none of its own while the bar is geometric.
                 Box(Modifier
                     .background(colors.backgroundColor, shapes.tabBarShape)
                     .clip(shapes.tabBarShape).then(tabBarContentModifier))
-                // 1: resting-width tabs, fading into the selected icon.
                 Box(Modifier.graphicsLayer {
                     alpha = (1f - fold.value * 3f).coerceIn(0f, 1f) * (1f - search.value)
                 }.drawWithContent {
                     val p = fold.value
                     val width = lerp(lerp(size.width, size.height, search.value), size.height, p)
                     val contentScope = this
-                    // At rest the pressed selector may protrude beyond the
-                    // capsule. Clip only while tabs disappear into the fold.
                     if (p == 0f && search.value == 0f) {
                         contentScope.drawContent()
                     } else {
@@ -139,7 +119,6 @@ internal fun SharedTransitionScope.GeometricFloatingTabBar(
                         sharedScope.expandedTabs(Modifier, visibility)
                     }
                 }
-                // 2: selected control only during the fold; resting tabs own their ink.
                 Box(Modifier.graphicsLayer {
                     alpha = maxOf(fold.value, search.value)
                 }.clip(shapes.standaloneTabShape).then(if (isInline || searchMode) Modifier.tapClickable(
@@ -152,12 +131,9 @@ internal fun SharedTransitionScope.GeometricFloatingTabBar(
                         titleFraction = { (1f - fold.value) * (1f - search.value) },
                     )
                 }
-                // 3: the search circle's glass. Unlike Square, where search is a fifth tab inside
-                // the pill until the bar folds, VYORA's search is always a circle of its own.
                 Box(Modifier
                     .background(colors.backgroundColor, shapes.standaloneTabShape)
                     .clip(shapes.standaloneTabShape).then(tabBarContentModifier))
-                // 4: the search control. Hidden while the field has replaced it.
                 Box(Modifier.graphicsLayer { alpha = 1f - search.value * (1f - fold.value) }
                     .clip(shapes.standaloneTabShape)
                     .tapClickable(
@@ -171,14 +147,12 @@ internal fun SharedTransitionScope.GeometricFloatingTabBar(
                         titleFraction = { 1f - fold.value },
                     )
                 }
-                // 5: search field replaces the magnifier when entering search.
                 Box(Modifier.graphicsLayer { alpha = search.value * (1f - fold.value) }
                     .then(if (!searchMode || isInline) Modifier.clearAndSetSemantics {} else Modifier)) {
                     if (searchMode || search.value > 0f) {
                         searchBarContent?.invoke(Modifier.fillMaxWidth().fillMaxHeight())
                     }
                 }
-                // 6: one player whose width, height and content all follow the fold.
                 Box {
                     if (accessory != null) {
                         CompositionLocalProvider(LocalFloatingTabBarCollapseProgress provides collapseProgress) {
@@ -196,11 +170,6 @@ internal fun SharedTransitionScope.GeometricFloatingTabBar(
             val p = fold.value
             val s = search.value
 
-            // The tabs are measured once, at their resting width, and keep that size for the
-            // whole fold: their height is the pill's height, which every other row copies.
-            // Height comes from the tabs' own intrinsic height and is then FIXED. ExpandedTabs
-            // sizes its puck with fillMaxHeight(), which collapses to nothing under an unbounded
-            // height — the selection puck simply vanished when this was measured loose.
             val pillW = restPillWidth.coerceAtMost(width)
             val tabs = children[1].measure(Constraints.fixed(pillW, children[1].maxIntrinsicHeight(pillW)))
             val expandedHeight = tabs.height
@@ -209,10 +178,6 @@ internal fun SharedTransitionScope.GeometricFloatingTabBar(
             val circle = height.coerceAtMost(width)
 
             val playerWidth0 = lerp(width.toFloat(), (width - 2 * (compactHeight + spacing)).coerceAtLeast(0).toFloat(), p).roundToInt()
-            // The player's height is needed to place everything, but its real width depends on
-            // that placement. measure() may only be called ONCE per Measurable (Compose throws
-            // "measure() may not be called multiple times"), so the height comes from an intrinsic
-            // query and the single real measure happens below.
             val playerHeight = if (accessory != null) children[6].maxIntrinsicHeight(playerWidth0) else 0
             val geometry = foldGeometry(
                 width = width,
@@ -235,7 +200,6 @@ internal fun SharedTransitionScope.GeometricFloatingTabBar(
             val rowY = geometry.rowY
             layout(width, geometry.height) {
                 surface.placeRelative(geometry.spanX, rowY)
-                // Vertically centred in the row: the tabs keep their resting height while the row shrinks.
                 tabs.placeRelative(geometry.spanX, rowY + (height - tabs.height) / 2)
                 selectedButton.placeRelative(geometry.selectedX, rowY)
                 searchSurface.placeRelative(geometry.searchX, rowY)

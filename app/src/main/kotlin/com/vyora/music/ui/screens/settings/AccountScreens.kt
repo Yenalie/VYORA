@@ -84,7 +84,6 @@ import kotlinx.coroutines.launch
 
 private val DialogShape = RoundedCornerShape(26.dp)
 
-/** First row of Settings: the account, or an invitation to sign in. */
 @Composable
 fun AccountSummaryRow(onClick: () -> Unit) {
     val account by AccountStore.account.collectAsState()
@@ -115,7 +114,6 @@ fun AccountSummaryRow(onClick: () -> Unit) {
     }
 }
 
-/** Account page: sign in (Google page or cookies), or sync status and sign out. */
 @Composable
 fun AccountScreen(onBack: () -> Unit, onSignIn: () -> Unit) {
     val account by AccountStore.account.collectAsState()
@@ -223,7 +221,6 @@ fun AccountScreen(onBack: () -> Unit, onSignIn: () -> Unit) {
     }
 }
 
-/** Also forgets the Google session of the sign-in page, so the next sign-in starts clean. */
 private fun signOut(keepLibrary: Boolean) {
     SyncEngine.signOut(keepLibrary)
     runCatching { CookieManager.getInstance().removeAllCookies(null) }
@@ -258,7 +255,6 @@ private fun Avatar(account: YouTubeAccount?, size: androidx.compose.ui.unit.Dp) 
     }
 }
 
-/** Advanced sign-in for when Google refuses the in-app page: paste a browser's cookies. */
 @Composable
 private fun CookieDialog(onDismiss: () -> Unit, onSignedIn: () -> Unit) {
     val context = LocalContext.current
@@ -321,10 +317,6 @@ private fun CookieDialog(onDismiss: () -> Unit, onSignedIn: () -> Unit) {
     )
 }
 
-/**
- * Google's own sign-in page in a WebView. Once it lands on YouTube Music with a session
- * cookie, the cookies are handed to [SyncEngine.signIn] and the page closes.
- */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun YouTubeSignInScreen(onBack: () -> Unit, onDone: () -> Unit) {
@@ -353,8 +345,6 @@ fun YouTubeSignInScreen(onBack: () -> Unit, onDone: () -> Unit) {
                         CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
-                        // Google turns away sign-ins from pages that announce an embedded
-                        // WebView ("; wv"); without the marker it is a regular Chrome UA.
                         settings.userAgentString = settings.userAgentString.replace("; wv", "")
                         webViewClient = object : WebViewClient() {
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) { loading = true }
@@ -376,8 +366,6 @@ fun YouTubeSignInScreen(onBack: () -> Unit, onDone: () -> Unit) {
                                 }
                             }
                         }
-                        // Start from a clean browser session: an expired one would land on
-                        // YouTube Music straight away and fail again.
                         CookieManager.getInstance().removeAllCookies { loadUrl(YouTubeConfig.SIGN_IN_URL) }
                     }
                 },

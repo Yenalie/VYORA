@@ -1,5 +1,18 @@
 package com.vyora.music.playback.service
 
+import android.net.wifi.WifiManager
+import android.os.PowerManager
+import androidx.core.content.ContextCompat
+import androidx.media3.cast.CastPlayer
+import androidx.media3.cast.SessionAvailabilityListener
+import androidx.media3.common.MediaItem
+import com.google.android.gms.cast.framework.CastContext
+import com.vyora.music.R
+import com.vyora.music.data.discord.DiscordPresence
+import com.vyora.music.data.discord.PresenceTrack
+import com.vyora.music.playback.cast.CastItemConverter
+import com.vyora.music.playback.cast.CastProxy
+import com.vyora.music.playback.cast.CastSupport
 import android.app.PendingIntent
 import android.content.Intent
 import android.util.Log
@@ -28,15 +41,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-/**
- * Owns the ExoPlayer, the playlist and stream-URL resolution.
- *
- * Every queue entry is a MediaItem whose URI is the YouTube watch URL. The real
- * audio URL is resolved lazily by [ResolvingDataSource] right before ExoPlayer
- * loads that item. Because this all lives in the service, next/previous from the
- * notification, lockscreen or a headset work, and auto-advance keeps working
- * after the Activity is gone.
- */
 @androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
 class PlaybackService : MediaSessionService() {
 
@@ -48,9 +52,53 @@ class PlaybackService : MediaSessionService() {
     private lateinit var crossfader: Crossfader
     private var tickerJob: Job? = null
     private var autoplayJob: Job? = null
-    /** Songs Autoplay already added this session, so the radio doesn't loop the same ones. */
     private val autoplayed = LinkedHashSet<String>()
     private var autoplayFailedSeed: String? = null
+    private var castPlayer: CastPlayer? = null
+    private var castSnapshot: QueueSnapshot? = null
+    private var castPollJob: Job? = null
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: WifiManager.WifiLock? = null
+    private val active: Player get() = mediaSession?.player ?: player
+
+    private class QueueSnapshot(
+        val items: List<MediaItem>,
+        val index: Int,
+        val positionMs: Long,
+        val playWhenReady: Boolean,
+        val repeatMode: Int,
+    )
+
+    private val presenceListener = object : Player.Listener {
+        override fun onEvents(player: Player, events: Player.Events) {
+            if (events.containsAny(
+                    Player.EVENT_MEDIA_ITEM_TRANSITION,
+                    Player.EVENT_PLAY_WHEN_READY_CHANGED,
+                    Player.EVENT_PLAYBACK_STATE_CHANGED,
+                    Player.EVENT_POSITION_DISCONTINUITY,
+                    Player.EVENT_MEDIA_METADATA_CHANGED,
+                )
+            ) pushPresence(player)
+        }
+    }
+
+    private val castListener = object : Player.Listener {
+        override fun onEvents(player: Player, events: Player.Events) {
+            if (player === active) rememberCast(player)
+        }
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = maybeAutoplay()
+
+        override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+            if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) maybeAutoplay()
+        }
+
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) = holdCastLocks(playWhenReady)
+
+        override fun onPlayerError(error: PlaybackException) {
+            Log.e(TAG, "Cast playback error (${error.errorCodeName})", error)
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -66,7 +114,6 @@ class PlaybackService : MediaSessionService() {
             .setMediaSourceFactory(sourceFactory)
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(SettingsRepository.current.pauseOnDisconnect)
-            // Keeps CPU + Wi-Fi awake so streaming doesn't stall with the screen off.
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
 
@@ -79,10 +126,7 @@ class PlaybackService : MediaSessionService() {
             }
 
             override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
-                // A new track gets a fresh chance at the one-shot 403 retry.
                 retriedIds.clear()
-                // Our own crossfade handoff keeps the fade going; anything else (skip, tap in
-                // the queue, new list) cuts the old song's tail right away.
                 if (!crossfader.onTransition(player.currentMediaItemIndex)) player.volume = sleepFactor()
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) keepCurrentFirstInShuffle()
                 saveQueue()
@@ -91,7 +135,6 @@ class PlaybackService : MediaSessionService() {
 
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 if (playWhenReady) startTicker() else crossfader.cancel()
-                // "End of song" sleep timer: ExoPlayer paused right at the end of the item.
                 if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM &&
                     SleepTimer.mode.value == SleepTimer.Mode.EndOfTrack
                 ) finishSleep(pause = false)
@@ -102,7 +145,6 @@ class PlaybackService : MediaSessionService() {
                 newPosition: Player.PositionInfo,
                 reason: Int,
             ) {
-                // A seek inside the song during a fade: stop blending, play it at full volume.
                 if (reason == Player.DISCONTINUITY_REASON_SEEK && oldPosition.mediaItemIndex == newPosition.mediaItemIndex) {
                     crossfader.cancel()
                     player.volume = sleepFactor()
@@ -116,12 +158,10 @@ class PlaybackService : MediaSessionService() {
             }
 
             override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
-                // Turning shuffle on keeps the current song and shuffles only what follows.
                 if (shuffleModeEnabled) keepCurrentFirstInShuffle()
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                // Remember where playback stopped, so the next launch resumes there.
                 if (!isPlaying) saveQueue()
             }
 
@@ -132,19 +172,22 @@ class PlaybackService : MediaSessionService() {
                 }
             }
         })
+        player.addListener(presenceListener)
         crossfader = Crossfader(this, player, sourceFactory)
 
-        // Apple Music-like queue edits under shuffle ("Play Next" really plays next).
         player.setShuffleOrder(PlayNextShuffleOrder(IntArray(0)))
         restoreQueue()
 
-        // Equalizer / bass boost / surround / loudness follow the Settings page.
         AudioEffects.attach(player.audioSessionId)
 
-        // Playback preferences apply live, without restarting the service.
         settingsJob = scope.launch {
             var autoplayWas: Boolean? = null
+            var discordWas: Boolean? = null
             SettingsRepository.settings.collect { s ->
+                if (discordWas != s.discordPresence) {
+                    if (s.discordPresence) pushPresence(active) else DiscordPresence.stop()
+                    discordWas = s.discordPresence
+                }
                 player.skipSilenceEnabled = s.skipSilence
                 MediaCache.setMaxBytes(s.mediaCache.bytes)
                 player.setHandleAudioBecomingNoisy(s.pauseOnDisconnect)
@@ -157,7 +200,6 @@ class PlaybackService : MediaSessionService() {
         }
         scope.launch {
             SleepTimer.mode.collect { mode ->
-                // "End of song" uses ExoPlayer's own pause-at-end; timed modes fade + pause.
                 player.pauseAtEndOfMediaItems = mode == SleepTimer.Mode.EndOfTrack
                 if (mode == null) player.volume = 1f
                 if (mode != null) startTicker()
@@ -174,15 +216,134 @@ class PlaybackService : MediaSessionService() {
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(sessionActivity)
             .build()
+        setupCast()
     }
 
-    /**
-     * - HTTP 403/410: the cached stream URL expired or is bound to another IP. Drop it and
-     *   retry the same track once, from the same position.
-     * - No connection / timeout: stay on the track (paused in error) instead of skipping
-     *   through the whole queue while offline. Pressing play retries.
-     * - Anything else (removed, region-locked...): skip to the next track if enabled.
-     */
+    private fun setupCast() {
+        if (!CastSupport.hasPlayServices(this)) return
+        val task = runCatching { CastContext.getSharedInstance(this, ContextCompat.getMainExecutor(this)) }
+            .onFailure { Log.w(TAG, "Cast framework unavailable", it) }
+            .getOrNull() ?: return
+        task.addOnSuccessListener { cast ->
+            if (mediaSession == null) return@addOnSuccessListener
+            val cp = CastPlayer(cast, CastItemConverter { id -> CastProxy.urlFor(id) })
+            cp.addListener(presenceListener)
+            cp.addListener(castListener)
+            cp.setSessionAvailabilityListener(object : SessionAvailabilityListener {
+                override fun onCastSessionAvailable() = switchTo(cp)
+                override fun onCastSessionUnavailable() = switchTo(player)
+            })
+            castPlayer = cp
+            CastSupport.publish(true, null)
+            if (cp.isCastSessionAvailable) switchTo(cp)
+        }.addOnFailureListener { Log.w(TAG, "Cast framework unavailable", it) }
+    }
+
+    private fun switchTo(target: Player) {
+        val session = mediaSession ?: return
+        val previous = session.player
+        if (previous === target) return
+        val toCast = target !== player
+        val snapshot = if (toCast) snapshotOf(previous) else castSnapshot ?: snapshotOf(previous)
+        if (toCast) {
+            runCatching { CastProxy.start(this) }.onFailure { Log.e(TAG, "Cast proxy failed", it) }
+            crossfader.cancel()
+            player.pause()
+            player.volume = 1f
+        } else {
+            castPollJob?.cancel()
+            castPollJob = null
+            holdCastLocks(false)
+            runCatching { previous.stop() }
+            CastProxy.stop()
+        }
+        session.player = target
+        if (snapshot.items.isNotEmpty()) {
+            target.setMediaItems(snapshot.items, snapshot.index.coerceIn(0, snapshot.items.lastIndex), snapshot.positionMs)
+            target.repeatMode = snapshot.repeatMode
+            target.playWhenReady = snapshot.playWhenReady
+            target.prepare()
+        }
+        castSnapshot = null
+        if (toCast) {
+            rememberCast(target)
+            holdCastLocks(snapshot.playWhenReady)
+            castPollJob = scope.launch {
+                while (isActive) {
+                    delay(2_000)
+                    if (active === target) rememberCast(target)
+                }
+            }
+        } else {
+            saveQueue()
+        }
+        val device = if (toCast) {
+            runCatching { CastSupport.context(this)?.sessionManager?.currentCastSession?.castDevice?.friendlyName }.getOrNull()
+                ?: getString(R.string.cast_device_fallback)
+        } else null
+        CastSupport.publish(true, device)
+        pushPresence(target)
+    }
+
+    private fun snapshotOf(p: Player): QueueSnapshot = QueueSnapshot(
+        items = List(p.mediaItemCount) { p.getMediaItemAt(it) },
+        index = p.currentMediaItemIndex.coerceAtLeast(0),
+        positionMs = p.currentPosition.coerceAtLeast(0L),
+        playWhenReady = p.playWhenReady,
+        repeatMode = p.repeatMode,
+    )
+
+    private fun rememberCast(p: Player) {
+        if (p.mediaItemCount == 0) return
+        castSnapshot = snapshotOf(p)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun holdCastLocks(hold: Boolean) {
+        val casting = active !== player
+        if (hold && casting) {
+            if (wakeLock == null) {
+                wakeLock = (getSystemService(POWER_SERVICE) as PowerManager)
+                    .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VYORA:cast")
+                    .apply { setReferenceCounted(false) }
+            }
+            if (wifiLock == null) {
+                wifiLock = (applicationContext.getSystemService(WIFI_SERVICE) as WifiManager)
+                    .createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "VYORA:cast")
+                    .apply { setReferenceCounted(false) }
+            }
+            runCatching { wakeLock?.acquire(4 * 60 * 60 * 1000L) }
+            runCatching { wifiLock?.acquire() }
+        } else {
+            runCatching { if (wakeLock?.isHeld == true) wakeLock?.release() }
+            runCatching { if (wifiLock?.isHeld == true) wifiLock?.release() }
+        }
+    }
+
+    private fun pushPresence(p: Player) {
+        if (p !== active) return
+        val item = p.currentMediaItem
+        val playing = p.playWhenReady &&
+            (p.playbackState == Player.STATE_READY || p.playbackState == Player.STATE_BUFFERING)
+        if (item == null || !playing) {
+            DiscordPresence.update(null)
+            return
+        }
+        val md = item.mediaMetadata
+        val now = System.currentTimeMillis()
+        val started = now - p.currentPosition.coerceAtLeast(0L)
+        val duration = p.duration.takeIf { it != C.TIME_UNSET && it > 0 }
+            ?: (md.extras?.getLong(MediaItems.EXTRA_DURATION_SEC, 0L) ?: 0L) * 1000L
+        DiscordPresence.update(
+            PresenceTrack(
+                title = md.title?.toString().orEmpty().ifBlank { item.mediaId },
+                artist = md.artist?.toString().orEmpty(),
+                startedAt = started,
+                endsAt = if (duration > 0) started + duration else 0L,
+            )
+        )
+    }
+
     private fun handleError(error: PlaybackException) {
         val item = player.currentMediaItem
         val id = item?.mediaId.orEmpty()
@@ -211,9 +372,6 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
-    // ------------------------------------------------------------ volume: fades & sleep
-
-    /** One loop for crossfade and the sleep timer: 50 ms while something fades, else 250 ms. */
     private fun startTicker() {
         if (tickerJob?.isActive == true) return
         tickerJob = scope.launch {
@@ -226,7 +384,6 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
-    /** Returns false when there is nothing left to watch (paused, no timer). */
     private fun tick(): Boolean {
         val mode = SleepTimer.mode.value
         if (mode is SleepTimer.Mode.At && SleepTimer.remainingMs() == 0L) {
@@ -236,14 +393,11 @@ class PlaybackService : MediaSessionService() {
         if (!player.playWhenReady && !crossfader.isActive) return mode != null
         val s = SettingsRepository.current
         val outer = sleepFactor()
-        // No crossfade into a song that the "end of song" timer will never play.
         val fade = crossfader.tick(s.crossfade && mode != SleepTimer.Mode.EndOfTrack, s.crossfadeSeconds, outer)
         player.volume = fade * outer
-        // Nothing to watch with crossfade off and no timer: stop polling until that changes.
         return s.crossfade || mode != null || crossfader.isActive
     }
 
-    /** Sleep-timer fade over its last [SleepTimer.FADE_MS] (1 = full volume). */
     private fun sleepFactor(): Float = when (val mode = SleepTimer.mode.value) {
         is SleepTimer.Mode.At -> ((SleepTimer.remainingMs() ?: 0L).toFloat() / SleepTimer.FADE_MS).coerceIn(0f, 1f)
         SleepTimer.Mode.EndOfTrack -> {
@@ -256,23 +410,15 @@ class PlaybackService : MediaSessionService() {
 
     private fun finishSleep(pause: Boolean) {
         crossfader.cancel()
-        if (pause) player.pause()
+        if (pause) active.pause()
         SleepTimer.cancel()
         player.pauseAtEndOfMediaItems = false
-        // Paused already, so restoring the volume is silent; next play starts normally.
         player.volume = 1f
-        // The "end of song" pause happens at the end: start the next song from 0 next time.
         if (!pause && player.hasNextMediaItem()) player.seekToNextMediaItem()
     }
 
-    // --------------------------------------------------------------------- autoplay
-
-    /**
-     * Apple Music's ∞: when two or fewer songs are left, append ~15 similar ones from the
-     * YouTube Music radio of the last song. Runs in the service, so it also works with the
-     * screen off. Repeat (all / one) means the user wants this queue, so nothing is added.
-     */
     private fun maybeAutoplay() {
+        val player = active
         if (!SettingsRepository.current.autoplay) return
         if (player.repeatMode != Player.REPEAT_MODE_OFF || player.mediaItemCount == 0) return
         if (autoplayJob?.isActive == true) return
@@ -293,11 +439,10 @@ class PlaybackService : MediaSessionService() {
         autoplayJob = scope.launch {
             val songs = YouTubeClient.radio(seed).getOrNull()
             if (songs.isNullOrEmpty()) {
-                autoplayFailedSeed = seed // offline or no mix: don't retry on every event
+                autoplayFailedSeed = seed
                 return@launch
             }
             autoplayFailedSeed = null
-            // Re-check: the user may have turned it off or replaced the queue meanwhile.
             if (!SettingsRepository.current.autoplay || player.mediaItemCount == 0) return@launch
             val inQueue = HashSet<String>().apply { for (i in 0 until player.mediaItemCount) add(player.getMediaItemAt(i).mediaId) }
             val picks = songs.filter { it.id !in inQueue && it.id !in autoplayed }.take(AUTOPLAY_BATCH)
@@ -312,7 +457,6 @@ class PlaybackService : MediaSessionService() {
             val firstNew = player.mediaItemCount
             player.addMediaItems(picks.map { MediaItems.from(it, autoplay = true) })
             if (ended) {
-                // The queue had already run out while we were fetching: carry on.
                 player.seekTo(firstNew, 0L)
                 player.prepare()
                 player.play()
@@ -320,7 +464,6 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
-    /** Autoplay switched off: drop the similar songs that haven't played yet. */
     private fun removeUpcomingAutoplay() {
         autoplayJob?.cancel()
         val current = player.currentMediaItemIndex
@@ -346,12 +489,10 @@ class PlaybackService : MediaSessionService() {
         QueueStore.save(this, items, player.currentMediaItemIndex, player.currentPosition.coerceAtLeast(0L))
     }
 
-    /** Puts the last session's queue back, paused and not yet buffering (no network). */
     private fun restoreQueue() {
         if (player.mediaItemCount > 0) return
         val saved = QueueStore.load(this) ?: return
         player.setMediaItems(saved.items, saved.index, saved.positionMs)
-        // Not prepared on purpose: pressing play prepares it (see PlayerManager.togglePlayPause).
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
@@ -371,11 +512,22 @@ class PlaybackService : MediaSessionService() {
         crossfader.release()
         scope.cancel()
         AudioEffects.release()
+        DiscordPresence.stop()
+        holdCastLocks(false)
+        CastProxy.stop()
+        castPlayer?.let {
+            it.setSessionAvailabilityListener(null)
+            it.removeListener(castListener)
+            it.removeListener(presenceListener)
+            it.release()
+        }
+        castPlayer = null
+        CastSupport.publish(false, null)
         mediaSession?.run {
-            player.release()
             release()
             mediaSession = null
         }
+        player.release()
         super.onDestroy()
     }
 

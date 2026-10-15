@@ -15,14 +15,6 @@ import org.json.JSONArray
 
 private val Context.legacyLibraryStore: DataStore<Preferences> by preferencesDataStore(name = "vyora_library_v2")
 
-/**
- * Moves a VYORA 1.x library into Room, once:
- *  - 1.0 SharedPreferences "vyora_library" (delimiter format),
- *  - 1.1-1.3 DataStore "vyora_library_v2" (JSON),
- *  - SharedPreferences "vyora_search" (recent searches).
- * The old stores are emptied only after the Room transaction committed, so a crash in the
- * middle simply repeats the import on the next launch.
- */
 internal object LegacyImport {
     private const val TAG = "VYORA-Import"
     private const val META_PREFS = "vyora_db_meta"
@@ -75,7 +67,6 @@ internal object LegacyImport {
     ) {
         val dao = db.library()
         val now = System.currentTimeMillis()
-        // The old lists were newest first; timestamps one second apart keep that order.
         fun stamp(index: Int) = now - index * 1000L
         db.withTransaction {
             dao.upsertItems((liked + recent + saved + playlists.flatMap { it.songs }).distinctBy { it.id }.map(ItemEntity::of))
@@ -93,7 +84,6 @@ internal object LegacyImport {
     }
 }
 
-/** Readers for the 1.x storage formats. Pure, so the unit tests cover them. */
 internal object LegacyFormat {
     data class Playlist(val id: String, val name: String, val songs: List<SimpleItem>, val createdAt: Long)
 
@@ -117,7 +107,6 @@ internal object LegacyFormat {
         return List(array.length()) { array.optString(it) }.filter { it.isNotBlank() }.distinctBy { it.lowercase() }
     }
 
-    /** 1.0 format: "id###title###artist###thumb|||...". */
     fun decodeDelimited(raw: String?): List<SimpleItem> {
         if (raw.isNullOrBlank()) return emptyList()
         return raw.split("|||").mapNotNull { part ->

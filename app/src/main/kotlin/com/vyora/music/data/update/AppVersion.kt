@@ -1,11 +1,5 @@
 package com.vyora.music.data.update
 
-/**
- * Release version as written in a git tag or versionName: "v1.5.0", "1.5", "1.5.0-beta2".
- *
- * Numeric parts are compared one by one (missing parts count as 0). A pre-release suffix
- * ("-beta2") sorts before the same version without one, so 1.5.0-beta2 < 1.5.0.
- */
 data class AppVersion(val parts: List<Int>, val preRelease: String?) : Comparable<AppVersion> {
 
     override fun compareTo(other: AppVersion): Int {
@@ -27,7 +21,6 @@ data class AppVersion(val parts: List<Int>, val preRelease: String?) : Comparabl
         parts.joinToString(".") + (preRelease?.let { "-$it" } ?: "")
 
     companion object {
-        /** Null when [raw] has no leading number (e.g. "nightly"). */
         fun parse(raw: String?): AppVersion? {
             val clean = raw?.trim()?.removePrefix("v")?.removePrefix("V") ?: return null
             if (clean.isEmpty()) return null

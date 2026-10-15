@@ -196,11 +196,6 @@ fun GlassSettingsScreen(onBack: () -> Unit) {
 
 private fun percent(v: Float) = "${(v * 100).roundToInt()}%"
 
-/**
- * Live preview: colourful drifting blobs recorded into their own backdrop layer, with a
- * miniature tab bar and a round glass button on top rendered by the real glass engine
- * and the current settings.
- */
 @Composable
 private fun GlassPreview() {
     val config = LocalGlassEffectConfig.current
@@ -223,7 +218,6 @@ private fun GlassPreview() {
             blob(accent, w * (0.15f + 0.35f * drift), h * 0.35f, h * 0.75f)
             blob(SystemColors.BlueDark, w * (0.85f - 0.3f * drift), h * 0.55f, h * 0.7f)
             blob(SystemColors.YellowDark, w * 0.5f, h * (0.9f - 0.4f * drift), h * 0.55f)
-            // Stripes make refraction visible.
             for (i in 0..14) {
                 val x = i * w / 14f
                 drawLine(colors.text.copy(alpha = 0.10f), Offset(x, 0f), Offset(x - h * 0.4f, h), strokeWidth = 3f)

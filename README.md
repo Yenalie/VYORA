@@ -44,6 +44,9 @@ Dengarkan jutaan lagu dari katalog YouTube Music, simpan favoritmu, dan sinkronk
 ### Musik
 - Cari lagu, album, artis, dan playlist dari katalog YouTube Music
 - Lirik yang berjalan mengikuti lagu
+- **Kartu lirik:** pilih beberapa baris lirik dan bagikan sebagai gambar dengan latar artwork
+- **Unduh lagu** untuk diputar offline, termasuk unduh semua isi playlist
+- **Cast** ke Chromecast dan speaker Google Cast
 - Autoplay: lagu serupa terus diputar setelah antrean habis
 - Antrean lengkap: putar berikutnya, putar terakhir, acak, ulangi
 - Sleep timer, crossfade antar lagu, dan lewati bagian hening
@@ -69,6 +72,7 @@ Dengarkan jutaan lagu dari katalog YouTube Music, simpan favoritmu, dan sinkronk
 
 ### Lainnya
 - **Pembaruan otomatis:** VYORA memberi tahu lewat notifikasi saat ada versi baru, lalu mengunduh dan memasangnya langsung dari aplikasi
+- **Discord Rich Presence:** tampilkan lagu yang sedang diputar di profil Discord
 - Lagu yang pernah diputar disimpan di cache, jadi lebih hemat kuota
 - Tersedia dalam 5 bahasa: Indonesia, Inggris, Melayu, Spanyol, dan Jepang
 
@@ -102,6 +106,7 @@ di [Panduan Developer](docs/DEVELOPMENT.md).
 - [NewPipe Extractor](https://github.com/TeamNewPipe/NewPipeExtractor)
 - [Room](https://developer.android.com/training/data-storage/room)
 - [Coil](https://github.com/coil-kt/coil)
+- [Google Cast SDK](https://developers.google.com/cast) lewat Media3 Cast
 - [LRCLIB](https://lrclib.net) untuk lirik
 - Efek glass dari [Kyant0/backdrop](https://github.com/Kyant0/backdrop)
 

@@ -24,17 +24,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
-/** How often the picture is re-aligned with the song, and its colour read. */
 private const val FOLLOW_INTERVAL_MS = 500L
 private const val SAMPLE_INTERVAL_MS = 800L
 private const val SAMPLE_WIDTH = 64
 private const val SAMPLE_HEIGHT = 36
 
-/**
- * The music video of [videoId], muted and kept in sync with the song, fading in over the
- * cover once its first frame is ready. While it shows, its colour drives [VideoAmbience].
- * Drawn through a TextureView so it clips to the artwork's rounded corners.
- */
 @Composable
 fun VideoArtwork(videoId: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current

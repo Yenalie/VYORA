@@ -189,7 +189,6 @@ private fun freqLabel(hz: Int) = if (hz >= 1000) {
     if (k >= 10f || abs(k - k.roundToInt()) < 0.05f) "${k.roundToInt()}k" else "%.1fk".format(k)
 } else "$hz"
 
-/** "+1.5", "0", "-3": half-dB steps, no trailing ".0". */
 private fun dbLabel(db: Float): String {
     val r = (db * 2).roundToInt() / 2f
     val body = if (r == r.roundToInt().toFloat()) "${abs(r.roundToInt())}" else "%.1f".format(abs(r))
@@ -200,7 +199,6 @@ private fun dbLabel(db: Float): String {
     }
 }
 
-/** One vertical slider per band, with the dB value on top and the frequency below. */
 @Composable
 private fun BandsEditor(gains: FloatArray, dim: Boolean, onChange: (Int, Float) -> Unit) {
     Row(
@@ -230,7 +228,6 @@ private fun BandsEditor(gains: FloatArray, dim: Boolean, onChange: (Int, Float) 
     }
 }
 
-/** iOS-style vertical slider, filled from the 0 dB centre line toward the knob. */
 @Composable
 private fun VerticalSlider(
     value: Float,
@@ -249,13 +246,12 @@ private fun VerticalSlider(
         val heightPx = constraints.maxHeight.toFloat()
         val usable = (heightPx - knobPx).coerceAtLeast(1f)
         val span = (max - min).takeIf { it > 0f } ?: 1f
-        // fraction 1 = top (max gain)
         val fraction = ((value - min) / span).coerceIn(0f, 1f)
         val zeroFraction = ((0f - min) / span).coerceIn(0f, 1f)
         fun emit(y: Float) {
             val f = (1f - (y - knobPx / 2f) / usable).coerceIn(0f, 1f)
             var v = min + f * span
-            if (abs(v) < 0.4f) v = 0f // gentle snap to 0 dB
+            if (abs(v) < 0.4f) v = 0f
             latest((v * 2).roundToInt() / 2f)
         }
         val knobY = usable * (1f - fraction)
@@ -285,7 +281,6 @@ private fun VerticalSlider(
                     .clip(CircleShape)
                     .background(accent)
             )
-            // 0 dB tick
             Box(
                 Modifier
                     .offset { IntOffset(0, (zeroY - with(density) { 1.dp.toPx() }).roundToInt()) }

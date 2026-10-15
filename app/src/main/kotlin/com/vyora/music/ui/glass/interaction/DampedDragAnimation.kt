@@ -1,11 +1,3 @@
-/*
- * Vendored from Kyant0/AndroidLiquidGlass (kmp branch)
- * https://github.com/Kyant0/AndroidLiquidGlass — Copyright 2025 Kyant0, Apache License 2.0
- * app/src/commonMain/kotlin/com/kyant/backdrop/catalog/utils/DampedDragAnimation.kt
- *
- * Not published as a library — ported straight from the catalog demo app that
- * showcases Kyant0/backdrop, source-only. Package renamed accordingly.
- */
 package com.vyora.music.ui.glass.interaction
 
 import androidx.compose.animation.core.Animatable
@@ -33,13 +25,6 @@ class DampedDragAnimation(
     val onDragStarted: DampedDragAnimation.(position: Offset) -> Unit,
     val onDragStopped: DampedDragAnimation.() -> Unit,
     val onDrag: DampedDragAnimation.(size: IntSize, dragAmount: Offset) -> Unit,
-    /**
-     * Damping of the tracked drag velocity, which callers turn into stretch.
-     *
-     * The library's 0.5f is underdamped, so the velocity rings after every change
-     * of speed and anything driven by it wobbles rather than following the finger.
-     * Pass 1f for a stretch that tracks the drag and stops when it stops.
-     */
     val velocityDampingRatio: Float = 0.5f,
 ) {
 
@@ -120,17 +105,6 @@ class DampedDragAnimation(
         }
     }
 
-    /**
-     * Set the value immediately, with no animation of its own.
-     *
-     * For following an external driver frame by frame — the tab pager's own scroll
-     * position, say. [updateValue] would spring toward each sample and so trail the
-     * driver by a frame or more, and [animateToValue] would additionally press-grow
-     * the puck on every single sample.
-     *
-     * Suspend rather than launching internally so the caller keeps ONE collector
-     * coroutine for the whole gesture instead of starting a fresh one per frame.
-     */
     suspend fun snapValue(value: Float) {
         valueAnimation.snapTo(value.coerceIn(valueRange))
     }

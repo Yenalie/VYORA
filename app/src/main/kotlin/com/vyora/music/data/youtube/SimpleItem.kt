@@ -3,7 +3,6 @@ package com.vyora.music.data.youtube
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Values of [SimpleItem.type]. Persisted as-is, so never rename them. */
 object ItemType {
     const val SONG = "song"
     const val ARTIST = "artist"
@@ -11,7 +10,6 @@ object ItemType {
     const val PLAYLIST = "playlist"
 }
 
-/** Everything the app shows or plays: a song, an artist, an album or a playlist. */
 data class SimpleItem(
     val id: String,
     val title: String,
@@ -20,17 +18,8 @@ data class SimpleItem(
     val url: String,
     val duration: Long = 0L,
     val type: String = ItemType.SONG,
-    /** Subscribers (artist) or track count (album/playlist); -1 = unknown. */
     val count: Long = -1L,
-    /**
-     * YouTube channel id of the (first) artist, e.g. "UC_DHlXllTSMB8pTC38_leFg". Tells apart
-     * artists that share a name (Indonesian Tulus vs the Norwegian band). Null if unknown.
-     */
     val artistId: String? = null,
-    /**
-     * A music video (official video, live, cover) rather than an audio-only "song" upload.
-     * Now Playing shows the moving picture instead of the cover for these.
-     */
     val isVideo: Boolean = false,
 ) {
     val isSong: Boolean get() = type == ItemType.SONG
@@ -41,7 +30,6 @@ data class SimpleItem(
     }
 }
 
-/** The one JSON shape for [SimpleItem], shared by the library, the saved queue and tests. */
 object SimpleItemJson {
     private const val ID = "id"
     private const val TITLE = "title"
@@ -86,7 +74,6 @@ object SimpleItemJson {
     fun encode(list: List<SimpleItem>): String =
         JSONArray().apply { list.forEach { put(toJson(it)) } }.toString()
 
-    /** Corrupt or partial data yields the rows that could be read, never an exception. */
     fun decode(raw: String?): List<SimpleItem> {
         if (raw.isNullOrBlank()) return emptyList()
         val array = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()

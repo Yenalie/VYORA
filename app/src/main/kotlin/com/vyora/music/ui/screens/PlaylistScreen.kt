@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.MusicOff
 import androidx.compose.material.icons.filled.PlayArrow
@@ -89,15 +90,12 @@ import com.vyora.music.ui.theme.VyoraText
 import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.Page
 
-/** Contents of an album or playlist. [playlistId] is the YouTube `list=` value. */
 @Composable
 fun PlaylistScreen(
     playlistId: String,
     onBack: () -> Unit,
-    /** queue, start index, shuffle on? */
     onPlay: (List<SimpleItem>, Int, Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    /** What the tapped row already knew, shown instantly while the page loads. */
     seedArt: String? = null,
     seedTitle: String? = null,
     seedOwner: String? = null,
@@ -134,11 +132,10 @@ fun PlaylistScreen(
             YouTubeClient.getPlaylistMore(playlistId, page, detail?.thumbnail).fold(
                 onSuccess = { more ->
                     val merged = (songs + more.items).distinctBy { it.id }
-                    // No new rows: the cursor is stuck, stop paging.
                     nextPage = if (merged.size == songs.size) null else more.nextPage
                     songs = merged
                 },
-                onFailure = { /* keep cursor; scrolling again retries */ }
+                onFailure = { }
             )
             loadingMore = false
         }
@@ -154,10 +151,7 @@ fun PlaylistScreen(
     }
     LaunchedEffect(nearEnd, songs.size) { if (nearEnd) loadMore() }
 
-    // iOS 26.4: the whole page takes a deep version of the artwork colour and the cover
-    // runs edge to edge at the top, fading into that colour.
     val tint by rememberArtworkTint(seedArt ?: detail?.thumbnail)
-    // Dark: a deep shade of the artwork colour. Light: a soft pastel of it.
     val isDarkPage = LocalVyoraColors.current.isDark
     val pageTarget = if (isDarkPage) lerp(tint, Color.Black, 0.55f) else lerp(tint, Color.White, 0.8f)
     val onPage = VyoraText
@@ -165,10 +159,8 @@ fun PlaylistScreen(
     var menu by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val queuedMsg = stringResource(R.string.toast_play_last)
+    val downloadAllMsg = stringResource(R.string.toast_download_all_started)
 
-    // Two glass sources, so nothing ever samples a layer that contains itself:
-    //  - pageBackdrop: just the tinted page colour, sampled by in-list glass (cards, buttons);
-    //  - listBackdrop: the whole scrolling page, sampled by the floating toolbar on top.
     val pageBackdrop = rememberLayerBackdrop()
     val listBackdrop = rememberLayerBackdrop()
 
@@ -176,8 +168,6 @@ fun PlaylistScreen(
       Box(Modifier.fillMaxSize().layerBackdrop(listBackdrop)) {
         Box(Modifier.fillMaxSize().layerBackdrop(pageBackdrop).background(page))
         CompositionLocalProvider(LocalAppBackdrop provides pageBackdrop) {
-        // The header is there from the first frame (seeded from the tapped row), so the
-        // cover has somewhere to fly to; loading / error states sit under it.
         LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
@@ -244,7 +234,6 @@ fun PlaylistScreen(
         }
       }
 
-        // Floating iOS 26 toolbar: liquid-glass back / more buttons refracting the page.
         CompositionLocalProvider(LocalAppBackdrop provides listBackdrop, LocalMenuBackdrop provides listBackdrop) {
         Row(
             Modifier
@@ -262,7 +251,6 @@ fun PlaylistScreen(
                 fill = onPage.copy(alpha = 0.10f),
             )
             Spacer(Modifier.weight(1f))
-            // iOS 26 album toolbar: "+" adds the album to the Library, then turns into a check.
             val saved by LibraryManager.savedCollections.collectAsState()
             val isSaved = saved.any { it.id == playlistId }
             val title = detail?.title ?: seedTitle
@@ -310,6 +298,10 @@ fun PlaylistScreen(
                                 songs.forEach { PlayerManager.addToQueue(it) }
                                 Toast.makeText(context, queuedMsg, Toast.LENGTH_SHORT).show()
                             },
+                            MenuAction(stringResource(R.string.download_all), Icons.Default.FileDownload) {
+                                com.vyora.music.data.download.Downloads.downloadAll(context, songs)
+                                Toast.makeText(context, downloadAllMsg, Toast.LENGTH_SHORT).show()
+                            },
                         ),
                     )
                 }
@@ -335,7 +327,6 @@ private fun Header(
 ) {
     val onPage = VyoraText
     Box(Modifier.fillMaxWidth()) {
-        // Lands from the list thumbnail: bounds fly, corners ease from 10dp to square.
         val corner by morphingCorner(from = 10.dp, to = 0.dp)
         Artwork(
             url = art,
@@ -346,7 +337,6 @@ private fun Header(
             placeholderKey = artPlaceholderKey,
             modifier = Modifier.sharedArtwork(artworkKey(playlistId)).fillMaxWidth().aspectRatio(1f),
         )
-        // Fade the cover into the page colour so the title sits on a calm field.
         Box(
             Modifier
                 .matchParentSize()
@@ -372,7 +362,6 @@ private fun Header(
                 Spacer(Modifier.height(2.dp))
                 Text(owner, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Normal), color = onPage.copy(alpha = 0.75f), textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            // Total from YouTube if known, else what has been loaded so far.
             val count = totalSongs.takeIf { it > 0 }?.toInt() ?: loadedCount
             if (count > 0) {
                 Spacer(Modifier.height(4.dp))

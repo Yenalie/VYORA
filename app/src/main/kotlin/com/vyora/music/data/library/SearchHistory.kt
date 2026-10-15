@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/** "Recent Searches", like Apple Music: newest first, de-duplicated, capped. Stored in Room. */
 object SearchHistory {
     private const val MAX = 12
 

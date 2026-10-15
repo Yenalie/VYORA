@@ -5,14 +5,6 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-/**
- * The app's one database: library, playlists, history, searches, the saved queue and the
- * list of changes waiting to be synced to YouTube. Settings stay in SharedPreferences and the
- * YouTube sign-in in encrypted storage ([com.vyora.music.data.account.AccountStore]).
- *
- * Schemas are exported to `app/schemas/`; a version bump needs a Migration, never a
- * destructive fallback, because this is the user's library.
- */
 @Database(
     entities = [
         ItemEntity::class,
@@ -47,7 +39,6 @@ abstract class VyoraDatabase : RoomDatabase() {
                     .also { instance = it }
             }
 
-        /** Tests swap in an in-memory database. */
         internal fun replaceForTest(db: VyoraDatabase?) {
             synchronized(this) { instance = db }
         }

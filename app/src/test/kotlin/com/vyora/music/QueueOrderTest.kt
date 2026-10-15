@@ -9,9 +9,7 @@ class QueueOrderTest {
     private fun order(vararg ix: Int) = PlayNextShuffleOrder(ix, Random(1))
 
     @Test fun playNextGoesRightAfterCurrentWhileShuffled() {
-        // Play order 2 -> 0 -> 3 -> 1, current = 2. "Play Next" inserts at playlist index 3.
         val next = order(2, 0, 3, 1).cloneAndInsert(3, 1) as PlayNextShuffleOrder
-        // Old 3 becomes 4; the new item (3) follows the item before the insertion point (2).
         assertEquals(listOf(2, 3, 0, 4, 1), next.order())
     }
 

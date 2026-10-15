@@ -7,17 +7,11 @@ import androidx.media3.common.MediaMetadata
 import com.vyora.music.data.youtube.ItemType
 import com.vyora.music.data.youtube.SimpleItem
 
-/**
- * SimpleItem <-> MediaItem, shared by the UI ([PlayerManager]) and the playback service
- * (autoplay adds songs on its own, with the screen off).
- */
 object MediaItems {
     const val EXTRA_DURATION_SEC = "vyora_duration_sec"
     const val EXTRA_ITEM_TYPE = "vyora_item_type"
-    /** Added by Autoplay (similar songs after the queue), not by the user. */
     const val EXTRA_AUTOPLAY = "vyora_autoplay"
     const val EXTRA_ARTIST_ID = "vyora_artist_id"
-    /** A music video: Now Playing shows its moving picture. */
     const val EXTRA_VIDEO = "vyora_video"
 
     fun from(item: SimpleItem, autoplay: Boolean = false): MediaItem {
@@ -30,7 +24,6 @@ object MediaItems {
         }
         return MediaItem.Builder()
             .setMediaId(item.id)
-            // The service's ResolvingDataSource swaps this for the real audio URL on load.
             .setUri(SimpleItem.watchUrl(item.id))
             .setMediaMetadata(
                 MediaMetadata.Builder()

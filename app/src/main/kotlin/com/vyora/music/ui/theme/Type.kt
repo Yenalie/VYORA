@@ -8,10 +8,6 @@ import androidx.compose.ui.unit.sp
 
 private val Base = FontFamily.Default
 
-// iOS Dynamic Type ramp (Large size), mapped onto the Material slots:
-// Large Title 34 / Title1 28 / Title2 22 / Title3 20 / Headline 17 / Body 17 /
-// Callout 16 / Subheadline 15 / Footnote 13 / Caption1 12 / Caption2 11.
-// SF tracks tight at display sizes, so letter spacing is pulled in to match.
 val Typography = Typography(
     displayLarge = TextStyle(fontFamily = Base, fontWeight = FontWeight.Bold, fontSize = 34.sp, lineHeight = 41.sp, letterSpacing = (-0.9).sp),
     headlineLarge = TextStyle(fontFamily = Base, fontWeight = FontWeight.Bold, fontSize = 34.sp, lineHeight = 41.sp, letterSpacing = (-0.9).sp),

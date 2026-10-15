@@ -5,16 +5,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/**
- * Sleep timer shared by the UI and the playback service (same process). The UI sets it;
- * [com.vyora.music.playback.service.PlaybackService] watches it, fades the music out over the last
- * [FADE_MS] and pauses. Kept in memory only: a timer should not survive a reboot.
- */
 object SleepTimer {
     sealed interface Mode {
-        /** Pause at [endsAtElapsed] (SystemClock.elapsedRealtime based). */
         data class At(val endsAtElapsed: Long, val minutes: Int) : Mode
-        /** Pause when the current song finishes. */
         data object EndOfTrack : Mode
     }
 
@@ -36,7 +29,6 @@ object SleepTimer {
         _mode.value = null
     }
 
-    /** Milliseconds left for a timed mode, null otherwise. */
     fun remainingMs(now: Long = SystemClock.elapsedRealtime()): Long? =
         (_mode.value as? Mode.At)?.let { (it.endsAtElapsed - now).coerceAtLeast(0L) }
 }

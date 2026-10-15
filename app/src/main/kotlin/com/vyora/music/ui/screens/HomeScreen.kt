@@ -75,17 +75,12 @@ import com.vyora.music.ui.theme.VyoraSurface
 import com.vyora.music.ui.theme.VyoraText
 import com.vyora.music.ui.theme.VyoraTextMuted
 
-/** Collection routes opened from Home / Library shelves. */
 object Collections {
     const val LIKED = "liked"
     const val RECENT = "recent"
+    const val DOWNLOADS = "downloads"
 }
 
-/**
- * Apple Music "Home" (iOS 26): large title, "Top Picks" tall cards whose lower panel takes
- * the artwork colour, shelves with "Title ›" headers that open the full list, and a paged
- * "Top Songs" shelf of 4-row columns.
- */
 @Composable
 fun HomeScreen(
     onPlayList: (List<SimpleItem>, Int) -> Unit,
@@ -103,7 +98,6 @@ fun HomeScreen(
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf(false) }
     var attempt by rememberSaveable { mutableStateOf(0) }
-    // Seeds only change when the user's top artists change, not on every play.
     val seeds = remember(recent, liked) { HomeFeed.seedArtists(recent, liked).joinToString(",") }
 
     LaunchedEffect(attempt, seeds, chartQuery) {
@@ -121,7 +115,6 @@ fun HomeScreen(
     val topSongs = content?.topSongs.orEmpty()
     val artistShelves = content?.artistShelves.orEmpty()
 
-    // Tapping the tab again scrolls back to the top.
     val listState = rememberLazyListState()
     OnTabReselect("home") { listState.scrollToTopSmooth() }
 
@@ -140,7 +133,6 @@ fun HomeScreen(
                 trailing = {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         GlassIconButton(Icons.Default.Search, stringResource(R.string.search), onOpenSearch, size = 44.dp, iconSize = 22.dp)
-                        // Apple Music puts the account / settings entry in a round avatar button.
                         AccountButton(onClick = onOpenSettings)
                     }
                 },
@@ -246,10 +238,6 @@ fun HomeScreen(
     }
 }
 
-/**
- * Apple Music "Top Picks" card: a caption above, square artwork, and a lower panel filled
- * with a darkened version of the artwork colour carrying the title.
- */
 @Composable
 private fun TopPickCard(pick: TopPick, onClick: () -> Unit) {
     val item = pick.item
@@ -277,7 +265,6 @@ private fun TopPickCard(pick: TopPick, onClick: () -> Unit) {
                         contentDescription = item.title,
                         modifier = Modifier.fillMaxWidth().aspectRatio(1f),
                     )
-                    // Soft blend from the artwork into the colour panel, as on iOS.
                     Box(
                         Modifier
                             .align(Alignment.BottomCenter)
@@ -315,7 +302,6 @@ private fun TopPickCard(pick: TopPick, onClick: () -> Unit) {
     }
 }
 
-/** A "Title ›" shelf of square tiles. */
 @Composable
 private fun Shelf(
     title: String,
@@ -337,7 +323,6 @@ private fun Shelf(
     }
 }
 
-/** Square artwork with a one-line title and secondary artist line. Long press = menu. */
 @Composable
 fun SquareTile(item: SimpleItem, modifier: Modifier = Modifier, width: androidx.compose.ui.unit.Dp = 160.dp, onClick: () -> Unit) {
     var menu by remember { mutableStateOf(false) }

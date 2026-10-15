@@ -25,7 +25,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** What Settings shows under the account. */
 data class SyncStatus(
     val running: Boolean = false,
     val lastSyncAt: Long = 0L,
@@ -34,16 +33,6 @@ data class SyncStatus(
 
 enum class SyncError { OFFLINE, SESSION_EXPIRED, FAILED }
 
-/**
- * Two-way sync between the Room library and the signed-in YouTube Music account.
- *
- * Push: every library change made while signed in is a row in `sync_actions`; [kick] sends
- * them in order. A failed request keeps its row (offline is normal) and is retried later.
- *
- * Pull ([syncNow]): liked songs, library playlists and saved albums are read from YouTube
- * and merged. Nothing local is deleted unless the full remote list was read, and nothing
- * with a change still waiting to be pushed is touched, so the pull never undoes a tap.
- */
 object SyncEngine {
     private const val TAG = "VYORA-Sync"
     private const val PREFS = "vyora_sync"
@@ -75,9 +64,6 @@ object SyncEngine {
         if (isSignedIn() && System.currentTimeMillis() - last > AUTO_SYNC_AFTER_MS) syncNow() else kick()
     }
 
-    // ---------------------------------------------------------------------- sign in / out
-
-    /** Checks the captured browser session, stores it and runs the first sync. */
     suspend fun signIn(cookie: String): Result<YouTubeAccount> = runCatching {
         require(InnerTubeAuth.hasSession(cookie)) { "No YouTube session in cookies" }
         val account = YouTubeMusicApi.account(cookie) ?: throw SessionExpiredException("No account on this session")
@@ -87,11 +73,6 @@ object SyncEngine {
         account
     }
 
-    /**
-     * Signs out. [keepLibrary] keeps everything that came from YouTube as a phone-only
-     * library; otherwise synced likes, saved albums and YouTube playlists are removed and
-     * only what was made on this phone stays.
-     */
     fun signOut(keepLibrary: Boolean) {
         AccountStore.clear()
         pushJob?.cancel()
@@ -118,9 +99,6 @@ object SyncEngine {
         }
     }
 
-    // ------------------------------------------------------------------------- triggers
-
-    /** Sends queued changes soon (debounced, so a burst of taps is one round). */
     fun kick() {
         if (!isSignedIn()) return
         pushJob?.cancel()
@@ -130,7 +108,6 @@ object SyncEngine {
         }
     }
 
-    /** Full two-way sync. */
     fun syncNow() {
         if (!isSignedIn()) return
         scope.launch {
@@ -151,7 +128,6 @@ object SyncEngine {
         }
     }
 
-    /** Runs [block], turning failures into [SyncStatus.error]. True when it all worked. */
     private suspend fun guarded(block: suspend () -> Unit): Boolean = try {
         block()
         _status.update { it.copy(error = null) }
@@ -170,8 +146,6 @@ object SyncEngine {
         false
     }
 
-    // ----------------------------------------------------------------------------- push
-
     private suspend fun push() {
         val database = db ?: return
         val sync = database.sync()
@@ -183,7 +157,6 @@ object SyncEngine {
             } catch (e: SessionExpiredException) {
                 throw e
             } catch (e: IOException) {
-                // Offline or YouTube hiccup: keep it for later, but not forever.
                 if (action.attempts + 1 >= MAX_ATTEMPTS) sync.delete(action.id) else sync.bumpAttempts(action.id)
                 throw e
             } catch (e: Exception) {
@@ -212,7 +185,6 @@ object SyncEngine {
                 YouTubeMusicApi.renamePlaylist(remote, action.extra ?: return)
             }
             SyncKind.PLAYLIST_ADD -> {
-                // Playlists not on YouTube yet are uploaded whole by uploadLocalPlaylists().
                 val remote = dao.playlist(action.target)?.remoteId ?: return
                 val videoId = action.extra ?: return
                 val row = dao.playlistSong(action.target, videoId) ?: return
@@ -224,15 +196,12 @@ object SyncEngine {
                 val extra = action.extra ?: return
                 val videoId = extra.substringBefore('|')
                 val handle = extra.substringAfter('|', "").ifBlank {
-                    // Added in this session, so the set id was never read: look it up.
                     YouTubeMusicApi.playlist(remote).songs.items.firstOrNull { it.item.id == videoId }?.setVideoId
                 } ?: return
                 YouTubeMusicApi.removeFromPlaylist(remote, videoId, handle)
             }
         }
     }
-
-    // ----------------------------------------------------------------------------- pull
 
     private suspend fun pullLikes() {
         val database = db ?: return
@@ -249,7 +218,6 @@ object SyncEngine {
             local.values.filter { it.itemId in remoteIds && !it.synced }.forEach { dao.setLikedSynced(it.itemId, true) }
             val gone = local.values.filter { it.synced && it.itemId !in remoteIds && it.itemId !in pending }
             if (remote.complete && gone.isNotEmpty()) dao.deleteLiked(gone.map { it.itemId })
-            // Liked on this phone before signing in: send them up.
             local.values.filter { !it.synced && it.itemId !in remoteIds && it.itemId !in pending }.forEach {
                 database.sync().insert(SyncActionEntity(kind = SyncKind.LIKE, target = it.itemId))
             }
@@ -322,7 +290,6 @@ object SyncEngine {
         queueUnsyncedSaved(database, ItemType.ALBUM, remoteIds)
     }
 
-    /** Albums / playlists saved on this phone before signing in go up to the account. */
     private suspend fun queueUnsyncedSaved(database: VyoraDatabase, type: String, remoteIds: Set<String>) {
         val pending = database.sync().pendingTargets().toSet()
         database.library().unsyncedSavedIds(type)
@@ -330,7 +297,6 @@ object SyncEngine {
             .forEach { database.sync().insert(SyncActionEntity(kind = SyncKind.SAVE, target = it)) }
     }
 
-    /** Playlists that exist only on this phone are created on the account, songs included. */
     private suspend fun uploadLocalPlaylists() {
         val database = db ?: return
         val dao = database.library()
@@ -339,13 +305,11 @@ object SyncEngine {
             val songs = dao.playlistSongs(playlist.id).map { it.itemId }
             val remoteId = YouTubeMusicApi.createPlaylist(playlist.name, songs)
             dao.setPlaylistRemote(playlist.id, remoteId)
-            // Read back the entry handles, needed to remove songs later.
             runCatching { YouTubeMusicApi.playlist(remoteId) }.getOrNull()?.songs?.items?.forEach {
                 dao.setPlaylistSongHandle(playlist.id, it.item.id, it.setVideoId)
             }
         }
     }
 
-    /** Local id of a playlist that came from YouTube. */
     private const val LOCAL_PREFIX = "yt_"
 }

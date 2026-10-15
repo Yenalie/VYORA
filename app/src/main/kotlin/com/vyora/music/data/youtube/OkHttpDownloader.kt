@@ -9,7 +9,6 @@ import org.schabi.newpipe.extractor.downloader.Request
 import org.schabi.newpipe.extractor.downloader.Response
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException
 
-/** NewPipe Extractor's HTTP layer, on OkHttp. */
 class OkHttpDownloader : Downloader() {
 
     private val client = OkHttpClient.Builder()
@@ -29,7 +28,6 @@ class OkHttpDownloader : Downloader() {
         request.headers().forEach { (name, values) ->
             values.forEach { value -> builder.addHeader(name, value) }
         }
-        // Extractor requests that name their own client keep it; the rest look like a browser.
         if (request.headers().keys.none { it.equals(USER_AGENT, ignoreCase = true) }) {
             builder.header(USER_AGENT, YouTubeConfig.BROWSER_USER_AGENT)
         }
