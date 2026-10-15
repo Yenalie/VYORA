@@ -8,7 +8,7 @@
 
 Dengarkan jutaan lagu dari katalog YouTube Music, simpan favoritmu, dan sinkronkan dengan akun YouTube Music kamu.
 
-[![Download APK](https://img.shields.io/badge/Download-APK%201.4.1-FA2D48?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Yenalie/VYORA/releases/latest/download/VYORA-1.4.1-release.apk)
+[![Download APK](https://img.shields.io/github/v/release/Yenalie/VYORA?label=Download%20APK&style=for-the-badge&logo=android&logoColor=white&color=FA2D48)](https://github.com/Yenalie/VYORA/releases/latest)
 [![Release](https://img.shields.io/github/v/release/Yenalie/VYORA?style=for-the-badge&color=0A84FF)](https://github.com/Yenalie/VYORA/releases)
 [![License](https://img.shields.io/badge/License-GPL--3.0-30D158?style=for-the-badge)](LICENSE)
 
@@ -68,6 +68,7 @@ Dengarkan jutaan lagu dari katalog YouTube Music, simpan favoritmu, dan sinkronk
 - Sesi akun disimpan terenkripsi di perangkat
 
 ### Lainnya
+- **Pembaruan otomatis:** VYORA memberi tahu lewat notifikasi saat ada versi baru, lalu mengunduh dan memasangnya langsung dari aplikasi
 - Lagu yang pernah diputar disimpan di cache, jadi lebih hemat kuota
 - Tersedia dalam 5 bahasa: Indonesia, Inggris, Melayu, Spanyol, dan Jepang
 
@@ -77,6 +78,9 @@ Unduh APK terbaru di bagian **Assets** pada halaman [Releases](https://github.co
 
 **Kebutuhan:** Android 10 atau lebih baru. Efek Liquid Glass penuh butuh Android 12 ke atas.
 Di perangkat yang lebih lama, tampilannya otomatis menyesuaikan.
+
+Setelah terpasang, versi berikutnya bisa langsung diperbarui dari **Pengaturan > Pembaruan**.
+Saat pertama kali memperbarui, Android akan meminta izin "Instal aplikasi tidak dikenal" untuk VYORA.
 
 > Build ini masih tahap uji coba dan belum tersedia di Play Store.
 

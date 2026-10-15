@@ -8,6 +8,8 @@ import coil.memory.MemoryCache
 import com.vyora.music.data.account.SyncEngine
 import com.vyora.music.data.library.LibraryManager
 import com.vyora.music.data.library.SearchHistory
+import com.vyora.music.data.settings.SettingsRepository
+import com.vyora.music.data.update.UpdateManager
 
 /**
  * Starts the library database and the YouTube account sync, and sets up Coil.
@@ -24,6 +26,9 @@ class VyoraApp : Application(), ImageLoaderFactory {
         LibraryManager.init(this)
         SearchHistory.init(this)
         SyncEngine.init(this)
+        // Settings are needed for the update switch; init is idempotent.
+        SettingsRepository.init(this)
+        UpdateManager.init(this)
     }
 
     override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)

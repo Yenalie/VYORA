@@ -13,8 +13,8 @@ android {
         applicationId 'com.vyora.music'
         minSdk 29
         targetSdk 35
-        versionCode 6
-        versionName '1.4.1'
+        versionCode 7
+        versionName '1.5.0'
 
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
@@ -113,6 +113,9 @@ dependencies {
     implementation libs.androidx.room.ktx
     ksp libs.androidx.room.compiler
     implementation libs.androidx.datastore.preferences
+
+    // Background check for new releases (in-app updates).
+    implementation libs.androidx.work.runtime
 
     testImplementation 'junit:junit:4.13.2'
     // The real org.json; android.jar only ships stubs for JVM tests.

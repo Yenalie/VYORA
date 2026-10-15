@@ -270,4 +270,34 @@
     <string name="account_sign_in_again">Masuk lagi</string>
     <string name="account_login_title">Masuk</string>
     <string name="playlist_on_youtube">YouTube</string>
+
+    <!-- In-app updates -->
+    <string name="settings_updates">Pembaruan</string>
+    <string name="update_check_now">Periksa pembaruan</string>
+    <string name="update_auto_check">Periksa otomatis</string>
+    <string name="update_footer">VYORA mencari versi baru di GitHub saat dibuka dan dua kali sehari, lalu memberi tahu lewat notifikasi.</string>
+    <string name="update_current_version">Versi %1$s</string>
+    <string name="update_checking">Memeriksa…</string>
+    <string name="update_up_to_date">VYORA %1$s sudah versi terbaru</string>
+    <string name="update_new_version">Versi %1$s tersedia</string>
+    <string name="update_ready">Versi %1$s siap dipasang</string>
+    <string name="update_available_title">Pembaruan tersedia</string>
+    <string name="update_available_body">VYORA %1$s siap diunduh.</string>
+    <string name="update_available_size">VYORA %1$s siap diunduh (%2$s).</string>
+    <string name="update_downloading">Mengunduh…</string>
+    <string name="update_downloading_percent">Mengunduh… %1$d%%</string>
+    <string name="update_now">Perbarui</string>
+    <string name="update_later">Nanti</string>
+    <string name="update_install">Pasang</string>
+    <string name="update_retry">Coba lagi</string>
+    <string name="update_background">Sembunyikan</string>
+    <string name="update_open_releases">Buka GitHub</string>
+    <string name="update_error_network">Tidak bisa terhubung ke GitHub. Periksa koneksimu.</string>
+    <string name="update_error_download">Unduhan terhenti. Coba lagi.</string>
+    <string name="update_error_invalid">File yang diunduh bukan versi VYORA yang lebih baru.</string>
+    <string name="update_error_signature">Build ini ditandatangani dengan kunci berbeda, jadi Android tidak bisa memasangnya di atas versi ini. Unduh dari GitHub lalu pasang ulang.</string>
+    <string name="update_channel">Pembaruan aplikasi</string>
+    <string name="update_channel_desc">Memberi tahu saat ada versi VYORA baru</string>
+    <string name="update_notification_title">VYORA %1$s tersedia</string>
+    <string name="update_notification_text">Ketuk untuk melihat yang baru dan memperbarui.</string>
 </resources>

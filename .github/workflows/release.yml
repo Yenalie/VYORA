@@ -1,0 +1,122 @@
+name: Release
+
+# Push a tag like v1.5.0 and this builds, signs and publishes the APK as a GitHub release.
+# Installed apps find it through the in-app updater (GitHub "latest release" API).
+#
+# Repository secrets (Settings > Secrets and variables > Actions):
+#   VYORA_KEYSTORE_BASE64    base64 of the .jks file (base64 -w0 release-key.jks)
+#   VYORA_KEYSTORE_PASSWORD  store password
+#   VYORA_KEY_ALIAS          key alias
+#   VYORA_KEY_PASSWORD       key password
+# Always sign with the same key as earlier releases, or Android refuses to update over them.
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to (re)build, e.g. v1.5.0
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Check tag matches versionName
+        id: version
+        run: |
+          NAME=$(sed -nE "s/^\s*versionName '([^']+)'.*/\1/p" app/build.gradle | head -1)
+          echo "versionName=$NAME tag=$TAG"
+          if [ "v$NAME" != "$TAG" ]; then
+            echo "::error::Tag $TAG does not match versionName $NAME in app/build.gradle"
+            exit 1
+          fi
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Restore signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.VYORA_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Secret VYORA_KEYSTORE_BASE64 is missing; an unsigned APK cannot be installed."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "VYORA_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest
+
+      - name: Build signed release APK
+        env:
+          VYORA_KEYSTORE_PASSWORD: ${{ secrets.VYORA_KEYSTORE_PASSWORD }}
+          VYORA_KEY_ALIAS: ${{ secrets.VYORA_KEY_ALIAS }}
+          VYORA_KEY_PASSWORD: ${{ secrets.VYORA_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease
+
+      - name: Verify signature and rename
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          SRC=$(ls app/build/outputs/apk/release/*.apk | grep -v unsigned | head -1)
+          if [ -z "$SRC" ]; then echo "::error::No signed APK was produced"; exit 1; fi
+          "$APKSIGNER" verify --print-certs "$SRC" | head -3
+          OUT="VYORA-${{ steps.version.outputs.name }}-release.apk"
+          cp "$SRC" "$OUT"
+          sha256sum "$OUT" > "$OUT.sha256"
+          echo "APK=$OUT" >> "$GITHUB_ENV"
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          NAME=${{ steps.version.outputs.name }}
+          SECTION=$(awk -v v="## $NAME" '$0==v{f=1;next} /^## /{f=0} f' CHANGELOG.md | sed '/./,$!d')
+          {
+            echo "## VYORA $NAME"
+            echo
+            echo "### Yang baru"
+            if [ -n "$SECTION" ]; then echo "$SECTION"; else echo "- Perbaikan dan peningkatan"; fi
+            echo
+            echo "### Instalasi"
+            echo "Unduh **$APK** di bagian Assets di bawah, atau buka VYORA > Pengaturan > Pembaruan. Butuh Android 10 atau lebih baru, dan bisa langsung dipasang di atas versi sebelumnya."
+            echo
+            echo "> Build uji coba, belum tersedia di Play Store."
+          } > notes.md
+          cat notes.md
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" "$APK.sha256" --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$TAG" --notes-file notes.md --latest --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" "$APK" "$APK.sha256" \
+              --title "VYORA ${{ steps.version.outputs.name }}" \
+              --notes-file notes.md --latest --repo "$GITHUB_REPOSITORY"
+          fi
+
+      - name: Remove signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"

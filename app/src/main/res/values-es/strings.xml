@@ -274,4 +274,34 @@
     <string name="account_sign_in_again">Volver a iniciar sesión</string>
     <string name="account_login_title">Iniciar sesión</string>
     <string name="playlist_on_youtube">YouTube</string>
+
+    <!-- In-app updates -->
+    <string name="settings_updates">Actualizaciones</string>
+    <string name="update_check_now">Buscar actualizaciones</string>
+    <string name="update_auto_check">Buscar automáticamente</string>
+    <string name="update_footer">VYORA busca nuevas versiones en GitHub al abrirse y dos veces al día, y te avisa con una notificación.</string>
+    <string name="update_current_version">Versión %1$s</string>
+    <string name="update_checking">Buscando…</string>
+    <string name="update_up_to_date">VYORA %1$s está actualizado</string>
+    <string name="update_new_version">Versión %1$s disponible</string>
+    <string name="update_ready">Versión %1$s lista para instalar</string>
+    <string name="update_available_title">Actualización disponible</string>
+    <string name="update_available_body">VYORA %1$s está listo para descargar.</string>
+    <string name="update_available_size">VYORA %1$s está listo para descargar (%2$s).</string>
+    <string name="update_downloading">Descargando…</string>
+    <string name="update_downloading_percent">Descargando… %1$d%%</string>
+    <string name="update_now">Actualizar</string>
+    <string name="update_later">Más tarde</string>
+    <string name="update_install">Instalar</string>
+    <string name="update_retry">Reintentar</string>
+    <string name="update_background">Ocultar</string>
+    <string name="update_open_releases">Abrir GitHub</string>
+    <string name="update_error_network">No se pudo conectar con GitHub. Revisa tu conexión.</string>
+    <string name="update_error_download">La descarga se detuvo. Inténtalo de nuevo.</string>
+    <string name="update_error_invalid">El archivo descargado no es una versión más reciente de VYORA.</string>
+    <string name="update_error_signature">Esta compilación está firmada con otra clave, así que Android no puede instalarla sobre esta versión. Descárgala desde GitHub y reinstala.</string>
+    <string name="update_channel">Actualizaciones de la app</string>
+    <string name="update_channel_desc">Te avisa cuando sale una nueva versión de VYORA</string>
+    <string name="update_notification_title">VYORA %1$s disponible</string>
+    <string name="update_notification_text">Toca para ver las novedades y actualizar.</string>
 </resources>

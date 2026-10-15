@@ -1,6 +1,7 @@
 package com.vyora.music
 
 import android.content.Context
+import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -14,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import com.vyora.music.core.LocaleHelper
 import com.vyora.music.data.settings.SettingsRepository
 import com.vyora.music.data.settings.ThemeMode
+import com.vyora.music.data.update.UpdateManager
 import com.vyora.music.ui.VyoraAppRoot
 import com.vyora.music.ui.theme.VYORATheme
 import com.vyora.music.ui.theme.resolveDarkTheme
@@ -49,6 +51,20 @@ class MainActivity : ComponentActivity() {
                 VyoraAppRoot(settings)
             }
         }
+        // Opened from the "update available" notification.
+        UpdateManager.handleIntent(this, intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        UpdateManager.handleIntent(this, intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Returning from "Install unknown apps" with the permission now granted.
+        UpdateManager.onResume(this)
     }
 
     override fun onStop() {

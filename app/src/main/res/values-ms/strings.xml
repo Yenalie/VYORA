@@ -270,4 +270,34 @@
     <string name="account_sign_in_again">Log masuk semula</string>
     <string name="account_login_title">Log masuk</string>
     <string name="playlist_on_youtube">YouTube</string>
+
+    <!-- In-app updates -->
+    <string name="settings_updates">Kemas kini</string>
+    <string name="update_check_now">Semak kemas kini</string>
+    <string name="update_auto_check">Semak secara automatik</string>
+    <string name="update_footer">VYORA mencari versi baharu di GitHub apabila dibuka dan dua kali sehari, kemudian memaklumkan melalui pemberitahuan.</string>
+    <string name="update_current_version">Versi %1$s</string>
+    <string name="update_checking">Menyemak…</string>
+    <string name="update_up_to_date">VYORA %1$s ialah versi terkini</string>
+    <string name="update_new_version">Versi %1$s tersedia</string>
+    <string name="update_ready">Versi %1$s sedia dipasang</string>
+    <string name="update_available_title">Kemas kini tersedia</string>
+    <string name="update_available_body">VYORA %1$s sedia dimuat turun.</string>
+    <string name="update_available_size">VYORA %1$s sedia dimuat turun (%2$s).</string>
+    <string name="update_downloading">Memuat turun…</string>
+    <string name="update_downloading_percent">Memuat turun… %1$d%%</string>
+    <string name="update_now">Kemas kini</string>
+    <string name="update_later">Nanti</string>
+    <string name="update_install">Pasang</string>
+    <string name="update_retry">Cuba lagi</string>
+    <string name="update_background">Sembunyikan</string>
+    <string name="update_open_releases">Buka GitHub</string>
+    <string name="update_error_network">Tidak dapat menghubungi GitHub. Semak sambungan anda.</string>
+    <string name="update_error_download">Muat turun terhenti. Cuba lagi.</string>
+    <string name="update_error_invalid">Fail yang dimuat turun bukan versi VYORA yang lebih baharu.</string>
+    <string name="update_error_signature">Binaan ini ditandatangani dengan kunci berbeza, jadi Android tidak dapat memasangnya di atas versi ini. Muat turun dari GitHub dan pasang semula.</string>
+    <string name="update_channel">Kemas kini aplikasi</string>
+    <string name="update_channel_desc">Memaklumkan apabila versi VYORA baharu keluar</string>
+    <string name="update_notification_title">VYORA %1$s tersedia</string>
+    <string name="update_notification_text">Ketik untuk melihat apa yang baharu dan kemas kini.</string>
 </resources>

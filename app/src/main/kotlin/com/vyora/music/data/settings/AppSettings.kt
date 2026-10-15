@@ -110,6 +110,8 @@ data class AppSettings(
     val equalizer: EqualizerSettings = EqualizerSettings(),
     val videoArtwork: VideoArtwork = VideoArtwork.ALWAYS,
     val mediaCache: CacheSize = CacheSize.MB_512,
+    /** Look for a new VYORA release on GitHub (on launch and twice a day in the background). */
+    val autoUpdateCheck: Boolean = true,
 )
 
 /**
@@ -225,6 +227,7 @@ object SettingsRepository {
             ),
             videoArtwork = p.enum("video_artwork", d.videoArtwork),
             mediaCache = p.enum("media_cache", d.mediaCache),
+            autoUpdateCheck = p.getBoolean("update_auto", d.autoUpdateCheck),
         )
     }
 
@@ -268,5 +271,6 @@ object SettingsRepository {
         putInt("eq_version", EQ_VERSION)
         putString("video_artwork", s.videoArtwork.name)
         putString("media_cache", s.mediaCache.name)
+        putBoolean("update_auto", s.autoUpdateCheck)
     }
 }

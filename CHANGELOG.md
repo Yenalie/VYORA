@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0
+- Pembaruan otomatis di dalam aplikasi: VYORA memeriksa versi baru di GitHub saat dibuka dan dua kali sehari
+- Notifikasi saat ada versi baru, ketuk untuk langsung mengunduh dan memasang
+- Menu baru Pengaturan > Pembaruan untuk memeriksa manual dan mengatur pemeriksaan otomatis
+- Unduhan dicek dulu sebelum dipasang, jadi hanya versi VYORA yang lebih baru dengan tanda tangan yang sama yang bisa dipasang
+
 ## 1.4.1
 - Latar ambient kini tampil lebih jelas mengikuti warna lagu
 - Latar Now Playing bergerak lebih halus dan terasa hidup

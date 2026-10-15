@@ -19,6 +19,33 @@ simpan di luar repo (atau pakai variabel `VYORA_KEYSTORE`, `VYORA_KEYSTORE_PASSW
 ke GitHub. Tanpa keystore, `assembleRelease` tetap jalan tapi APK-nya belum ditandatangani;
 pakai `assembleDebug` untuk mencoba.
 
+## Rilis & pembaruan otomatis
+
+Rilis dibuat oleh GitHub Actions (`.github/workflows/release.yml`):
+
+1. Naikkan `versionCode` dan `versionName` di `app/build.gradle`.
+2. Tulis catatan versi di `CHANGELOG.md` dengan judul `## <versionName>`.
+3. Commit, lalu buat dan push tag: `git tag v1.5.0 && git push origin v1.5.0`.
+
+Workflow mengecek tag cocok dengan `versionName`, menjalankan unit test, build APK yang
+ditandatangani, lalu membuat GitHub Release berisi `VYORA-<versi>-release.apk`, file `.sha256`,
+dan catatan dari CHANGELOG. Kunci diambil dari secrets repo `VYORA_KEYSTORE_BASE64`,
+`VYORA_KEYSTORE_PASSWORD`, `VYORA_KEY_ALIAS`, `VYORA_KEY_PASSWORD`.
+
+**Selalu tanda tangani dengan kunci yang sama.** Android menolak memasang APK dengan kunci
+lain di atas versi yang sudah terpasang, dan updater di aplikasi juga mengecek hal ini.
+
+Di aplikasi, `data/update/` menangani pembaruan:
+
+- `ReleaseApi` membaca `api.github.com/repos/Yenalie/VYORA/releases/latest` (draft dan
+  pre-release diabaikan) dan memilih aset `.apk`.
+- `UpdateManager` membandingkan tag dengan `BuildConfig.VERSION_NAME`, mengunduh APK ke
+  `cache/updates/`, memastikan package, versionCode, dan sertifikatnya cocok, lalu membuka
+  installer sistem lewat `FileProvider`.
+- `UpdateWorker` (WorkManager) memeriksa tiap 12 jam saat online dan menampilkan notifikasi
+  sekali per versi. Pemeriksaan juga jalan saat aplikasi dibuka (paling sering tiap 3 jam).
+- Pengguna bisa memeriksa manual atau mematikan pemeriksaan otomatis di Pengaturan > Pembaruan.
+
 ## Struktur
 
 ```
@@ -33,6 +60,10 @@ com.vyora.music
 │   │   ├── SimpleItem             model + format JSON bersama
 │   │   └── YouTubeConfig          semua konstanta YouTube
 │   ├── db/                        Room: entity, DAO, VyoraDatabase, impor data 1.x
+│   ├── update/                    pembaruan aplikasi dari GitHub Releases
+│   │   ├── ReleaseApi, AppVersion  baca rilis terbaru + bandingkan versi
+│   │   ├── UpdateManager          cek, unduh, verifikasi, pasang, notifikasi
+│   │   └── UpdateWorker           pemeriksaan berkala di latar belakang
 │   ├── account/                   akun YouTube Music + sinkronisasi
 │   │   ├── AccountStore           sesi login (dienkripsi Android Keystore)
 │   │   ├── YouTubeMusicApi        request InnerTube WEB_REMIX yang sudah login

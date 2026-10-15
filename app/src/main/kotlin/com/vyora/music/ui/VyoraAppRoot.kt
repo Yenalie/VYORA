@@ -1,5 +1,7 @@
 package com.vyora.music.ui
 
+import com.vyora.music.data.update.UpdateManager
+import com.vyora.music.ui.components.UpdateDialogHost
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -225,6 +227,7 @@ fun VyoraAppRoot(settings: AppSettings) {
 
     LaunchedEffect(Unit) {
         PlayerManager.initialize(context)
+        UpdateManager.checkOnLaunch(context)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
             != PackageManager.PERMISSION_GRANTED
@@ -637,6 +640,9 @@ fun VyoraAppRoot(settings: AppSettings) {
         // Context menus: drawn above everything, on liquid glass refracting the app layer.
         GlassMenuHost(glassMenu)
         com.vyora.music.ui.components.PlaylistPickerHost(playlistPicker)
+
+        // "New version available" dialog (launch check, Settings, or the notification).
+        UpdateDialogHost()
 
         SnackbarHost(
             hostState = snackbarHostState,

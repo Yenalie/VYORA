@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Update
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Wallpaper
@@ -65,6 +67,9 @@ import com.vyora.music.data.settings.GlassLook
 import com.vyora.music.data.settings.SettingsRepository
 import com.vyora.music.data.settings.ThemeMode
 import com.vyora.music.data.settings.VideoArtwork
+import com.vyora.music.data.update.UpdateManager
+import com.vyora.music.data.update.UpdateState
+import com.vyora.music.ui.components.updateErrorText
 import com.vyora.music.data.youtube.StreamResolver
 import com.vyora.music.playback.source.MediaCache
 import com.vyora.music.ui.theme.SystemColors
@@ -293,6 +298,10 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                 )
             }
         }
+        // -------------------------------------------------------------------- updates
+        item(key = "updates") {
+            UpdatesGroup(autoCheck = settings.autoUpdateCheck)
+        }
         item(key = "about") {
             SettingsGroup {
                 SettingsNavRow(
@@ -328,6 +337,49 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
 }
 
 private enum class ConfirmAction { HISTORY, RESET }
+
+/** Settings > Updates: manual check with live status, and the background-check switch. */
+@Composable
+private fun UpdatesGroup(autoCheck: Boolean) {
+    val context = LocalContext.current
+    val state by UpdateManager.state.collectAsState()
+    val version = UpdateManager.currentVersion?.toString() ?: com.vyora.music.BuildConfig.VERSION_NAME
+    val status = when (val s = state) {
+        UpdateState.Idle -> stringResource(R.string.update_current_version, version)
+        UpdateState.Checking -> stringResource(R.string.update_checking)
+        UpdateState.UpToDate -> stringResource(R.string.update_up_to_date, version)
+        is UpdateState.Available -> stringResource(R.string.update_new_version, s.release.version.toString())
+        is UpdateState.Downloading ->
+            if (s.progress < 0f) stringResource(R.string.update_downloading)
+            else stringResource(R.string.update_downloading_percent, (s.progress * 100).toInt())
+        is UpdateState.ReadyToInstall -> stringResource(R.string.update_ready, s.release.version.toString())
+        is UpdateState.Failed -> updateErrorText(s.reason)
+    }
+    SettingsGroup(
+        header = stringResource(R.string.settings_updates),
+        footer = stringResource(R.string.update_footer),
+    ) {
+        SettingsRow(
+            title = stringResource(R.string.update_check_now),
+            subtitle = status,
+            icon = Icons.Default.SystemUpdate, iconTint = SystemColors.Green,
+            onClick = {
+                when (state) {
+                    is UpdateState.Available, is UpdateState.Downloading, is UpdateState.ReadyToInstall -> UpdateManager.showPrompt()
+                    UpdateState.Checking -> Unit
+                    else -> UpdateManager.check(context, manual = true)
+                }
+            },
+        )
+        SettingsSwitchRow(
+            title = stringResource(R.string.update_auto_check),
+            icon = Icons.Default.Update, iconTint = SystemColors.Blue,
+            checked = autoCheck,
+            onCheckedChange = { v -> UpdateManager.setAutoCheck(context, v) },
+            divider = false,
+        )
+    }
+}
 
 /** Songs plus covers on disk. */
 private fun cacheUsage(context: Context): Long =
