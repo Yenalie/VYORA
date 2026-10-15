@@ -1,0 +1,25 @@
+name: Attach APK to release
+
+# Puts a prebuilt, signed APK from the repo onto a GitHub release as a downloadable asset.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (e.g. v1.4.1)
+        required: true
+      apk:
+        description: Path of the APK in the repo
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ inputs.tag }}" "${{ inputs.apk }}" --clobber --repo "${{ github.repository }}"
