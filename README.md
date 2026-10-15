@@ -8,7 +8,7 @@
 
 Dengarkan jutaan lagu dari katalog YouTube Music, simpan favoritmu, dan sinkronkan dengan akun YouTube Music kamu.
 
-[![Download APK](https://img.shields.io/badge/Download-APK%201.4.1-FA2D48?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Yenalie/VYORA/raw/main/release/VYORA-1.4.1-release.apk)
+[![Download APK](https://img.shields.io/badge/Download-APK%201.4.1-FA2D48?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Yenalie/VYORA/releases/latest/download/VYORA-1.4.1-release.apk)
 [![Release](https://img.shields.io/github/v/release/Yenalie/VYORA?style=for-the-badge&color=0A84FF)](https://github.com/Yenalie/VYORA/releases)
 [![License](https://img.shields.io/badge/License-GPL--3.0-30D158?style=for-the-badge)](LICENSE)
 
@@ -73,8 +73,7 @@ Dengarkan jutaan lagu dari katalog YouTube Music, simpan favoritmu, dan sinkronk
 
 ## Download
 
-Unduh APK terbaru di halaman [Releases](https://github.com/Yenalie/VYORA/releases) atau
-langsung [di sini](https://github.com/Yenalie/VYORA/raw/main/release/VYORA-1.4.1-release.apk).
+Unduh APK terbaru di bagian **Assets** pada halaman [Releases](https://github.com/Yenalie/VYORA/releases/latest).
 
 **Kebutuhan:** Android 10 atau lebih baru. Efek Liquid Glass penuh butuh Android 12 ke atas.
 Di perangkat yang lebih lama, tampilannya otomatis menyesuaikan.
