@@ -23,6 +23,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -663,17 +664,18 @@ private fun LyricsPanel() {
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .padding(bottom = 8.dp)
-                        .clip(RoundedCornerShape(22.dp))
-                        .background(Color.Black.copy(alpha = 0.55f))
-                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                        .clip(RoundedCornerShape(26.dp))
+                        .background(Color(0xFF1C1C1E).copy(alpha = 0.94f))
+                        .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(26.dp))
+                        .padding(horizontal = 6.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TextButton(onClick = { selection = null }) { Text(stringResource(R.string.cancel), color = Color.White) }
                     Text(
                         if (sel.isEmpty()) stringResource(R.string.lyrics_card_pick)
                         else stringResource(R.string.lyrics_card_selected, sel.size),
-                        color = Color.White.copy(alpha = 0.75f),
-                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.85f),
+                        style = MaterialTheme.typography.titleSmall,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.weight(1f),
                     )

@@ -40,8 +40,8 @@ class ScreenshotTest {
     private val service = object : ExternalResource() {
         override fun before() {
             val app = ApplicationProvider.getApplicationContext<android.app.Application>()
+            SettingsRepository.init(app)
             if (System.getProperty("shots.glass") == "off") {
-                SettingsRepository.init(app)
                 SettingsRepository.update { it.copy(glass = it.glass.copy(enabled = false)) }
             }
             val svc = Robolectric.buildService(PlaybackService::class.java).create().get()
@@ -52,8 +52,27 @@ class ScreenshotTest {
 
     @get:Rule val chain: RuleChain = RuleChain.outerRule(service).around(compose)
 
-    private fun shot(name: String) {
-        val dir = File("/tmp/shots").apply { mkdirs() }
+    private var fakeTrack: com.vyora.music.data.youtube.SimpleItem? = null
+
+    private fun flow(name: String): kotlinx.coroutines.flow.MutableStateFlow<Any?> {
+        val f = PlayerManager::class.java.getDeclaredField(name).apply { isAccessible = true }
+        @Suppress("UNCHECKED_CAST")
+        return f.get(PlayerManager) as kotlinx.coroutines.flow.MutableStateFlow<Any?>
+    }
+
+    private fun fakePlayback() {
+        val item = fakeTrack ?: return
+        val duration = (if (item.duration > 0) item.duration else 213L) * 1000L
+        val position = (duration * 0.34).toLong()
+        flow("_isBuffering").value = false
+        flow("_playbackError").value = null
+        flow("_isPlaying").value = true
+        flow("_durationMs").value = duration
+        flow("_positionMs").value = position
+        flow("_progress").value = position.toFloat() / duration
+    }
+
+    private fun capture(): Bitmap {
         val window = compose.activity.window
         val view = window.decorView
         val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
@@ -61,12 +80,65 @@ class ScreenshotTest {
         android.view.PixelCopy.request(window, bmp, { done = true }, android.os.Handler(android.os.Looper.getMainLooper()))
         var guard = 0
         while (!done && guard++ < 50) shadowOf(android.os.Looper.getMainLooper()).idle()
+        return bmp
+    }
+
+    private fun difference(a: Bitmap, b: Bitmap): Double {
+        if (a.width != b.width || a.height != b.height) return 1.0
+        var changed = 0
+        var total = 0
+        var y = 0
+        while (y < a.height) {
+            var x = 0
+            while (x < a.width) {
+                val p = a.getPixel(x, y)
+                val q = b.getPixel(x, y)
+                val d = maxOf(
+                    kotlin.math.abs((p shr 16 and 0xFF) - (q shr 16 and 0xFF)),
+                    kotlin.math.abs((p shr 8 and 0xFF) - (q shr 8 and 0xFF)),
+                    kotlin.math.abs((p and 0xFF) - (q and 0xFF)),
+                )
+                if (d > 24) changed++
+                total++
+                x += 4
+            }
+            y += 4
+        }
+        return changed.toDouble() / total
+    }
+
+    private fun settle(minMs: Long = 1500, maxMs: Long = 30_000) {
+        waitReal(minMs)
+        var previous = capture()
+        var stable = 0
+        val end = System.currentTimeMillis() + maxMs
+        while (System.currentTimeMillis() < end) {
+            waitReal(800)
+            val current = capture()
+            if (difference(previous, current) < 0.003) {
+                if (++stable >= 3) return
+            } else {
+                stable = 0
+            }
+            previous = current
+        }
+        println("SHOT settle timeout")
+    }
+
+    private fun shot(name: String, minMs: Long = 1500) {
+        settle(minMs)
+        fakePlayback()
+        compose.mainClock.advanceTimeBy(32)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val bmp = capture()
+        val dir = File("/tmp/shots").apply { mkdirs() }
         File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
     private fun waitReal(ms: Long) {
         val end = System.currentTimeMillis() + ms
         while (System.currentTimeMillis() < end) {
+            fakePlayback()
             compose.mainClock.advanceTimeBy(100)
             shadowOf(android.os.Looper.getMainLooper()).idle()
             Thread.sleep(100)
@@ -111,47 +183,74 @@ class ScreenshotTest {
 
     @Test fun tour() {
         org.junit.Assume.assumeTrue(System.getProperty("shots.only").orEmpty().isNotBlank())
-        waitReal(9000)
-        shot("01_home")
-        if (System.getProperty("shots.only") == "play") return playTour()
-        step("home2") { swipeUp(); waitReal(2500); shot("02_home_scrolled") }
-        step("library") { clickText("Library"); waitReal(1500); shot("03_library") }
-        step("search") { clickText("Search"); waitReal(2500); shot("04_search") }
+        val found = runBlocking { YouTubeClient.search("Tulus", SearchFilter.SONGS).getOrThrow().items.take(8) }
+        val lead = found.firstOrNull { song ->
+            val lyr = runBlocking { com.vyora.music.data.lyrics.LyricsRepository.lyricsFor(song.id, song.title, song.artist, song.duration) }
+            lyr != null && lyr.isSynced
+        } ?: found.first()
+        val songs = listOf(lead) + (found - lead)
+        println("SHOT lead=${lead.title}")
+        compose.runOnUiThread { songs.drop(1).take(5).forEach { com.vyora.music.data.library.LibraryManager.toggleLike(it) } }
+        waitReal(6000)
+        shot("01_home", minMs = 6000)
+        if (System.getProperty("shots.only") == "play") return playTour(songs)
+        step("library") { clickText("Library"); shot("03_library") }
+        step("search") { clickText("Search"); shot("04_search") }
         step("settings") {
             clickText("Home"); waitReal(800)
-            clickDesc("Settings"); waitReal(1500); shot("05_settings")
-            clickText("Sign in to YouTube Music"); waitReal(1200); shot("05b_account")
-            clickText("Sign in with cookies"); waitReal(800); shot("05c_cookie_dialog")
-            clickText("Cancel"); waitReal(500)
-            if (System.getProperty("shots.account") == "1") {
-                compose.runOnUiThread {
-                    com.vyora.music.data.account.AccountStore.save("SAPISID=test", com.vyora.music.data.account.YouTubeAccount("Yena", "@yena", null))
-                }
-                waitReal(3000); shot("05d_account_signed_in")
-                compose.runOnUiThread { com.vyora.music.data.account.AccountStore.clear() }
-            }
+            clickDesc("Settings"); shot("05_settings")
+            clickText("Sign in to YouTube Music"); shot("05b_account")
             compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
-            swipeUp(); waitReal(800); shot("06_settings_2")
-            swipeUp(); waitReal(800); shot("07_settings_3")
+            swipeUp(); shot("06_settings_2", minMs = 1000)
+            swipeUp(); shot("07_settings_3", minMs = 1000)
             compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
         }
-        playTour()
+        playTour(songs)
     }
 
-    private fun playTour() {
+    private fun playTour(songs: List<com.vyora.music.data.youtube.SimpleItem>) {
         step("play") {
-            val filter = if (System.getProperty("shots.video") == "1") SearchFilter.VIDEOS else SearchFilter.SONGS
-            val songs = runBlocking { YouTubeClient.search("Tulus", filter).getOrThrow().items.take(6) }
-            compose.runOnUiThread { PlayerManager.setQueue(songs, 0) }
-            waitReal(3000); shot("08_mini_player")
-            clickLastText(songs[0].title); waitReal(2500); shot("09_now_playing")
-            clickDesc("Queue"); waitReal(6000); shot("10_queue")
+            SettingsRepository.update { it.copy(skipUnavailable = false) }
+            compose.runOnUiThread { PlayerManager.setQueue(songs.take(6), 0) }
+            fakeTrack = songs[0]
+            compose.mainClock.autoAdvance = false
+            shot("08_mini_player", minMs = 3000)
+            clickLastText(songs[0].title); shot("09_now_playing", minMs = 2500)
+            clickDesc("Queue"); shot("10_queue", minMs = 3000)
             clickDesc("Queue"); waitReal(800)
-            clickTopDesc("More"); waitReal(1000); shot("11_player_menu")
-            clickText("Sleep Timer"); waitReal(1000); shot("12_sleep_menu")
-            clickText("30 minutes"); waitReal(1500); shot("13_sleep_badge")
-            clickLastText(songs[0].artist, lowest = false); waitReal(9000); shot("14_artist")
-            swipeUp(); waitReal(1500); shot("15_artist_2")
+            clickTopDesc("More"); shot("11_player_menu", minMs = 1000)
+            compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(800)
+        }
+        step("lyrics") {
+            clickDesc("Lyrics"); shot("12_lyrics", minMs = 4000)
+            val song = songs[0]
+            val lyr = runBlocking { com.vyora.music.data.lyrics.LyricsRepository.lyricsFor(song.id, song.title, song.artist, song.duration) }
+            val texts = when {
+                lyr == null -> emptyList()
+                lyr.isSynced -> lyr.synced.map { it.text }
+                else -> lyr.plain.orEmpty().lines()
+            }.filter { it.isNotBlank() }
+            println("SHOT lyrics lines=${texts.size}")
+            clickDesc("Lyrics card"); waitReal(600)
+            val h = compose.activity.window.decorView.height
+            var picked = 0
+            for (t in texts.distinct()) {
+                if (picked >= 3) break
+                val nodes = compose.onAllNodesWithText(t, useUnmergedTree = true).fetchSemanticsNodes()
+                val index = nodes.indexOfFirst { it.boundsInRoot.top > h * 0.18f && it.boundsInRoot.bottom < h * 0.55f }
+                if (index < 0) continue
+                compose.onAllNodesWithText(t, useUnmergedTree = true)[index].performClick()
+                waitReal(300)
+                picked++
+            }
+            println("SHOT picked=$picked")
+            shot("13_lyrics_select", minMs = 800)
+            clickText("Cancel"); waitReal(500)
+            clickDesc("Lyrics"); waitReal(800)
+        }
+        step("artist") {
+            clickTopDesc("More"); waitReal(1000)
+            clickText("Go to Artist"); shot("14_artist", minMs = 6000)
         }
     }
 }

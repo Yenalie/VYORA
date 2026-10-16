@@ -37,6 +37,7 @@ Dengarkan jutaan lagu dari katalog YouTube Music, simpan favoritmu, dan sinkronk
 <p align="center">
   <img src="docs/screenshots/settings.png" width="23%" alt="Pengaturan" />
   <img src="docs/screenshots/settings_2.png" width="23%" alt="Pengaturan audio" />
+  <img src="docs/screenshots/lyrics_card.png" width="23%" alt="Pilih lirik untuk kartu lirik" />
 </p>
 
 ## Fitur
