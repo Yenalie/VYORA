@@ -74,7 +74,7 @@ jobs:
           "$APKSIGNER" verify --print-certs "$SRC" | head -3
           # The app only installs updates signed with this certificate (UpdateSignature.RELEASE_CERT_SHA256).
           EXPECTED=75a7fd6458a9590b1b0c91d09c966f1ce202aae7f97dfe6021ad070d35442d9f
-          ACTUAL=$("$APKSIGNER" verify --print-certs "$SRC" | sed -nE 's/^Signer #1 certificate SHA-256 digest: ([0-9a-f]+)$/\1/p')
+          ACTUAL=$("$APKSIGNER" verify --print-certs "$SRC" | sed -nE 's/^(Signer #1|V[0-9.]+ Signer:) certificate SHA-256 digest: ([0-9a-f]+)$/\2/p' | head -1)
           if [ "$ACTUAL" != "$EXPECTED" ]; then
             echo "::error::APK signed with $ACTUAL, expected the pinned release key $EXPECTED"
             exit 1
