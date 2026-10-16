@@ -206,7 +206,7 @@ object UpdateManager {
                 _state.value = UpdateState.Failed(UpdateError.DOWNLOAD, release)
                 return@launch
             }
-            val problem = verify(app, target)
+            val problem = verify(app, target, release)
             if (problem != null) {
                 target.delete()
                 _state.value = UpdateState.Failed(problem, release)
@@ -224,23 +224,38 @@ object UpdateManager {
         _state.value = if (release != null) UpdateState.Available(release) else UpdateState.Idle
     }
 
-    private fun verify(context: Context, apk: File): UpdateError? {
+    private fun verify(context: Context, apk: File, release: ReleaseInfo): UpdateError? {
         val pm = context.packageManager
-        val flags = if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else 0
-        val archive = pm.archiveInfo(apk.path, flags) ?: return UpdateError.INVALID_APK
+        val archive = pm.archiveInfo(apk.path, PackageManager.GET_SIGNING_CERTIFICATES) ?: return UpdateError.INVALID_APK
         if (archive.packageName != context.packageName) return UpdateError.INVALID_APK
         if (archive.versionCodeCompat <= BuildConfig.VERSION_CODE) return UpdateError.INVALID_APK
-        if (Build.VERSION.SDK_INT >= 28) {
-            val installed = runCatching {
-                pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
-            }.getOrNull()
-            val mine = installed?.signerDigests().orEmpty()
-            val theirs = archive.signerDigests()
-            if (mine.isNotEmpty() && theirs.isNotEmpty() && mine.intersect(theirs).isEmpty()) {
-                return UpdateError.SIGNATURE
-            }
+        if (!checksumMatches(release, apk)) return UpdateError.INVALID_APK
+        val installed = runCatching {
+            pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+        }.getOrNull()
+        val verdict = UpdateSignature.check(
+            installed = installed?.signerDigests().orEmpty(),
+            archive = archive.signerDigests(),
+            pinned = if (BuildConfig.DEBUG) null else UpdateSignature.RELEASE_CERT_SHA256,
+        )
+        if (verdict != UpdateSignature.Verdict.OK) {
+            Log.w(TAG, "Rejected update: $verdict")
+            return UpdateError.SIGNATURE
         }
         return null
+    }
+
+    /** When the release publishes a `.sha256` file, the download must match it exactly. */
+    private fun checksumMatches(release: ReleaseInfo, apk: File): Boolean {
+        val url = release.checksumUrl ?: return true
+        val expected = runCatching {
+            val request = Request.Builder().url(url).header("User-Agent", "VYORA-Android").build()
+            ReleaseApi.client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) error("HTTP ${response.code}")
+                UpdateSignature.parseChecksum(response.body?.string().orEmpty())
+            }
+        }.getOrNull() ?: return false
+        return expected == UpdateSignature.sha256(apk)
     }
 
     fun install(context: Context) {
@@ -340,10 +355,10 @@ object UpdateManager {
         get() = if (Build.VERSION.SDK_INT >= 28) longVersionCode else versionCode.toLong()
 
     private fun PackageInfo.signerDigests(): Set<String> {
-        if (Build.VERSION.SDK_INT < 28) return emptySet()
         val info = signingInfo ?: return emptySet()
         val signers = if (info.hasMultipleSigners()) info.apkContentsSigners else info.signingCertificateHistory
-        val sha = MessageDigest.getInstance("SHA-256")
-        return signers.orEmpty().map { sig -> sha.digest(sig.toByteArray()).joinToString("") { "%02x".format(it) } }.toSet()
+        return signers.orEmpty().map { sig ->
+            with(UpdateSignature) { MessageDigest.getInstance("SHA-256").digest(sig.toByteArray()).toHex() }
+        }.toSet()
     }
 }

@@ -16,11 +16,21 @@ import com.vyora.music.core.LocaleHelper
 import com.vyora.music.data.settings.SettingsRepository
 import com.vyora.music.data.settings.ThemeMode
 import com.vyora.music.data.update.UpdateManager
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.splashscreen.SplashScreenViewProvider
+import com.vyora.music.ui.LaunchReveal
+import com.vyora.music.ui.LaunchRevealBox
 import com.vyora.music.ui.VyoraAppRoot
 import com.vyora.music.ui.theme.VYORATheme
 import com.vyora.music.ui.theme.resolveDarkTheme
 
 class MainActivity : ComponentActivity() {
+    private companion object {
+        const val SPLASH_ICON_MS = 380L
+        const val SPLASH_FADE_DELAY_MS = 90L
+        const val SPLASH_FADE_MS = 360L
+    }
+
     private val notificationPermission =
         registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
     override fun attachBaseContext(newBase: Context) {
@@ -28,6 +38,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splash = installSplashScreen()
+        // Only a cold open gets the opening transition; rotations and theme changes stay instant.
+        val animateLaunch = savedInstanceState == null
+        if (animateLaunch) splash.setOnExitAnimationListener(::playSplashExit) else LaunchReveal.onSplashExit()
         SettingsRepository.init(this)
         val systemDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
         val startDark = when (SettingsRepository.current.themeMode) {
@@ -48,11 +62,33 @@ class MainActivity : ComponentActivity() {
                 )
             }
             VYORATheme(darkTheme = dark, accent = Color(settings.accent.argb)) {
-                VyoraAppRoot(settings)
+                LaunchRevealBox(animate = animateLaunch) {
+                    VyoraAppRoot(settings)
+                }
             }
         }
         UpdateManager.handleIntent(this, intent)
         askForNotifications()
+    }
+
+    /** The waveform zooms toward the viewer and dissolves while the UI settles in underneath. */
+    private fun playSplashExit(provider: SplashScreenViewProvider) {
+        LaunchReveal.onSplashExit()
+        runCatching {
+            val icon = provider.iconView
+            icon.animate()
+                .scaleX(2.2f).scaleY(2.2f).alpha(0f)
+                .setDuration(SPLASH_ICON_MS)
+                .setInterpolator(android.view.animation.PathInterpolator(0.4f, 0f, 0.8f, 0.4f))
+                .start()
+            provider.view.animate()
+                .alpha(0f)
+                .setStartDelay(SPLASH_FADE_DELAY_MS)
+                .setDuration(SPLASH_FADE_MS)
+                .setInterpolator(android.view.animation.PathInterpolator(0.2f, 0f, 0f, 1f))
+                .withEndAction { provider.remove() }
+                .start()
+        }.onFailure { provider.remove() }
     }
 
     private fun askForNotifications() {

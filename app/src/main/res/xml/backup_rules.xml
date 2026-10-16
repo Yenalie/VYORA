@@ -6,4 +6,5 @@
     <exclude domain="file" path="offline_audio/" />
     <exclude domain="file" path="offline_art/" />
     <exclude domain="database" path="exoplayer_internal.db" />
+    <exclude domain="root" path="app_webview/" />
 </full-backup-content>

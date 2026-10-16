@@ -1,3 +1,12 @@
+/*
+ * Vendored from Kyant0/AndroidLiquidGlass (kmp branch)
+ * https://github.com/Kyant0/AndroidLiquidGlass — Copyright 2025 Kyant0, Apache License 2.0
+ * app/src/commonMain/kotlin/com/kyant/backdrop/catalog/utils/InteractiveHighlight.kt
+ *
+ * Not published as a library — ported straight from the catalog demo app that
+ * showcases Kyant0/backdrop, source-only. Package renamed and RuntimeShader
+ * imports repointed at this app's vendored com.vyora.music.ui.glass.backdrop.
+ */
 package com.vyora.music.ui.glass.interaction
 
 import androidx.compose.animation.core.Animatable

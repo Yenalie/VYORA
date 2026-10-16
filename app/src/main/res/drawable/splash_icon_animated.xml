@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Splash icon: the VYORA waveform drawing itself in, bar by bar. -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt">
+    <aapt:attr name="android:drawable">
+        <vector
+            android:width="288dp"
+            android:height="288dp"
+            android:viewportWidth="288"
+            android:viewportHeight="288">
+            <group
+                android:name="wave"
+                android:pivotX="144"
+                android:pivotY="144"
+                android:rotation="14">
+        <group
+            android:name="bar0"
+            android:pivotX="78.0"
+            android:pivotY="144"
+            android:scaleY="0.2">
+            <path
+                android:fillColor="@color/splash_bars"
+                android:pathData="M78.0,122.0 L78.0,122.0 A6.5,6.5 0 0 1 84.5,128.5 L84.5,159.5 A6.5,6.5 0 0 1 71.5,159.5 L71.5,128.5 A6.5,6.5 0 0 1 78.0,122.0 Z" />
+        </group>
+        <group
+            android:name="bar1"
+            android:pivotX="100.0"
+            android:pivotY="144"
+            android:scaleY="0.2">
+            <path
+                android:fillColor="@color/splash_bars"
+                android:pathData="M100.0,106.0 L100.0,106.0 A6.5,6.5 0 0 1 106.5,112.5 L106.5,175.5 A6.5,6.5 0 0 1 93.5,175.5 L93.5,112.5 A6.5,6.5 0 0 1 100.0,106.0 Z" />
+        </group>
+        <group
+            android:name="bar2"
+            android:pivotX="122.0"
+            android:pivotY="144"
+            android:scaleY="0.2">
+            <path
+                android:fillColor="@color/splash_bars"
+                android:pathData="M122.0,88.0 L122.0,88.0 A6.5,6.5 0 0 1 128.5,94.5 L128.5,193.5 A6.5,6.5 0 0 1 115.5,193.5 L115.5,94.5 A6.5,6.5 0 0 1 122.0,88.0 Z" />
+        </group>
+        <group
+            android:name="bar3"
+            android:pivotX="144.0"
+            android:pivotY="144"
+            android:scaleY="0.2">
+            <path
+                android:fillColor="@color/splash_bars"
+                android:pathData="M144.0,74.0 L144.0,74.0 A6.5,6.5 0 0 1 150.5,80.5 L150.5,207.5 A6.5,6.5 0 0 1 137.5,207.5 L137.5,80.5 A6.5,6.5 0 0 1 144.0,74.0 Z" />
+        </group>
+        <group
+            android:name="bar4"
+            android:pivotX="166.0"
+            android:pivotY="144"
+            android:scaleY="0.2">
+            <path
+                android:fillColor="@color/splash_bars"
+                android:pathData="M166.0,88.0 L166.0,88.0 A6.5,6.5 0 0 1 172.5,94.5 L172.5,193.5 A6.5,6.5 0 0 1 159.5,193.5 L159.5,94.5 A6.5,6.5 0 0 1 166.0,88.0 Z" />
+        </group>
+        <group
+            android:name="bar5"
+            android:pivotX="188.0"
+            android:pivotY="144"
+            android:scaleY="0.2">
+            <path
+                android:fillColor="@color/splash_bars"
+                android:pathData="M188.0,106.0 L188.0,106.0 A6.5,6.5 0 0 1 194.5,112.5 L194.5,175.5 A6.5,6.5 0 0 1 181.5,175.5 L181.5,112.5 A6.5,6.5 0 0 1 188.0,106.0 Z" />
+        </group>
+        <group
+            android:name="bar6"
+            android:pivotX="210.0"
+            android:pivotY="144"
+            android:scaleY="0.2">
+            <path
+                android:fillColor="@color/splash_bars"
+                android:pathData="M210.0,122.0 L210.0,122.0 A6.5,6.5 0 0 1 216.5,128.5 L216.5,159.5 A6.5,6.5 0 0 1 203.5,159.5 L203.5,128.5 A6.5,6.5 0 0 1 210.0,122.0 Z" />
+        </group>
+            </group>
+        </vector>
+    </aapt:attr>
+    <target android:name="bar0">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="620"
+                android:startOffset="0"
+                android:propertyName="scaleY"
+                android:valueType="floatType"
+                android:interpolator="@android:interpolator/fast_out_slow_in">
+                <propertyValuesHolder android:propertyName="scaleY" android:valueType="floatType">
+                    <keyframe android:fraction="0" android:value="0.2" />
+                    <keyframe android:fraction="0.55" android:value="1.08" />
+                    <keyframe android:fraction="0.8" android:value="0.94" />
+                    <keyframe android:fraction="1" android:value="1" />
+                </propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+    <target android:name="bar1">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="620"
+                android:startOffset="45"
+                android:propertyName="scaleY"
+                android:valueType="floatType"
+                android:interpolator="@android:interpolator/fast_out_slow_in">
+                <propertyValuesHolder android:propertyName="scaleY" android:valueType="floatType">
+                    <keyframe android:fraction="0" android:value="0.2" />
+                    <keyframe android:fraction="0.55" android:value="1.08" />
+                    <keyframe android:fraction="0.8" android:value="0.94" />
+                    <keyframe android:fraction="1" android:value="1" />
+                </propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+    <target android:name="bar2">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="620"
+                android:startOffset="90"
+                android:propertyName="scaleY"
+                android:valueType="floatType"
+                android:interpolator="@android:interpolator/fast_out_slow_in">
+                <propertyValuesHolder android:propertyName="scaleY" android:valueType="floatType">
+                    <keyframe android:fraction="0" android:value="0.2" />
+                    <keyframe android:fraction="0.55" android:value="1.08" />
+                    <keyframe android:fraction="0.8" android:value="0.94" />
+                    <keyframe android:fraction="1" android:value="1" />
+                </propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+    <target android:name="bar3">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="620"
+                android:startOffset="135"
+                android:propertyName="scaleY"
+                android:valueType="floatType"
+                android:interpolator="@android:interpolator/fast_out_slow_in">
+                <propertyValuesHolder android:propertyName="scaleY" android:valueType="floatType">
+                    <keyframe android:fraction="0" android:value="0.2" />
+                    <keyframe android:fraction="0.55" android:value="1.08" />
+                    <keyframe android:fraction="0.8" android:value="0.94" />
+                    <keyframe android:fraction="1" android:value="1" />
+                </propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+    <target android:name="bar4">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="620"
+                android:startOffset="180"
+                android:propertyName="scaleY"
+                android:valueType="floatType"
+                android:interpolator="@android:interpolator/fast_out_slow_in">
+                <propertyValuesHolder android:propertyName="scaleY" android:valueType="floatType">
+                    <keyframe android:fraction="0" android:value="0.2" />
+                    <keyframe android:fraction="0.55" android:value="1.08" />
+                    <keyframe android:fraction="0.8" android:value="0.94" />
+                    <keyframe android:fraction="1" android:value="1" />
+                </propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+    <target android:name="bar5">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="620"
+                android:startOffset="225"
+                android:propertyName="scaleY"
+                android:valueType="floatType"
+                android:interpolator="@android:interpolator/fast_out_slow_in">
+                <propertyValuesHolder android:propertyName="scaleY" android:valueType="floatType">
+                    <keyframe android:fraction="0" android:value="0.2" />
+                    <keyframe android:fraction="0.55" android:value="1.08" />
+                    <keyframe android:fraction="0.8" android:value="0.94" />
+                    <keyframe android:fraction="1" android:value="1" />
+                </propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+    <target android:name="bar6">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="620"
+                android:startOffset="270"
+                android:propertyName="scaleY"
+                android:valueType="floatType"
+                android:interpolator="@android:interpolator/fast_out_slow_in">
+                <propertyValuesHolder android:propertyName="scaleY" android:valueType="floatType">
+                    <keyframe android:fraction="0" android:value="0.2" />
+                    <keyframe android:fraction="0.55" android:value="1.08" />
+                    <keyframe android:fraction="0.8" android:value="0.94" />
+                    <keyframe android:fraction="1" android:value="1" />
+                </propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+</animated-vector>

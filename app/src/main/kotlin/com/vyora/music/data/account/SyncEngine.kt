@@ -1,5 +1,6 @@
 package com.vyora.music.data.account
 
+import com.vyora.music.data.youtube.SimpleItem
 import android.content.Context
 import android.util.Log
 import androidx.room.withTransaction
@@ -302,7 +303,7 @@ object SyncEngine {
         val dao = database.library()
         for (playlist in dao.playlists().filter { it.remoteId == null }) {
             if (!isSignedIn()) return
-            val songs = dao.playlistSongs(playlist.id).map { it.itemId }
+            val songs = dao.playlistSongs(playlist.id).map { it.itemId }.filterNot(SimpleItem::isLocalId)
             val remoteId = YouTubeMusicApi.createPlaylist(playlist.name, songs)
             dao.setPlaylistRemote(playlist.id, remoteId)
             runCatching { YouTubeMusicApi.playlist(remoteId) }.getOrNull()?.songs?.items?.forEach {

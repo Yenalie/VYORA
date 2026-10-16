@@ -1,3 +1,5 @@
+@file:OptIn(coil.annotation.ExperimentalCoilApi::class)
+
 package com.vyora.music.ui.screens.settings
 
 import android.content.Context

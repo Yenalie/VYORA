@@ -83,7 +83,7 @@ class FeaturesTest {
             shader = LinearGradient(0f, 0f, 600f, 600f, 0xFF2E86DE.toInt(), 0xFFE84393.toInt(), Shader.TileMode.CLAMP)
         })
         val lines = listOf("Kita adalah sisa-sisa keikhlasan", "yang tak diikhlaskan", "Bertahan demi rasa")
-        val out = File(System.getProperty("vyora.cards", "build/cards")).apply { mkdirs() }
+        val out = File(System.getProperty("vyora.cards") ?: "build/cards").apply { mkdirs() }
         for (style in LyricsCardStyle.entries) {
             val card = LyricsCardRenderer.render(art, "Hati-Hati di Jalan", "Tulus", lines, style)
             assertEquals(LyricsCardRenderer.WIDTH, card.width)

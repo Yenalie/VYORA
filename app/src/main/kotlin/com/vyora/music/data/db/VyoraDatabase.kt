@@ -1,6 +1,7 @@
 package com.vyora.music.data.db
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -17,17 +18,29 @@ import androidx.room.RoomDatabase
         QueueEntity::class,
         QueueStateEntity::class,
         SyncActionEntity::class,
+        PlayEventEntity::class,
     ],
-    version = 1,
+    version = VyoraDatabase.VERSION,
     exportSchema = true,
+    autoMigrations = [
+        AutoMigration(from = 1, to = 2),
+    ],
 )
 abstract class VyoraDatabase : RoomDatabase() {
     abstract fun library(): LibraryDao
     abstract fun queue(): QueueDao
     abstract fun sync(): SyncDao
+    abstract fun stats(): StatsDao
 
     companion object {
         const val NAME = "vyora.db"
+
+        /**
+         * Bump on every schema change. Additive changes get an [AutoMigration] above; anything Room can't
+         * infer (renames, splits, data rewrites) goes in [Migrations.ALL]. The exported JSON in
+         * `app/schemas/` must be committed, and [com.vyora.music.MigrationTest] must cover the new step.
+         */
+        const val VERSION = 2
 
         @Volatile
         private var instance: VyoraDatabase? = null
@@ -35,6 +48,7 @@ abstract class VyoraDatabase : RoomDatabase() {
         fun get(context: Context): VyoraDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(context.applicationContext, VyoraDatabase::class.java, NAME)
+                    .addMigrations(*Migrations.ALL)
                     .build()
                     .also { instance = it }
             }

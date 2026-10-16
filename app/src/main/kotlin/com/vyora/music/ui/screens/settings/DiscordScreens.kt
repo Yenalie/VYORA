@@ -23,8 +23,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Login
-import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Podcasts
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
@@ -103,12 +103,12 @@ fun DiscordScreen(onBack: () -> Unit, onLogin: () -> Unit) {
             }
         }
         item(key = "account") {
-            SettingsGroup(header = stringResource(R.string.discord_account)) {
+            SettingsGroup(header = stringResource(R.string.discord_account), footer = stringResource(R.string.discord_risk)) {
                 val current = user
                 if (current == null) {
                     SettingsRow(
                         title = stringResource(R.string.discord_sign_in),
-                        icon = Icons.Default.Login, iconTint = DiscordBlurple,
+                        icon = Icons.AutoMirrored.Filled.Login, iconTint = DiscordBlurple,
                         onClick = onLogin,
                     )
                     SettingsRow(
@@ -127,7 +127,7 @@ fun DiscordScreen(onBack: () -> Unit, onLogin: () -> Unit) {
                     SettingsActionRow(
                         title = stringResource(R.string.discord_sign_out),
                         destructive = true,
-                        icon = Icons.Default.Logout, iconTint = SystemColors.Red,
+                        icon = Icons.AutoMirrored.Filled.Logout, iconTint = SystemColors.Red,
                         onClick = { confirmSignOut = true },
                         divider = false,
                     )
@@ -344,12 +344,16 @@ fun DiscordLoginScreen(onDone: () -> Unit) {
                         addJavascriptInterface(object {
                             @JavascriptInterface
                             fun onToken(token: String) {
-                                post { accept(token) }
+                                post { if (isDiscordHost(android.net.Uri.parse(url.orEmpty()).host)) accept(token) }
                             }
                         }, "VyoraDiscord")
                         webViewClient = object : WebViewClient() {
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) { loading = true }
                             override fun onPageFinished(view: WebView?, url: String?) { loading = false }
+
+                            // The token bridge is exposed to every page this WebView renders, so keep it on Discord.
+                            override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean =
+                                !isDiscordHost(request?.url?.host)
                         }
                         clearDiscordWebData()
                         loadUrl("https://discord.com/login")
@@ -376,5 +380,10 @@ fun DiscordLoginScreen(onDone: () -> Unit) {
             }
         }
     }
-    DisposableEffect(Unit) { onDispose { webView = null } }
+    DisposableEffect(Unit) { onDispose { webView = null; clearDiscordWebData() } }
+}
+
+internal fun isDiscordHost(host: String?): Boolean {
+    val h = host?.lowercase() ?: return false
+    return h == "discord.com" || h.endsWith(".discord.com")
 }

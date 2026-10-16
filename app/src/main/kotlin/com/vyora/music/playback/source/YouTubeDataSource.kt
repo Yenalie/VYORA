@@ -6,6 +6,7 @@ import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.cache.Cache
@@ -29,7 +30,12 @@ object YouTubeDataSource {
     private const val NO_OFFLINE = "yt-none/"
     val OFFLINE_QUALITY = AudioQuality.HIGH
 
-    fun audioFactory(context: Context): DataSource.Factory = factory(context, Kind.AUDIO)
+    /**
+     * Audio for the player, Crossfader and Cast proxy. `https` (YouTube) goes through the stream cache;
+     * `content://` and `file://` (lossless files on the device) are read directly, never cached.
+     */
+    fun audioFactory(context: Context): DataSource.Factory =
+        DefaultDataSource.Factory(context.applicationContext, factory(context, Kind.AUDIO))
 
     fun videoFactory(context: Context): DataSource.Factory = factory(context, Kind.VIDEO)
 

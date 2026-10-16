@@ -80,6 +80,8 @@ object LibraryPages {
     const val PLAYLISTS = "library/playlists"
     const val ALBUMS = "library/albums"
     const val ARTISTS = "library/artists"
+    const val LOCAL = "library/local"
+    const val RECAP = "library/recap"
     fun playlist(id: String) = "userplaylist/$id"
 }
 

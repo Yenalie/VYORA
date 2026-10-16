@@ -355,10 +355,12 @@ fun YouTubeSignInScreen(onBack: () -> Unit, onDone: () -> Unit) {
                                 val cookie = CookieManager.getInstance().getCookie(YouTubeConfig.MUSIC_ORIGIN)
                                 if (!InnerTubeAuth.hasSession(cookie)) return
                                 checking = true
-                                CookieManager.getInstance().flush()
                                 scope.launch {
                                     SyncEngine.signIn(cookie)
-                                        .onSuccess { onDone() }
+                                        .onSuccess {
+                                            clearSignInWebData()
+                                            onDone()
+                                        }
                                         .onFailure {
                                             checking = false
                                             Toast.makeText(context, failed, Toast.LENGTH_LONG).show()
@@ -385,5 +387,15 @@ fun YouTubeSignInScreen(onBack: () -> Unit, onDone: () -> Unit) {
             }
         }
     }
-    DisposableEffect(Unit) { onDispose { CookieManager.getInstance().flush() } }
+    // The session lives only in AccountStore (Keystore-encrypted). Never leave the raw Google cookies in
+    // the WebView's own unencrypted cookie jar, whether sign-in succeeded or was abandoned.
+    DisposableEffect(Unit) { onDispose { clearSignInWebData() } }
+}
+
+private fun clearSignInWebData() {
+    runCatching {
+        CookieManager.getInstance().removeAllCookies(null)
+        CookieManager.getInstance().flush()
+        android.webkit.WebStorage.getInstance().deleteAllData()
+    }
 }

@@ -39,11 +39,18 @@ object StreamResolver {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Entry>) = size > MAX_ENTRIES
     }
     private val locks = ConcurrentHashMap<String, Any>()
+    private val picked = object : LinkedHashMap<String, AudioCandidate>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, AudioCandidate>) = size > MAX_ENTRIES
+    }.let { java.util.Collections.synchronizedMap(it) }
+
+    /** The rendition most recently chosen for [videoId] (codec + bitrate for the Now Playing badge). */
+    fun pickedAudio(videoId: String): AudioCandidate? = picked[videoId]
 
     @Throws(IOException::class)
     fun resolveAudio(videoId: String, quality: AudioQuality, preferredItag: Int? = null): ResolvedStream {
         val pick = StreamSelector.pickAudio(entry(videoId).audio, quality, preferredItag)
             ?: throw IOException("No playable audio stream for $videoId")
+        picked[videoId] = pick
         return ResolvedStream(videoId, pick.itag, pick.url, headersFor(pick.url), pick.mimeType)
     }
 
@@ -66,17 +73,20 @@ object StreamResolver {
         val lock = locks.getOrPut(videoId) { Any() }
         synchronized(lock) {
             cached(videoId)?.let { return it }
-            val fresh = try {
-                extract(videoId)
-            } catch (e: IOException) {
-                throw e
-            } catch (e: Exception) {
-                throw IOException("Stream extraction failed for $videoId", e)
+            try {
+                val fresh = try {
+                    extract(videoId)
+                } catch (e: IOException) {
+                    throw e
+                } catch (e: Exception) {
+                    throw IOException("Stream extraction failed for $videoId", e)
+                }
+                // Publish before releasing the lock so a caller arriving now hits the cache, not a new extraction.
+                synchronized(entries) { entries[videoId] = fresh }
+                return fresh
             } finally {
-                locks.remove(videoId)
+                locks.remove(videoId, lock)
             }
-            synchronized(entries) { entries[videoId] = fresh }
-            return fresh
         }
     }
 

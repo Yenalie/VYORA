@@ -110,7 +110,7 @@ object Downloads {
 
     fun downloadAll(context: Context, items: List<SimpleItem>) {
         val app = context.applicationContext
-        val songs = items.filter { it.isSong && it.id.isNotBlank() }
+        val songs = items.filter { it.isSong && it.id.isNotBlank() && !it.isLocal }
             .filter { _entries.value[it.id]?.status.let { s -> s == null || s == DownloadStatus.FAILED } }
             .distinctBy { it.id }
         if (songs.isEmpty()) return

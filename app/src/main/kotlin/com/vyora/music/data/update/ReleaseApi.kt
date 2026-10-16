@@ -15,6 +15,7 @@ data class ReleaseInfo(
     val apkName: String,
     val apkSize: Long,
     val pageUrl: String,
+    val checksumUrl: String? = null,
 )
 
 object ReleaseApi {
@@ -55,15 +56,24 @@ object ReleaseApi {
             if (best == null || asset.optString("name").contains("release", ignoreCase = true)) best = asset
         }
         val apk = best ?: return null
+        val checksumName = apk.optString("name") + ".sha256"
+        var checksumUrl: String? = null
+        for (i in 0 until assets.length()) {
+            val asset = assets.optJSONObject(i) ?: continue
+            if (asset.optString("name").equals(checksumName, ignoreCase = true)) {
+                checksumUrl = asset.optString("browser_download_url").takeIf { it.startsWith("https://") }
+            }
+        }
         return ReleaseInfo(
             version = version,
             tag = tag,
             name = root.optString("name").ifBlank { tag },
             notes = cleanNotes(root.optString("body")),
-            apkUrl = apk.optString("browser_download_url"),
+            apkUrl = apk.optString("browser_download_url").takeIf { it.startsWith("https://") } ?: return null,
             apkName = apk.optString("name"),
             apkSize = apk.optLong("size"),
             pageUrl = root.optString("html_url").ifBlank { RELEASES_PAGE },
+            checksumUrl = checksumUrl,
         )
     }
 

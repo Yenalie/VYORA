@@ -1179,7 +1179,10 @@ private fun SeekSection() {
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.align(Alignment.CenterStart),
             )
-            SleepBadge(Modifier.align(Alignment.Center))
+            Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
+                SleepBadge()
+                NowPlayingQuality()
+            }
             Text(
                 "-" + formatTime((durationMs - shownPositionMs).coerceAtLeast(0L)),
                 color = Color.White.copy(alpha = 0.6f),
@@ -1187,6 +1190,25 @@ private fun SeekSection() {
                 modifier = Modifier.align(Alignment.CenterEnd),
             )
         }
+    }
+}
+
+/** Apple-style quality mark between the elapsed and remaining time; tap for codec details. */
+@Composable
+private fun NowPlayingQuality() {
+    val format by PlayerManager.audioFormat.collectAsState()
+    val current by PlayerManager.currentItem.collectAsState()
+    var details by remember { mutableStateOf(false) }
+    val f = format ?: return
+    com.vyora.music.ui.components.QualityBadge(
+        tier = f.tier,
+        color = Color.White.copy(alpha = 0.6f),
+        lossyLabel = f.codec.uppercase(),
+        onClick = { details = true },
+        modifier = Modifier.padding(horizontal = 6.dp),
+    )
+    if (details) {
+        com.vyora.music.ui.components.AudioFormatDialog(f, current?.isLocal == true) { details = false }
     }
 }
 

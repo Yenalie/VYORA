@@ -76,6 +76,7 @@ fun ItemRow(
     contentColor: Color = VyoraText,
     secondaryColor: Color = VyoraTextMuted,
     playlistId: String? = null,
+    badge: (@Composable () -> Unit)? = null,
 ) {
     val current by PlayerManager.currentItem.collectAsState()
     val isSong = item.isSong
@@ -171,9 +172,13 @@ fun ItemRow(
                 }
                 val downloads by com.vyora.music.data.download.Downloads.entries.collectAsState()
                 val offline = isSong && downloads[item.id]?.status == com.vyora.music.data.download.DownloadStatus.COMPLETED
-                if (meta != null || offline) {
+                if (meta != null || offline || badge != null) {
                     Spacer(Modifier.height(1.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (badge != null) {
+                            badge()
+                            Spacer(Modifier.width(6.dp))
+                        }
                         if (offline) {
                             Icon(
                                 Icons.Default.DownloadDone,

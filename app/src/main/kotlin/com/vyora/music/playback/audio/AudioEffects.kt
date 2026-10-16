@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION") // Virtualizer is deprecated in favour of the system Spatializer but is still the only per-session virtualizer.
+
 package com.vyora.music.playback.audio
 
 import android.content.Context

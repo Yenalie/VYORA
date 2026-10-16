@@ -162,3 +162,19 @@ data class PlaylistSongRow(
     @ColumnInfo(name = "set_video_id") val setVideoId: String?,
     @androidx.room.Embedded val item: ItemEntity,
 )
+
+/**
+ * One listen that counted (see [com.vyora.music.playback.service.ListeningTracker]). A snapshot of the
+ * song's title/artist/artwork is kept so stats survive the song being removed from the library.
+ * Added in schema v2.
+ */
+@Entity(tableName = "play_events", indices = [Index("played_at"), Index("item_id")])
+data class PlayEventEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "item_id") val itemId: String,
+    val title: String,
+    val artist: String,
+    val thumbnail: String?,
+    @ColumnInfo(name = "played_at") val playedAt: Long,
+    @ColumnInfo(name = "listened_ms") val listenedMs: Long,
+)

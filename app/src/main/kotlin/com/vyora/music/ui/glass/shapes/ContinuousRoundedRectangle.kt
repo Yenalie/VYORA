@@ -1,3 +1,13 @@
+/*
+ * Vendored from Kyant0/Capsule
+ * https://github.com/Kyant0/Capsule — Copyright 2025 Kyant0, Apache License 2.0
+ * capsule/src/main/java/com/kyant/capsule/ContinuousRoundedRectangle.kt
+ *
+ * Vendored so the shape ships as source with this app (not published to
+ * Maven Central). Package renamed accordingly, and the AbsoluteContinuous*
+ * variants were dropped — this app only uses the LTR-aware
+ * ContinuousRoundedRectangle.
+ */
 package com.vyora.music.ui.glass.shapes
 
 import androidx.annotation.FloatRange

@@ -1,22 +1,21 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
 
 android {
-    namespace 'com.vyora.music'
-    compileSdk 36
+    namespace = 'com.vyora.music'
+    compileSdk = 36
 
     defaultConfig {
-        applicationId 'com.vyora.music'
-        minSdk 29
-        targetSdk 35
-        versionCode 8
-        versionName '1.6.0'
+        applicationId = 'com.vyora.music'
+        minSdk = 29
+        targetSdk = 35
+        versionCode = 9
+        versionName = '1.7.0'
 
-        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        testInstrumentationRunner = 'androidx.test.runner.AndroidJUnitRunner'
     }
 
     def keystoreProps = new Properties()
@@ -28,26 +27,41 @@ android {
         release {
             def storePath = signingValue('storeFile', 'VYORA_KEYSTORE')
             if (storePath) {
-                storeFile file(storePath)
-                storePassword signingValue('storePassword', 'VYORA_KEYSTORE_PASSWORD')
-                keyAlias signingValue('keyAlias', 'VYORA_KEY_ALIAS')
-                keyPassword signingValue('keyPassword', 'VYORA_KEY_PASSWORD')
+                storeFile = file(storePath)
+                storePassword = signingValue('storePassword', 'VYORA_KEYSTORE_PASSWORD')
+                keyAlias = signingValue('keyAlias', 'VYORA_KEY_ALIAS')
+                keyPassword = signingValue('keyPassword', 'VYORA_KEY_PASSWORD')
             }
         }
     }
 
     buildTypes {
         release {
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled = true
+            shrinkResources = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            if (signingConfigs.release.storeFile != null) signingConfig signingConfigs.release
+            if (signingConfigs.release.storeFile != null) signingConfig = signingConfigs.release
         }
     }
 
     buildFeatures {
-        compose true
-        buildConfig true
+        compose = true
+        buildConfig = true
+    }
+
+    // MigrationTest reads the exported schemas through MigrationTestHelper, which loads them as assets.
+    // Robolectric only sees the variant's merged assets, so they ride along in debug builds (never release).
+    sourceSets {
+        debug {
+            assets.srcDirs += files("$projectDir/schemas")
+        }
+    }
+
+    lint {
+        // Pre-existing issues are recorded here; anything new fails CI. Regenerate with ./gradlew updateLintBaseline.
+        baseline = file("lint-baseline.xml")
+        abortOnError = true
+        checkDependencies = false
     }
 
     testOptions {
@@ -66,10 +80,11 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
@@ -107,6 +122,9 @@ dependencies {
     implementation libs.androidx.datastore.preferences
 
     implementation libs.androidx.work.runtime
+    implementation libs.androidx.core.splashscreen
+    // Media3 Cast pulls an old Fragment through AppCompat; ActivityResult APIs need >= 1.3.
+    implementation libs.androidx.fragment
 
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20240303'

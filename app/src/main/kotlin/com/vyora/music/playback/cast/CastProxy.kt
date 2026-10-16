@@ -32,6 +32,7 @@ object CastProxy {
     private const val TAG = "VYORA-CastProxy"
     private const val BUFFER = 64 * 1024
     private const val MAX_HEADER_BYTES = 16 * 1024
+    private const val MAX_CONNECTIONS = 6
 
     private val types = ConcurrentHashMap<String, String>()
     private val lock = Any()
@@ -39,18 +40,23 @@ object CastProxy {
     @Volatile private var server: ServerSocket? = null
     @Volatile private var pool: ExecutorService? = null
     @Volatile private var factory: DataSource.Factory? = null
-    private var token: String = ""
+    @Volatile private var token: String = ""
+
+    @Volatile private var appContext: Context? = null
 
     fun start(context: Context) {
         synchronized(lock) {
             if (server?.isClosed == false) return
+            appContext = context.applicationContext
             factory = YouTubeDataSource.audioFactory(context.applicationContext)
             token = randomToken()
             val socket = ServerSocket()
             socket.reuseAddress = true
-            socket.bind(InetSocketAddress(0))
+            // Only the Wi-Fi/Ethernet address the Cast device can reach, not every interface (mobile data etc.).
+            socket.bind(InetSocketAddress(lanAddress(), 0))
             server = socket
-            val executor = Executors.newCachedThreadPool { r -> Thread(r, "vyora-cast-proxy").apply { isDaemon = true } }
+            // A fixed pool: a receiver needs a couple of connections; anything beyond that just queues.
+            val executor = Executors.newFixedThreadPool(MAX_CONNECTIONS) { r -> Thread(r, "vyora-cast-proxy").apply { isDaemon = true } }
             pool = executor
             executor.execute { acceptLoop(socket, executor) }
         }
@@ -66,10 +72,23 @@ object CastProxy {
     }
 
     fun urlFor(videoId: String): String {
+        rebindIfNetworkChanged()
         val socket = server
         val host = lanAddress()?.hostAddress
         if (socket == null || socket.isClosed || host == null) return SimpleItem.watchUrl(videoId)
         return "http://$host:${socket.localPort}/$token/audio/${Uri.encode(videoId)}"
+    }
+
+    /** The socket is bound to one LAN address; follow the device when it hops to another network. */
+    private fun rebindIfNetworkChanged() {
+        val socket = server ?: return
+        val bound = socket.inetAddress ?: return
+        if (bound.isAnyLocalAddress) return
+        val current = lanAddress() ?: return
+        if (current == bound) return
+        val context = appContext ?: return
+        stop()
+        runCatching { start(context) }.onFailure { Log.w(TAG, "Rebind failed", it) }
     }
 
     private fun acceptLoop(socket: ServerSocket, executor: ExecutorService) {
@@ -143,14 +162,14 @@ object CastProxy {
             return
         }
         val videoId = Uri.decode(parts[2])
-        if (!videoId.matches(Regex("[A-Za-z0-9_-]{6,20}"))) {
+        if (!isServable(videoId)) {
             status(out, 404, "Not Found")
             return
         }
         val range = parseRange(request.headers["range"])
         val start = range?.first ?: 0L
         val source = requireNotNull(factory).createDataSource()
-        val uri = Uri.parse(SimpleItem.watchUrl(videoId))
+        val uri = Uri.parse(SimpleItem.playbackUrl(videoId))
         try {
             val remaining = source.open(DataSpec.Builder().setUri(uri).setPosition(start).build())
             val total = if (remaining == C.LENGTH_UNSET.toLong()) -1L else start + remaining
@@ -226,7 +245,18 @@ object CastProxy {
         return read
     }
 
+    /** YouTube video ids, or `local:<MediaStore id>` for files on this device. */
+    internal fun isServable(id: String): Boolean =
+        id.matches(VIDEO_ID) || (SimpleItem.isLocalId(id) && id.removePrefix(SimpleItem.LOCAL_PREFIX).matches(DIGITS))
+
+    private val VIDEO_ID = Regex("[A-Za-z0-9_-]{6,20}")
+    private val DIGITS = Regex("[0-9]{1,19}")
+
     internal fun sniff(head: ByteArray): String = when {
+        head.size >= 4 && head[0] == 'f'.code.toByte() && head[1] == 'L'.code.toByte() && head[2] == 'a'.code.toByte() && head[3] == 'C'.code.toByte() -> "audio/flac"
+        head.size >= 12 && head[0] == 'R'.code.toByte() && head[1] == 'I'.code.toByte() && head[2] == 'F'.code.toByte() && head[3] == 'F'.code.toByte() -> "audio/wav"
+        head.size >= 4 && head[0] == 'O'.code.toByte() && head[1] == 'g'.code.toByte() && head[2] == 'g'.code.toByte() && head[3] == 'S'.code.toByte() -> "audio/ogg"
+        head.size >= 3 && head[0] == 'I'.code.toByte() && head[1] == 'D'.code.toByte() && head[2] == '3'.code.toByte() -> "audio/mpeg"
         head.size >= 4 && head[0] == 0x1A.toByte() && head[1] == 0x45.toByte() && head[2] == 0xDF.toByte() && head[3] == 0xA3.toByte() -> "audio/webm"
         head.size >= 8 && head[4] == 'f'.code.toByte() && head[5] == 't'.code.toByte() && head[6] == 'y'.code.toByte() && head[7] == 'p'.code.toByte() -> "audio/mp4"
         else -> "audio/mp4"

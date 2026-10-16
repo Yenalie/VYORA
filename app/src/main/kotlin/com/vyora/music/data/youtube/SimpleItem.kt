@@ -25,8 +25,21 @@ data class SimpleItem(
     val isSong: Boolean get() = type == ItemType.SONG
     val isCollection: Boolean get() = type == ItemType.ALBUM || type == ItemType.PLAYLIST
 
+    /** A file on this device (MediaStore), not a YouTube video. */
+    val isLocal: Boolean get() = isLocalId(id)
+
     companion object {
+        /** YouTube ids never contain ':', so this prefix can't collide with a video id. */
+        const val LOCAL_PREFIX = "local:"
+        private const val LOCAL_AUDIO_URI = "content://media/external/audio/media/"
+
         fun watchUrl(id: String) = "https://www.youtube.com/watch?v=$id"
+        fun isLocalId(id: String?) = id != null && id.startsWith(LOCAL_PREFIX)
+        fun localId(mediaStoreId: Long) = "$LOCAL_PREFIX$mediaStoreId"
+        fun localUri(id: String) = LOCAL_AUDIO_URI + id.removePrefix(LOCAL_PREFIX)
+
+        /** What the player opens for [id]: the content URI for local files, the watch page otherwise. */
+        fun playbackUrl(id: String) = if (isLocalId(id)) localUri(id) else watchUrl(id)
     }
 }
 

@@ -187,11 +187,11 @@ fun BoxScope.SongMenu(
         MenuAction(favorite, if (isLiked) Icons.Default.Star else Icons.Default.StarBorder, accent = isLiked) {
             LibraryManager.toggleLike(item)
         },
-        artist.takeIf { it.isNotBlank() }?.let { name ->
+        artist.takeIf { it.isNotBlank() && !item.isLocal }?.let { name ->
             MenuAction(goToArtist, Icons.Default.Person) { app.openArtist(name, null, item.artistId) }
         },
-        MenuAction(createStation, Icons.Default.Radio) { PlayerManager.startRadio(item) },
-        if (item.isSong) {
+        if (!item.isLocal) MenuAction(createStation, Icons.Default.Radio) { PlayerManager.startRadio(item) } else null,
+        if (item.isSong && !item.isLocal) {
             MenuAction(downloadLabel, downloadIcon, accent = downloadStatus == DownloadStatus.COMPLETED) {
                 when (downloadStatus) {
                     null, DownloadStatus.FAILED -> {
@@ -202,7 +202,7 @@ fun BoxScope.SongMenu(
                 }
             }
         } else null,
-        MenuAction(shareTitle, Icons.Default.IosShare) { shareSong(context, item, shareTitle) },
+        if (!item.isLocal) MenuAction(shareTitle, Icons.Default.IosShare) { shareSong(context, item, shareTitle) } else null,
     ) + extraActions
     GlassMenu(expanded = expanded, onDismiss = onDismiss, actions = actions)
 }

@@ -72,8 +72,7 @@ class ScreenshotTest {
         flow("_progress").value = position.toFloat() / duration
     }
 
-    private fun capture(): Bitmap {
-        val window = compose.activity.window
+    private fun capture(window: android.view.Window = compose.activity.window): Bitmap {
         val view = window.decorView
         val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         var done = false
@@ -161,7 +160,7 @@ class ScreenshotTest {
         try {
             block()
         } catch (e: Throwable) {
-            println("SHOT step $name failed: $e")
+            println("SHOT step $name failed: $e\n" + e.stackTrace.take(14).joinToString("\n"))
         }
     }
 
@@ -183,6 +182,7 @@ class ScreenshotTest {
 
     @Test fun tour() {
         org.junit.Assume.assumeTrue(System.getProperty("shots.only").orEmpty().isNotBlank())
+        if (System.getProperty("shots.only") == "new") return newFeatures()
         val found = runBlocking { YouTubeClient.search("Tulus", SearchFilter.SONGS).getOrThrow().items.take(8) }
         val lead = found.firstOrNull { song ->
             val lyr = runBlocking { com.vyora.music.data.lyrics.LyricsRepository.lyricsFor(song.id, song.title, song.artist, song.duration) }
@@ -251,6 +251,71 @@ class ScreenshotTest {
         step("artist") {
             clickTopDesc("More"); waitReal(1000)
             clickText("Go to Artist"); shot("14_artist", minMs = 6000)
+        }
+    }
+
+    /** `-Dshots.only=new`: Lossless, Recap, the quality badge and the opening transition. */
+    private fun newFeatures() {
+        val found = runBlocking { YouTubeClient.search("Tulus", SearchFilter.SONGS).getOrThrow().items.take(8) }
+        val formats = listOf(
+            com.vyora.music.data.local.AudioFormatInfo("audio/flac", 96_000, 24),
+            com.vyora.music.data.local.AudioFormatInfo("audio/alac", 192_000, 24),
+            com.vyora.music.data.local.AudioFormatInfo("audio/flac", 44_100, 16),
+            com.vyora.music.data.local.AudioFormatInfo("audio/mpeg", 44_100, 0, 320_000),
+            com.vyora.music.data.local.AudioFormatInfo("audio/wav", 48_000, 24),
+            com.vyora.music.data.local.AudioFormatInfo("audio/flac", 44_100, 16),
+        )
+        val local = found.take(6).mapIndexed { i, song ->
+            com.vyora.music.data.local.LocalTrack(
+                item = song.copy(id = com.vyora.music.data.youtube.SimpleItem.localId(1000L + i), url = ""),
+                album = "Manusia", sizeBytes = 40_000_000L, format = formats[i], dateAdded = 0L,
+            )
+        }
+        com.vyora.music.data.local.LocalLibrary.replaceForTest(local)
+        val now = System.currentTimeMillis()
+        compose.runOnUiThread {
+            found.forEachIndexed { i, song ->
+                repeat(8 - i) { k ->
+                    com.vyora.music.data.library.LibraryManager.recordPlay(song, 150_000L + k * 9_000L, now - (k * 7 + i) * 3_600_000L * 5)
+                }
+            }
+        }
+        waitReal(6000)
+        shot("20_home", minMs = 4000)
+        step("library") { clickText("Library"); shot("21_library") }
+        step("lossless") {
+            clickText("Lossless"); shot("22_lossless", minMs = 2500)
+            clickText("All 6"); shot("22b_lossless_all", minMs = 1200)
+            compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1200)
+        }
+        step("recap") {
+            clickText("Recap"); shot("23_recap", minMs = 3000)
+            swipeUp(); shot("24_recap_2", minMs = 1500)
+            compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1200)
+        }
+        step("player") {
+            SettingsRepository.update { it.copy(skipUnavailable = false) }
+            compose.runOnUiThread { PlayerManager.setQueue(local.map { it.item }, 0) }
+            fakeTrack = local[0].item
+            compose.mainClock.autoAdvance = false
+            waitReal(2500)
+            flow("_audioFormat").value = local[0].format.copy(channels = 2)
+            clickLastText(local[0].item.title); shot("25_player_hires", minMs = 2500)
+            flow("_audioFormat").value = local[0].format.copy(channels = 2)
+            clickLastText("Hi-Res Lossless"); settle(1200)
+            // AlertDialog lives in its own window: shoot the activity, dim it, and lay the dialog window on top.
+            val dialog = checkNotNull(org.robolectric.shadows.ShadowDialog.getLatestDialog()) { "format dialog did not open" }
+            check(dialog.isShowing) { "format dialog is not showing" }
+            val dialogWindow = dialog.window!!
+            fakePlayback(); shadowOf(android.os.Looper.getMainLooper()).idle()
+            val base = capture()
+            val top = capture(dialogWindow)
+            val bmp = base.copy(Bitmap.Config.ARGB_8888, true)
+            android.graphics.Canvas(bmp).apply {
+                drawColor(0x99000000.toInt())
+                drawBitmap(top, ((bmp.width - top.width) / 2).toFloat(), ((bmp.height - top.height) / 2).toFloat(), null)
+            }
+            File("/tmp/shots/26_format_dialog.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
     }
 }

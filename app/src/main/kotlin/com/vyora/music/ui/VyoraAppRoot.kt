@@ -16,6 +16,9 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
@@ -104,6 +107,8 @@ import com.vyora.music.ui.screens.LibraryPages
 import com.vyora.music.ui.screens.LibraryScreen
 import com.vyora.music.ui.screens.PlaylistScreen
 import com.vyora.music.ui.screens.PlaylistsScreen
+import com.vyora.music.ui.screens.LocalMusicScreen
+import com.vyora.music.ui.screens.RecapScreen
 import com.vyora.music.ui.screens.SearchScreen
 import com.vyora.music.ui.screens.UserPlaylistScreen
 import com.vyora.music.ui.screens.settings.AboutScreen
@@ -339,28 +344,28 @@ fun VyoraAppRoot(settings: AppSettings) {
                 when (navKind(targetState.destination.route)) {
                     NavKind.PUSH -> slideInHorizontally(PushSpec) { it } + fadeIn(tween(160))
                     NavKind.ALBUM -> fadeIn(tween(240, delayMillis = 40))
-                    NavKind.TAB -> fadeIn(tween(200))
+                    NavKind.TAB -> TabEnter
                 }
             },
             exitTransition = {
                 when (navKind(targetState.destination.route)) {
                     NavKind.PUSH -> slideOutHorizontally(PushSpec) { -it / 4 } + fadeOut(tween(300), targetAlpha = 0.6f)
                     NavKind.ALBUM -> fadeOut(tween(200))
-                    NavKind.TAB -> fadeOut(tween(200))
+                    NavKind.TAB -> TabExit
                 }
             },
             popEnterTransition = {
                 when (navKind(initialState.destination.route)) {
                     NavKind.PUSH -> slideInHorizontally(PushSpec) { -it / 4 } + fadeIn(tween(300), initialAlpha = 0.6f)
                     NavKind.ALBUM -> fadeIn(tween(240, delayMillis = 40))
-                    NavKind.TAB -> fadeIn(tween(200))
+                    NavKind.TAB -> TabEnter
                 }
             },
             popExitTransition = {
                 when (navKind(initialState.destination.route)) {
                     NavKind.PUSH -> slideOutHorizontally(PushSpec) { it } + fadeOut(tween(200, delayMillis = 140))
                     NavKind.ALBUM -> fadeOut(tween(200))
-                    NavKind.TAB -> fadeOut(tween(200))
+                    NavKind.TAB -> TabExit
                 }
             },
         ) {
@@ -447,6 +452,19 @@ fun VyoraAppRoot(settings: AppSettings) {
             }
             screen(LibraryPages.ARTISTS) {
                 ArtistsScreen(onBack = { navController.popBackStack() }, onOpenArtist = openArtistPage)
+            }
+            screen(LibraryPages.LOCAL) {
+                LocalMusicScreen(
+                    onBack = { navController.popBackStack() },
+                    onPlay = { songs, index, shuffle -> PlayerManager.setQueue(songs, index, shuffle) },
+                )
+            }
+            screen(LibraryPages.RECAP) {
+                RecapScreen(
+                    onBack = { navController.popBackStack() },
+                    onPlay = { songs, index -> PlayerManager.setQueue(songs, index) },
+                    onOpenArtist = { name, art -> openArtistPage(name, art, null) },
+                )
             }
             screen(
                 route = "userplaylist/{id}",
@@ -605,6 +623,12 @@ fun VyoraAppRoot(settings: AppSettings) {
 private val TabRoots = setOf("home", "search", "library")
 
 private enum class NavKind { TAB, ALBUM, PUSH }
+
+// Tab switches: the outgoing tab gets out of the way quickly and the new one settles in from a hair
+// smaller, so the two never sit on top of each other as a muddy double exposure.
+private val TabEnter = fadeIn(tween(240, delayMillis = 60, easing = LinearOutSlowInEasing)) +
+    scaleIn(tween(300, delayMillis = 60, easing = LinearOutSlowInEasing), initialScale = 0.985f)
+private val TabExit = fadeOut(tween(110, easing = FastOutLinearInEasing))
 
 private fun navKind(route: String?): NavKind = when {
     route == null -> NavKind.TAB

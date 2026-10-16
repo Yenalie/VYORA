@@ -8,6 +8,9 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
+import com.vyora.music.data.local.AudioFormatInfo
+import com.vyora.music.data.youtube.StreamResolver
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
@@ -69,6 +72,9 @@ object PlayerManager {
     val repeatMode: StateFlow<Int> = _repeatMode.asStateFlow()
     private val _upNext = MutableStateFlow<List<QueueEntry>>(emptyList())
     val upNext: StateFlow<List<QueueEntry>> = _upNext.asStateFlow()
+    private val _audioFormat = MutableStateFlow<AudioFormatInfo?>(null)
+    /** What is being decoded right now: codec, resolution and, for streams, the YouTube bitrate. */
+    val audioFormat: StateFlow<AudioFormatInfo?> = _audioFormat.asStateFlow()
     private val _playbackError = MutableStateFlow<Int?>(null)
     val playbackError: StateFlow<Int?> = _playbackError.asStateFlow()
 
@@ -148,6 +154,10 @@ object PlayerManager {
             }
         }
 
+        override fun onTracksChanged(tracks: Tracks) {
+            _audioFormat.value = audioFormatOf(tracks, controller.currentMediaItem?.mediaId)
+        }
+
         override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
             publishUpNext(controller)
         }
@@ -172,7 +182,34 @@ object PlayerManager {
         }
     }
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    private fun audioFormatOf(tracks: Tracks, mediaId: String?): AudioFormatInfo? {
+        val format = tracks.groups.asSequence()
+            .filter { it.type == C.TRACK_TYPE_AUDIO && it.isSelected }
+            .flatMap { group -> (0 until group.length).asSequence().filter(group::isTrackSelected).map(group::getTrackFormat) }
+            .firstOrNull() ?: return null
+        val mime = format.sampleMimeType ?: format.containerMimeType ?: return null
+        val stream = mediaId?.takeUnless(SimpleItem::isLocalId)?.let(StreamResolver::pickedAudio)
+        val bits = when (format.pcmEncoding) {
+            C.ENCODING_PCM_8BIT -> 8
+            C.ENCODING_PCM_16BIT, C.ENCODING_PCM_16BIT_BIG_ENDIAN -> 16
+            C.ENCODING_PCM_24BIT, C.ENCODING_PCM_24BIT_BIG_ENDIAN -> 24
+            C.ENCODING_PCM_32BIT, C.ENCODING_PCM_32BIT_BIG_ENDIAN, C.ENCODING_PCM_FLOAT -> 32
+            else -> 0
+        }
+        return AudioFormatInfo(
+            mimeType = mime,
+            sampleRateHz = format.sampleRate.coerceAtLeast(0),
+            bitDepth = bits,
+            // NewPipe reports average bitrate in kbps but itag bitrate in bps.
+            bitrate = stream?.bitrate?.takeIf { it > 0 }?.let { if (it < 10_000) it * 1000 else it }
+                ?: maxOf(format.averageBitrate, format.bitrate, 0),
+            channels = format.channelCount.coerceAtLeast(0),
+        )
+    }
+
     private fun syncFromController(controller: MediaController) {
+        _audioFormat.value = audioFormatOf(controller.currentTracks, controller.currentMediaItem?.mediaId)
         _isPlaying.value = controller.isPlaying
         _isBuffering.value = controller.playbackState == Player.STATE_BUFFERING
         _shuffle.value = controller.shuffleModeEnabled
@@ -271,6 +308,7 @@ object PlayerManager {
     }
 
     fun startRadio(item: SimpleItem) {
+        if (item.isLocal) return
         setQueue(listOf(item), 0, shuffle = false)
         scope.launch {
             val songs = YouTubeClient.radio(item.id).getOrNull().orEmpty()

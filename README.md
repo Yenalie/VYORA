@@ -39,11 +39,19 @@ Dengarkan jutaan lagu dari katalog YouTube Music, simpan favoritmu, dan sinkronk
   <img src="docs/screenshots/settings_2.png" width="23%" alt="Pengaturan audio" />
   <img src="docs/screenshots/lyrics_card.png" width="23%" alt="Pilih lirik untuk kartu lirik" />
 </p>
+<p align="center">
+  <img src="docs/screenshots/lossless.png" width="23%" alt="Lossless" />
+  <img src="docs/screenshots/audio_format.png" width="23%" alt="Detail format audio" />
+  <img src="docs/screenshots/recap.png" width="23%" alt="Rekap" />
+</p>
 
 ## Fitur
 
 ### Musik
 - Cari lagu, album, artis, dan playlist dari katalog YouTube Music
+- **Lossless:** putar file FLAC, ALAC, WAV, dan AIFF dari perangkat dalam kualitas penuh, hingga Hi-Res (24-bit / 192 kHz)
+- Lencana kualitas di Now Playing yang menunjukkan codec, bit depth, dan sample rate
+- **Rekap:** statistik mendengarkan berisi total menit, lagu dan artis teratas, serta grafik harian
 - Lirik yang berjalan mengikuti lagu
 - **Kartu lirik:** pilih beberapa baris lirik dan bagikan sebagai gambar dengan latar artwork
 - **Unduh lagu** untuk diputar offline, termasuk unduh semua isi playlist
@@ -69,7 +77,7 @@ Dengarkan jutaan lagu dari katalog YouTube Music, simpan favoritmu, dan sinkronk
 - Simpan lagu favorit, buat playlist, dan simpan album
 - Masuk dengan akun YouTube Music untuk sinkron dua arah: lagu yang disukai, playlist, dan album
 - Perubahan saat offline otomatis dikirim begitu online
-- Sesi akun disimpan terenkripsi di perangkat
+- Sesi akun disimpan terenkripsi di perangkat, dan cookie login dihapus dari WebView setelah masuk
 
 ### Lainnya
 - **Pembaruan otomatis:** VYORA memberi tahu lewat notifikasi saat ada versi baru, lalu mengunduh dan memasangnya langsung dari aplikasi
@@ -109,7 +117,7 @@ di [Panduan Developer](docs/DEVELOPMENT.md).
 - [Coil](https://github.com/coil-kt/coil)
 - [Google Cast SDK](https://developers.google.com/cast) lewat Media3 Cast
 - [LRCLIB](https://lrclib.net) untuk lirik
-- Efek glass dari [Kyant0/backdrop](https://github.com/Kyant0/backdrop)
+- Efek glass dari [Kyant0/backdrop](https://github.com/Kyant0/backdrop) dan [Kyant0/Capsule](https://github.com/Kyant0/Capsule), tab bar dari [compose-floating-tab-bar](https://github.com/elyesmansour/compose-floating-tab-bar). Daftar lengkap ada di `NOTICE.md`
 
 ## Lisensi
 

@@ -1,5 +1,31 @@
 @file:OptIn(ExperimentalSharedTransitionApi::class)
 
+/*
+ * FloatingTabBar v1.0.1 by Elyes Mansour
+ * https://github.com/elyesmansour/compose-floating-tab-bar
+ * Licensed under the Apache License, Version 2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Vendored from the v1.0.1 tag: the published AAR is compiled against
+ * Compose 1.8 and crashes with NoSuchMethodError on
+ * SharedTransitionScope.sharedElement under the Compose version this app uses.
+ * Compiling the source here keeps it binary-compatible.
+ *
+ * Local modifications on top of v1.0.1:
+ * - Package renamed.
+ * - InlineBar/ExpandedBar use Row/Column instead of ConstraintLayout, and the
+ *   tab pill + standalone tab cluster is centered (iOS 26 style) instead of
+ *   being pinned to opposite screen edges.
+ * - The inline/expanded AnimatedContent is center-aligned so the collapse
+ *   animation morphs around the center instead of the start edge.
+ * - ExpandedTabs grew a draggable selection puck ported from Kyant0's
+ *   AndroidLiquidGlass catalog (LiquidBottomTabs/LiquidBottomTab): equal-width
+ *   tabs, a spring-damped indicator you can press-drag between tabs (release
+ *   snaps to and navigates the nearest tab), a finger-tracking glow, and —
+ *   when an optional [Backdrop] is supplied — chromatic lens refraction and
+ *   an accent-tinted glass sample of the selected tab's icon showing through
+ *   the puck. See [DampedDragAnimation] and [InteractiveHighlight].
+ */
 package com.vyora.music.ui.glass.floatingtabbar
 
 import androidx.compose.animation.AnimatedContent
@@ -180,8 +206,7 @@ fun FloatingTabBar(
 
     val visual = when {
         scrollConnection.isInline -> FloatingTabBarVisual.INLINE
-        searchMode && searchBarContent != null -> FloatingTabBarVisual.SEARCH_EXPANDED
-        else -> FloatingTabBarVisual.EXPANDED
+        else -> FloatingTabBarVisual.SEARCH_EXPANDED
     }
 
     val transition = updateTransition(targetState = visual, label = "floatingTabBarVisual")
@@ -258,7 +283,7 @@ fun FloatingTabBar(
                     elevations = elevations,
                     tabBarContentModifier = tabBarContentModifier,
                     animatedVisibilityScope = this@AnimatedContent,
-                    searchBarContent = searchBarContent ?: {},
+                    searchBarContent = searchBarContent,
                     targetWidthPx = expandedContentWidthPx
                 )
             }

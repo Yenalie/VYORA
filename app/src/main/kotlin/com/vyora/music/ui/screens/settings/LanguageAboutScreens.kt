@@ -63,9 +63,10 @@ private data class Credit(val name: String, val license: String, val url: String
 
 private val Credits = listOf(
     Credit("NewPipe Extractor", "GPL-3.0", "https://github.com/TeamNewPipe/NewPipeExtractor"),
-    Credit("Convx (liquid glass, tab bar)", "GPL-3.0", "https://github.com/cosmictaserdev-creator/Convx"),
+    Credit("Convx (glass modifier, nav bar, mini player)", "GPL-3.0", "https://github.com/cosmictaserdev-creator/Convx"),
     Credit("Kyant0 / backdrop", "Apache-2.0", "https://github.com/Kyant0/backdrop"),
     Credit("Kyant0 / Capsule", "Apache-2.0", "https://github.com/Kyant0/Capsule"),
+    Credit("compose-floating-tab-bar", "Apache-2.0", "https://github.com/elyesmansour/compose-floating-tab-bar"),
     Credit("AndroidX Media3", "Apache-2.0", "https://github.com/androidx/media"),
     Credit("Coil", "Apache-2.0", "https://github.com/coil-kt/coil"),
     Credit("LRCLIB (lyrics)", "", "https://lrclib.net"),

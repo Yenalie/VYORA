@@ -6,9 +6,12 @@
 ./gradlew assembleDebug      # app/build/outputs/apk/debug/
 ./gradlew assembleRelease    # app/build/outputs/apk/release/ (R8, ditandatangani)
 ./gradlew testDebugUnitTest  # unit test
+./gradlew lintDebug          # lint; gagal kalau ada error baru di luar app/lint-baseline.xml
 ```
 
-Butuh JDK 17 dan Android SDK 36. Lokasi SDK diisi Android Studio di `local.properties`.
+Butuh JDK 17 dan Android SDK 36 (AGP 9.4, Gradle 9.8, Kotlin bawaan AGP). Lokasi SDK diisi
+Android Studio di `local.properties`. Kalau sengaja menerima peringatan lint lama, perbarui
+baseline dengan `./gradlew updateLintBaseline`.
 
 ## Signing
 
@@ -101,9 +104,18 @@ com.vyora.music
 | Lagu yang diunduh | `files/offline_audio` (tanpa eviction, indeks di `exoplayer_internal.db`) |
 | Artwork lagu yang diunduh | `files/offline_art` |
 | Sesi Discord | SharedPreferences `vyora_discord` (AES-GCM, kunci di Android Keystore, tidak ikut backup) |
+| Statistik Rekap | Room, tabel `play_events` (skema v2) |
+| Data WebView login (cookie) | `app_webview/`, dihapus setelah login dan tidak ikut backup |
 
-Skema Room tiap versi diekspor ke `app/schemas/`. Menaikkan versi database wajib disertai
-`Migration` (jangan pakai destructive fallback, ini library pengguna). Data dari VYORA 1.x
+Skema Room tiap versi diekspor ke `app/schemas/`. Langkah mengubah skema:
+
+1. Ubah entity, naikkan `VyoraDatabase.VERSION`.
+2. Perubahan aditif (tabel/kolom baru dengan default): tambah `AutoMigration(from = N, to = N + 1)`.
+   Rename/hapus: `AutoMigration` dengan `AutoMigrationSpec`. Selain itu: tulis `Migration` di `Migrations.ALL`.
+3. Build sekali supaya KSP mengekspor `app/schemas/.../<N+1>.json`, lalu commit file itu.
+4. Tambah kasus di `MigrationTest` (Robolectric + `MigrationTestHelper`).
+
+Jangan pakai destructive fallback, ini library pengguna. Data dari VYORA 1.x
 (DataStore, SharedPreferences, `queue.json`) dipindah otomatis sekali saat pertama dibuka.
 
 ## Akun YouTube Music

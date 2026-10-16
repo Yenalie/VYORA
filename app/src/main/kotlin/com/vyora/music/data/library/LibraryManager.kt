@@ -5,6 +5,8 @@ import android.util.Log
 import androidx.room.withTransaction
 import com.vyora.music.data.account.SyncEngine
 import com.vyora.music.data.db.HistoryEntity
+import com.vyora.music.data.db.PlayEventEntity
+import com.vyora.music.data.db.StatsDao
 import com.vyora.music.data.db.ItemEntity
 import com.vyora.music.data.db.LegacyImport
 import com.vyora.music.data.db.LikedEntity
@@ -99,7 +101,27 @@ object LibraryManager {
         }
     }
 
-    fun clearRecent() = write { it.library().clearHistory(); it.library().deleteOrphanItems() }
+    /** Clearing listening history also forgets Recap statistics: both are "what I listened to". */
+    fun clearRecent() = write {
+        it.library().clearHistory()
+        it.library().deleteOrphanItems()
+        it.stats().clear()
+    }
+
+    /** A listen that counted (decided by ListeningTracker) for Recap. */
+    fun recordPlay(item: SimpleItem, listenedMs: Long, at: Long = System.currentTimeMillis()) = write { database ->
+        database.stats().insert(
+            PlayEventEntity(
+                itemId = item.id, title = item.title, artist = primaryArtist(item.artist),
+                thumbnail = item.thumbnail, playedAt = at, listenedMs = listenedMs,
+            )
+        )
+    }
+
+    fun clearStats() = write { it.stats().clear() }
+
+    /** Null before [init]; the Recap screen collects its flows directly. */
+    fun stats(): StatsDao? = db?.stats()
 
     fun isSaved(id: String): Boolean = _saved.value.any { it.id == id }
 
@@ -185,6 +207,8 @@ object LibraryManager {
 
     private suspend fun queue(database: VyoraDatabase, kind: String, target: String, extra: String? = null, replaces: List<String> = emptyList()) {
         if (!SyncEngine.isSignedIn()) return
+        // Files on this device have no YouTube Music counterpart; keep them local-only.
+        if (SimpleItem.isLocalId(target) || SimpleItem.isLocalId(extra)) return
         val sync = database.sync()
         if (replaces.isNotEmpty()) sync.deleteFor(target, replaces)
         sync.insert(SyncActionEntity(kind = kind, target = target, extra = extra))

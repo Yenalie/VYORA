@@ -23,16 +23,16 @@ jobs:
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.TAG }}
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
 
       - name: Check tag matches versionName
         id: version
@@ -72,6 +72,13 @@ jobs:
           SRC=$(ls app/build/outputs/apk/release/*.apk | grep -v unsigned | head -1)
           if [ -z "$SRC" ]; then echo "::error::No signed APK was produced"; exit 1; fi
           "$APKSIGNER" verify --print-certs "$SRC" | head -3
+          # The app only installs updates signed with this certificate (UpdateSignature.RELEASE_CERT_SHA256).
+          EXPECTED=75a7fd6458a9590b1b0c91d09c966f1ce202aae7f97dfe6021ad070d35442d9f
+          ACTUAL=$("$APKSIGNER" verify --print-certs "$SRC" | sed -nE 's/^Signer #1 certificate SHA-256 digest: ([0-9a-f]+)$/\1/p')
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::APK signed with $ACTUAL, expected the pinned release key $EXPECTED"
+            exit 1
+          fi
           OUT="VYORA-${{ steps.version.outputs.name }}-release.apk"
           cp "$SRC" "$OUT"
           sha256sum "$OUT" > "$OUT.sha256"

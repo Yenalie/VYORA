@@ -24,7 +24,7 @@ object MediaItems {
         }
         return MediaItem.Builder()
             .setMediaId(item.id)
-            .setUri(SimpleItem.watchUrl(item.id))
+            .setUri(SimpleItem.playbackUrl(item.id))
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(item.title)
@@ -45,7 +45,7 @@ object MediaItems {
             title = md.title?.toString().orEmpty(),
             artist = md.artist?.toString().orEmpty(),
             thumbnail = md.artworkUri?.toString(),
-            url = SimpleItem.watchUrl(id),
+            url = SimpleItem.playbackUrl(id),
             duration = md.extras?.getLong(EXTRA_DURATION_SEC, 0L) ?: 0L,
             type = md.extras?.getString(EXTRA_ITEM_TYPE) ?: ItemType.SONG,
             artistId = md.extras?.getString(EXTRA_ARTIST_ID),

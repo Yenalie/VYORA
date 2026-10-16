@@ -7,6 +7,7 @@
         <exclude domain="file" path="offline_audio/" />
         <exclude domain="file" path="offline_art/" />
         <exclude domain="database" path="exoplayer_internal.db" />
+        <exclude domain="root" path="app_webview/" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="vyora_account.xml" />
@@ -15,5 +16,6 @@
         <exclude domain="file" path="offline_audio/" />
         <exclude domain="file" path="offline_art/" />
         <exclude domain="database" path="exoplayer_internal.db" />
+        <exclude domain="root" path="app_webview/" />
     </device-transfer>
 </data-extraction-rules>

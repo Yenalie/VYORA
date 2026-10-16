@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.7.0
+- **Lossless:** halaman baru di Library untuk memutar file FLAC, ALAC, WAV, dan AIFF dari perangkat dengan kualitas penuh, lengkap dengan filter Lossless dan Hi-Res
+- Lencana kualitas di Now Playing: Lossless, Hi-Res Lossless, atau codec stream (Opus/AAC). Ketuk untuk melihat codec, bit depth, sample rate, dan bitrate
+- **Rekap:** statistik mendengarkan 7 hari, 30 hari, dan sepanjang waktu, berisi total menit, lagu dan artis teratas, serta grafik harian
+- Splash screen beranimasi dan transisi pembukaan aplikasi yang halus, plus perpindahan tab yang lebih rapi
+- File lokal bisa di-Cast ke Chromecast
+- Keamanan: cookie login tidak lagi tertinggal di WebView dan tidak ikut backup; pembaruan hanya dipasang jika tanda tangan dan checksum cocok dengan rilis resmi
+- Peringatan risiko akun di pengaturan Discord
+- Mesin build diperbarui (AGP 9.4, Gradle 9.8, Media3 1.11) dan database disiapkan untuk migrasi otomatis
+- Perbaikan dan perapian kode
+
 ## 1.6.0
 - Kartu lirik: pilih sampai 6 baris lirik, lalu jadikan gambar dengan latar artwork, warna lagu, atau gelap. Bisa disimpan ke galeri atau langsung dibagikan
 - Unduh lagu untuk diputar offline, satu per satu atau semua lagu di Favorit dan playlist, dengan opsi hanya lewat Wi-Fi

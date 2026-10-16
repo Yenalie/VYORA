@@ -3,7 +3,7 @@ package com.vyora.music.playback.service
 import android.net.wifi.WifiManager
 import android.os.PowerManager
 import androidx.core.content.ContextCompat
-import androidx.media3.cast.CastPlayer
+import androidx.media3.cast.RemoteCastPlayer
 import androidx.media3.cast.SessionAvailabilityListener
 import androidx.media3.common.MediaItem
 import com.google.android.gms.cast.framework.CastContext
@@ -26,8 +26,10 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.vyora.music.MainActivity
+import com.vyora.music.data.library.LibraryManager
 import com.vyora.music.data.settings.SettingsRepository
 import com.vyora.music.data.youtube.StreamResolver
+import com.vyora.music.data.youtube.SimpleItem
 import com.vyora.music.data.youtube.YouTubeClient
 import com.vyora.music.playback.MediaItems
 import com.vyora.music.playback.SleepTimer
@@ -50,11 +52,12 @@ class PlaybackService : MediaSessionService() {
     private var settingsJob: Job? = null
     private val retriedIds = mutableSetOf<String>()
     private lateinit var crossfader: Crossfader
+    private val listening = ListeningTracker { item, ms -> LibraryManager.recordPlay(item, ms) }
     private var tickerJob: Job? = null
     private var autoplayJob: Job? = null
     private val autoplayed = LinkedHashSet<String>()
     private var autoplayFailedSeed: String? = null
-    private var castPlayer: CastPlayer? = null
+    private var castPlayer: RemoteCastPlayer? = null
     private var castSnapshot: QueueSnapshot? = null
     private var castPollJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
@@ -174,6 +177,7 @@ class PlaybackService : MediaSessionService() {
         })
         player.addListener(presenceListener)
         crossfader = Crossfader(this, player, sourceFactory)
+        listening.attach(player)
 
         player.setShuffleOrder(PlayNextShuffleOrder(IntArray(0)))
         restoreQueue()
@@ -224,9 +228,11 @@ class PlaybackService : MediaSessionService() {
         val task = runCatching { CastContext.getSharedInstance(this, ContextCompat.getMainExecutor(this)) }
             .onFailure { Log.w(TAG, "Cast framework unavailable", it) }
             .getOrNull() ?: return
-        task.addOnSuccessListener { cast ->
+        task.addOnSuccessListener { _ ->
             if (mediaSession == null) return@addOnSuccessListener
-            val cp = CastPlayer(cast, CastItemConverter { id -> CastProxy.urlFor(id) })
+            val cp = RemoteCastPlayer.Builder(this)
+                .setMediaItemConverter(CastItemConverter { id -> CastProxy.urlFor(id) })
+                .build()
             cp.addListener(presenceListener)
             cp.addListener(castListener)
             cp.setSessionAvailabilityListener(object : SessionAvailabilityListener {
@@ -243,6 +249,7 @@ class PlaybackService : MediaSessionService() {
         val session = mediaSession ?: return
         val previous = session.player
         if (previous === target) return
+        listening.attach(target)
         val toCast = target !== player
         val snapshot = if (toCast) snapshotOf(previous) else castSnapshot ?: snapshotOf(previous)
         if (toCast) {
@@ -433,8 +440,11 @@ class PlaybackService : MediaSessionService() {
         }
         if (left > AUTOPLAY_WHEN_LEFT) return
         val lastIndex = timeline.getLastWindowIndex(shuffle).takeIf { it != C.INDEX_UNSET } ?: return
-        val seed = player.getMediaItemAt(lastIndex).mediaId
-        if (seed.isBlank() || seed == autoplayFailedSeed) return
+        // Radio needs a YouTube seed; for a queue of device files use the last streamed song, if any.
+        val seed = (lastIndex downTo 0).asSequence()
+            .map { player.getMediaItemAt(it).mediaId }
+            .firstOrNull { it.isNotBlank() && !SimpleItem.isLocalId(it) } ?: return
+        if (seed == autoplayFailedSeed) return
 
         autoplayJob = scope.launch {
             val songs = YouTubeClient.radio(seed).getOrNull()
@@ -507,6 +517,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        listening.detach()
         saveQueue()
         settingsJob?.cancel()
         crossfader.release()
