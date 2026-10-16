@@ -537,7 +537,6 @@
     <string name="spotify_connect_body">Masuk untuk melihat playlist dan Lagu yang Disukai di Spotify. VYORA memutarnya lewat YouTube Music atau menyimpannya sebagai playlist.</string>
     <string name="spotify_connect_title">Hubungkan Spotify</string>
     <string name="spotify_connected">Terhubung ke Spotify</string>
-    <string name="spotify_cookie_hint">Tempel cookie sp_dc dari open.spotify.com di browser desktop. Cookie disimpan terenkripsi di perangkat ini.</string>
     <string name="spotify_footer">Memakai sesi web player Spotify, sama seperti YumaPlayer. Ini bukan fitur resmi Spotify dan bisa berhenti berfungsi saat Spotify mengubah situsnya. Audio selalu dari YouTube Music.</string>
     <string name="spotify_library">Koleksimu</string>
     <string name="spotify_liked">Lagu yang Disukai</string>
@@ -553,6 +552,7 @@
     <string name="spotify_signed_in">Berhasil masuk ke Spotify</string>
     <string name="spotify_starting">Mencari lagu di YouTube Music…</string>
     <string name="spotify_title">Spotify</string>
-    <string name="spotify_use_cookie">Pakai cookie sp_dc</string>
     <string name="spotify_waiting_login">Masuk; VYORA lanjut otomatis</string>
+    <string name="settings_transitions">Transisi Lagu</string>
+    <string name="spotify_login_token">Masuk</string>
 </resources>

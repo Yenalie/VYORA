@@ -34,7 +34,10 @@ import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.FolderDelete
 import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.HighQuality
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material.icons.filled.Tune
@@ -90,90 +93,320 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * Settings root, laid out like Apple Music's settings: one short list of sections, details on their own pages
+ * (Appearance, Audio Quality, Song Transitions, Downloads, Storage, Backup, Software Update).
+ */
 @Composable
 fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
     val settings by SettingsRepository.settings.collectAsState()
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var confirm by remember { mutableStateOf<ConfirmAction?>(null) }
+    var confirmReset by remember { mutableStateOf(false) }
     val clearedText = stringResource(R.string.cleared)
-    fun toast() = Toast.makeText(context, clearedText, Toast.LENGTH_SHORT).show()
-    var cacheBytes by remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(Unit) { cacheBytes = withContext(Dispatchers.IO) { cacheUsage(context) } }
+    val downloads by com.vyora.music.data.download.Downloads.entries.collectAsState()
+    val server by com.vyora.music.data.server.MusicServer.config.collectAsState()
+    val spotify by com.vyora.music.data.spotify.SpotifyAccount.profile.collectAsState()
+    val update by UpdateManager.state.collectAsState()
 
     SettingsPage(title = stringResource(R.string.settings), onBack = onBack) {
         item(key = "account") {
             SettingsGroup { AccountSummaryRow(onClick = { onOpen("account") }) }
         }
-        item(key = "appearance") {
-            SettingsGroup(header = stringResource(R.string.settings_appearance)) {
-                SettingsControlRow(title = stringResource(R.string.settings_theme)) {
-                    SegmentedControl(
-                        options = ThemeMode.entries,
-                        selected = settings.themeMode,
-                        onSelect = { mode -> SettingsRepository.update { it.copy(themeMode = mode) } },
-                        label = { themeLabel(it) },
+        item(key = "general") {
+            SettingsGroup {
+                SettingsNavRow(
+                    title = stringResource(R.string.settings_appearance),
+                    icon = Icons.Default.Palette, iconTint = SystemColors.Indigo,
+                    value = themeLabel(settings.themeMode),
+                    onClick = { onOpen("appearance") },
+                )
+                SettingsNavRow(
+                    title = stringResource(R.string.settings_liquid_glass),
+                    icon = Icons.Default.WaterDrop, iconTint = SystemColors.Teal,
+                    value = if (!settings.glass.enabled) stringResource(R.string.vyora_off) else glassLookLabel(settings.glass.style),
+                    onClick = { onOpen("glass") },
+                )
+                SettingsNavRow(
+                    title = stringResource(R.string.settings_language),
+                    icon = Icons.Default.Language, iconTint = SystemColors.Blue,
+                    value = languageLabel(settings.language),
+                    onClick = { onOpen("language") },
+                )
+                SettingsSwitchRow(
+                    title = stringResource(R.string.settings_haptics),
+                    icon = Icons.Default.Vibration, iconTint = SystemColors.Gray,
+                    checked = settings.haptics,
+                    onCheckedChange = { v -> SettingsRepository.update { it.copy(haptics = v) } },
+                    divider = false,
+                )
+            }
+        }
+        item(key = "audio") {
+            SettingsGroup(header = stringResource(R.string.settings_audio)) {
+                SettingsNavRow(
+                    title = stringResource(R.string.audio_quality),
+                    icon = Icons.Default.HighQuality, iconTint = SystemColors.Red,
+                    value = qualityLabel(settings.audioQuality),
+                    onClick = { onOpen("audio_quality") },
+                )
+                SettingsNavRow(
+                    title = stringResource(R.string.settings_equalizer),
+                    icon = Icons.Default.Equalizer, iconTint = SystemColors.Pink,
+                    value = stringResource(if (settings.equalizer.enabled) R.string.vyora_on else R.string.vyora_off),
+                    onClick = { onOpen("equalizer") },
+                )
+                SettingsNavRow(
+                    title = stringResource(R.string.settings_transitions),
+                    icon = Icons.Default.Tune, iconTint = SystemColors.Orange,
+                    value = if (settings.crossfade) stringResource(R.string.seconds_short, settings.crossfadeSeconds.roundToInt())
+                    else stringResource(R.string.vyora_off),
+                    onClick = { onOpen("transitions") },
+                )
+                SettingsSwitchRow(
+                    title = stringResource(R.string.skip_silence),
+                    icon = Icons.Default.GraphicEq, iconTint = SystemColors.Purple,
+                    checked = settings.skipSilence,
+                    onCheckedChange = { v -> SettingsRepository.update { it.copy(skipSilence = v) } },
+                    divider = false,
+                )
+            }
+        }
+        item(key = "playback") {
+            SettingsGroup(
+                header = stringResource(R.string.settings_playback),
+                footer = stringResource(R.string.autoplay_footer),
+            ) {
+                SettingsSwitchRow(
+                    title = stringResource(R.string.autoplay),
+                    icon = Icons.Default.AllInclusive, iconTint = SystemColors.Purple,
+                    checked = settings.autoplay,
+                    onCheckedChange = { v -> SettingsRepository.update { it.copy(autoplay = v) } },
+                )
+                SettingsSwitchRow(
+                    title = stringResource(R.string.pause_on_disconnect),
+                    icon = Icons.Default.Headphones, iconTint = SystemColors.Blue,
+                    checked = settings.pauseOnDisconnect,
+                    onCheckedChange = { v -> SettingsRepository.update { it.copy(pauseOnDisconnect = v) } },
+                )
+                SettingsSwitchRow(
+                    title = stringResource(R.string.skip_unavailable),
+                    icon = Icons.Default.SkipNext, iconTint = SystemColors.Indigo,
+                    checked = settings.skipUnavailable,
+                    onCheckedChange = { v -> SettingsRepository.update { it.copy(skipUnavailable = v) } },
+                    divider = false,
+                )
+            }
+        }
+        item(key = "library") {
+            SettingsGroup(header = stringResource(R.string.library)) {
+                SettingsNavRow(
+                    title = stringResource(R.string.downloads),
+                    icon = Icons.Default.Download, iconTint = SystemColors.Blue,
+                    value = downloads.size.takeIf { it > 0 }?.toString(),
+                    onClick = { onOpen("downloads") },
+                )
+                SettingsNavRow(
+                    title = stringResource(R.string.settings_storage),
+                    icon = Icons.Default.Storage, iconTint = SystemColors.Gray,
+                    value = cacheSizeLabel(settings.mediaCache),
+                    onClick = { onOpen("storage") },
+                )
+                SettingsNavRow(
+                    title = stringResource(R.string.server_title),
+                    icon = Icons.Default.Dns, iconTint = SystemColors.Indigo,
+                    value = stringResource(if (server != null) R.string.on else R.string.off),
+                    onClick = { onOpen("server") },
+                    divider = false,
+                )
+            }
+        }
+        item(key = "integrations") {
+            SettingsGroup(header = stringResource(R.string.settings_integrations)) {
+                SettingsNavRow(
+                    title = stringResource(R.string.spotify_title),
+                    icon = Icons.Default.MusicNote, iconTint = Color(0xFF1DB954),
+                    value = spotify?.name ?: stringResource(R.string.off),
+                    onClick = { onOpen("spotify") },
+                )
+                SettingsNavRow(
+                    title = stringResource(R.string.discord_title),
+                    icon = Icons.Default.Gamepad, iconTint = Color(0xFF5865F2),
+                    value = stringResource(if (settings.discordPresence) R.string.on else R.string.off),
+                    onClick = { onOpen("discord") },
+                )
+                SettingsNavRow(
+                    title = stringResource(R.string.scrobble_title),
+                    icon = Icons.Default.GraphicEq, iconTint = Color(0xFFD51007),
+                    value = stringResource(if (settings.scrobbleLastFm || settings.scrobbleListenBrainz) R.string.on else R.string.off),
+                    onClick = { onOpen("scrobble") },
+                    divider = false,
+                )
+            }
+        }
+        item(key = "about") {
+            SettingsGroup {
+                SettingsNavRow(
+                    title = stringResource(R.string.backup_header),
+                    icon = Icons.Default.Backup, iconTint = SystemColors.Green,
+                    onClick = { onOpen("backup") },
+                )
+                SettingsNavRow(
+                    title = stringResource(R.string.settings_updates),
+                    icon = Icons.Default.SystemUpdate, iconTint = SystemColors.Gray,
+                    value = when (val u = update) {
+                        is UpdateState.Available -> u.release.version.toString()
+                        is UpdateState.ReadyToInstall -> u.release.version.toString()
+                        else -> com.vyora.music.BuildConfig.VERSION_NAME
+                    },
+                    onClick = { onOpen("updates") },
+                )
+                SettingsNavRow(
+                    title = stringResource(R.string.settings_about),
+                    icon = Icons.Default.Info, iconTint = SystemColors.Gray,
+                    onClick = { onOpen("about") },
+                    divider = false,
+                )
+            }
+        }
+        item(key = "reset") {
+            SettingsGroup {
+                SettingsActionRow(
+                    title = stringResource(R.string.reset_settings),
+                    destructive = true,
+                    onClick = { confirmReset = true },
+                    divider = false,
+                )
+            }
+        }
+    }
+
+    if (confirmReset) {
+        ConfirmDialog(
+            message = stringResource(R.string.confirm_reset),
+            onDismiss = { confirmReset = false },
+            onConfirm = {
+                confirmReset = false
+                SettingsRepository.resetAll()
+                Toast.makeText(context, clearedText, Toast.LENGTH_SHORT).show()
+            },
+        )
+    }
+}
+
+/** Appearance: theme, accent, backgrounds and animated artwork. */
+@Composable
+fun AppearanceSettingsScreen(onBack: () -> Unit) {
+    val settings by SettingsRepository.settings.collectAsState()
+    SettingsPage(title = stringResource(R.string.settings_appearance), onBack = onBack) {
+        item(key = "theme") {
+            SettingsGroup(header = stringResource(R.string.settings_theme)) {
+                ThemeMode.entries.forEachIndexed { i, mode ->
+                    SettingsChoiceRow(
+                        title = themeLabel(mode),
+                        selected = settings.themeMode == mode,
+                        onClick = { SettingsRepository.update { it.copy(themeMode = mode) } },
+                        divider = i < ThemeMode.entries.lastIndex,
                     )
                 }
-                SettingsControlRow(title = stringResource(R.string.settings_accent)) {
+            }
+        }
+        item(key = "accent") {
+            SettingsGroup(header = stringResource(R.string.settings_accent)) {
+                SettingsControlRow(divider = false) {
                     AccentSwatches(
                         selected = settings.accent,
                         onSelect = { accent -> SettingsRepository.update { it.copy(accent = accent) } },
                     )
                 }
+            }
+        }
+        item(key = "backgrounds") {
+            SettingsGroup {
                 SettingsSwitchRow(
                     title = stringResource(R.string.settings_ambient),
                     subtitle = stringResource(R.string.settings_ambient_desc),
-                    icon = Icons.Default.Palette, iconTint = SystemColors.Pink,
                     checked = settings.ambientBackground,
                     onCheckedChange = { v -> SettingsRepository.update { it.copy(ambientBackground = v) } },
                 )
                 SettingsSwitchRow(
                     title = stringResource(R.string.settings_player_bg),
-                    icon = Icons.Default.Wallpaper, iconTint = SystemColors.Purple,
                     checked = settings.animatedPlayerBackground,
                     onCheckedChange = { v -> SettingsRepository.update { it.copy(animatedPlayerBackground = v) } },
                     divider = false,
                 )
             }
         }
-        item(key = "video_artwork") {
-            SettingsGroup(footer = stringResource(R.string.video_artwork_footer)) {
-                SettingsControlRow(title = stringResource(R.string.video_artwork), divider = false) {
-                    SegmentedControl(
-                        options = VideoArtwork.entries,
-                        selected = settings.videoArtwork,
-                        onSelect = { mode -> SettingsRepository.update { it.copy(videoArtwork = mode) } },
-                        label = { videoArtworkLabel(it) },
+        item(key = "video") {
+            SettingsGroup(header = stringResource(R.string.video_artwork), footer = stringResource(R.string.video_artwork_footer)) {
+                VideoArtwork.entries.forEachIndexed { i, mode ->
+                    SettingsChoiceRow(
+                        title = videoArtworkLabel(mode),
+                        selected = settings.videoArtwork == mode,
+                        onClick = { SettingsRepository.update { it.copy(videoArtwork = mode) } },
+                        divider = i < VideoArtwork.entries.lastIndex,
                     )
                 }
             }
         }
-        item(key = "glass") {
+    }
+}
+
+/** Audio Quality, like Apple Music's: one checklist for Wi-Fi and, optionally, one for mobile data. */
+@Composable
+fun AudioQualityScreen(onBack: () -> Unit) {
+    val settings by SettingsRepository.settings.collectAsState()
+    SettingsPage(title = stringResource(R.string.audio_quality), onBack = onBack) {
+        item(key = "wifi") {
+            SettingsGroup(
+                header = if (settings.separateMobileQuality) stringResource(R.string.audio_quality_wifi) else null,
+                footer = stringResource(R.string.audio_quality_footer),
+            ) {
+                AudioQuality.entries.forEachIndexed { i, q ->
+                    SettingsChoiceRow(
+                        title = qualityLabel(q),
+                        selected = settings.audioQuality == q,
+                        onClick = { SettingsRepository.update { it.copy(audioQuality = q) } },
+                        divider = i < AudioQuality.entries.lastIndex,
+                    )
+                }
+            }
+        }
+        item(key = "split") {
             SettingsGroup {
-                SettingsNavRow(
-                    title = stringResource(R.string.settings_liquid_glass),
-                    icon = Icons.Default.WaterDrop, iconTint = SystemColors.Teal,
-                    value = if (!settings.glass.enabled) stringResource(R.string.vyora_off) else glassLookLabel(settings.glass.style),
-                    onClick = { onOpen("glass") },
+                SettingsSwitchRow(
+                    title = stringResource(R.string.audio_quality_split),
+                    checked = settings.separateMobileQuality,
+                    onCheckedChange = { v -> SettingsRepository.update { it.copy(separateMobileQuality = v) } },
                     divider = false,
                 )
             }
         }
-        item(key = "audio") {
-            SettingsGroup(
-                header = stringResource(R.string.settings_audio),
-                footer = stringResource(R.string.crossfade_footer),
-            ) {
-                SettingsNavRow(
-                    title = stringResource(R.string.settings_equalizer),
-                    icon = Icons.Default.Equalizer, iconTint = SystemColors.Red,
-                    value = stringResource(if (settings.equalizer.enabled) R.string.vyora_on else R.string.vyora_off),
-                    onClick = { onOpen("equalizer") },
-                )
+        if (settings.separateMobileQuality) {
+            item(key = "mobile") {
+                SettingsGroup(header = stringResource(R.string.audio_quality_mobile)) {
+                    AudioQuality.entries.forEachIndexed { i, q ->
+                        SettingsChoiceRow(
+                            title = qualityLabel(q),
+                            selected = settings.mobileQuality == q,
+                            onClick = { SettingsRepository.update { it.copy(mobileQuality = q) } },
+                            divider = i < AudioQuality.entries.lastIndex,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Song Transitions: crossfade on/off and its length. */
+@Composable
+fun TransitionsScreen(onBack: () -> Unit) {
+    val settings by SettingsRepository.settings.collectAsState()
+    SettingsPage(title = stringResource(R.string.settings_transitions), onBack = onBack) {
+        item(key = "crossfade") {
+            SettingsGroup(footer = stringResource(R.string.crossfade_footer)) {
                 SettingsSwitchRow(
                     title = stringResource(R.string.crossfade),
-                    icon = Icons.Default.Tune, iconTint = SystemColors.Pink,
                     checked = settings.crossfade,
                     onCheckedChange = { v -> SettingsRepository.update { it.copy(crossfade = v) } },
                     divider = settings.crossfade,
@@ -191,116 +424,70 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                 }
             }
         }
-        item(key = "quality") {
-            SettingsGroup(footer = stringResource(R.string.audio_quality_footer)) {
-                SettingsControlRow(
-                    title = stringResource(if (settings.separateMobileQuality) R.string.audio_quality_wifi else R.string.audio_quality),
-                ) {
-                    SegmentedControl(
-                        options = AudioQuality.entries,
-                        selected = settings.audioQuality,
-                        onSelect = { q -> SettingsRepository.update { it.copy(audioQuality = q) } },
-                        label = { qualityLabel(it) },
-                    )
-                }
+    }
+}
+
+/** Downloads: Wi-Fi only and removing everything. */
+@Composable
+fun DownloadsSettingsScreen(onBack: () -> Unit) {
+    val settings by SettingsRepository.settings.collectAsState()
+    val context = LocalContext.current
+    val downloads by com.vyora.music.data.download.Downloads.entries.collectAsState()
+    var offlineBytes by remember { mutableStateOf(0L) }
+    var confirm by remember { mutableStateOf(false) }
+    val clearedText = stringResource(R.string.cleared)
+    LaunchedEffect(downloads.size) {
+        offlineBytes = withContext(Dispatchers.IO) { com.vyora.music.data.download.Downloads.usedBytes(context) }
+    }
+    SettingsPage(title = stringResource(R.string.downloads), onBack = onBack) {
+        item(key = "wifi") {
+            SettingsGroup {
                 SettingsSwitchRow(
-                    title = stringResource(R.string.audio_quality_split),
-                    icon = Icons.Default.Wifi, iconTint = SystemColors.Green,
-                    checked = settings.separateMobileQuality,
-                    onCheckedChange = { v -> SettingsRepository.update { it.copy(separateMobileQuality = v) } },
-                    divider = settings.separateMobileQuality,
-                )
-                if (settings.separateMobileQuality) {
-                    SettingsControlRow(title = stringResource(R.string.audio_quality_mobile), divider = false) {
-                        SegmentedControl(
-                            options = AudioQuality.entries,
-                            selected = settings.mobileQuality,
-                            onSelect = { q -> SettingsRepository.update { it.copy(mobileQuality = q) } },
-                            label = { qualityLabel(it) },
-                        )
-                    }
-                }
-            }
-        }
-        item(key = "playback") {
-            SettingsGroup(
-                header = stringResource(R.string.settings_playback),
-                footer = stringResource(R.string.autoplay_footer),
-            ) {
-                SettingsSwitchRow(
-                    title = stringResource(R.string.autoplay),
-                    icon = Icons.Default.AllInclusive, iconTint = SystemColors.Purple,
-                    checked = settings.autoplay,
-                    onCheckedChange = { v -> SettingsRepository.update { it.copy(autoplay = v) } },
-                )
-                SettingsSwitchRow(
-                    title = stringResource(R.string.skip_silence),
-                    icon = Icons.Default.GraphicEq, iconTint = SystemColors.Orange,
-                    checked = settings.skipSilence,
-                    onCheckedChange = { v -> SettingsRepository.update { it.copy(skipSilence = v) } },
-                )
-                SettingsSwitchRow(
-                    title = stringResource(R.string.pause_on_disconnect),
-                    icon = Icons.Default.Headphones, iconTint = SystemColors.Blue,
-                    checked = settings.pauseOnDisconnect,
-                    onCheckedChange = { v -> SettingsRepository.update { it.copy(pauseOnDisconnect = v) } },
-                )
-                SettingsSwitchRow(
-                    title = stringResource(R.string.skip_unavailable),
-                    icon = Icons.Default.SkipNext, iconTint = SystemColors.Indigo,
-                    checked = settings.skipUnavailable,
-                    onCheckedChange = { v -> SettingsRepository.update { it.copy(skipUnavailable = v) } },
+                    title = stringResource(R.string.download_wifi_only),
+                    checked = settings.downloadWifiOnly,
+                    onCheckedChange = { v -> SettingsRepository.update { it.copy(downloadWifiOnly = v) } },
                     divider = false,
                 )
             }
         }
-        item(key = "sources") {
-            SettingsGroup(header = stringResource(R.string.settings_sources)) {
-                val server by com.vyora.music.data.server.MusicServer.config.collectAsState()
-                SettingsNavRow(
-                    title = stringResource(R.string.server_title),
-                    subtitle = stringResource(R.string.server_subtitle),
-                    icon = Icons.Default.Dns, iconTint = SystemColors.Indigo,
-                    value = stringResource(if (server != null) R.string.on else R.string.off),
-                    onClick = { onOpen("server") },
-                )
-                SettingsNavRow(
-                    title = stringResource(R.string.import_title),
-                    icon = Icons.AutoMirrored.Filled.PlaylistAdd, iconTint = Color(0xFF1DB954),
-                    onClick = { onOpen("import") },
+        item(key = "remove") {
+            SettingsGroup(footer = stringResource(R.string.downloads_usage, downloads.size, Formatter.formatShortFileSize(context, offlineBytes))) {
+                SettingsActionRow(
+                    title = stringResource(R.string.downloads_remove_all),
+                    destructive = true,
+                    onClick = { if (downloads.isNotEmpty()) confirm = true },
                     divider = false,
                 )
             }
         }
-        item(key = "general") {
-            SettingsGroup(header = stringResource(R.string.settings_general)) {
-                SettingsNavRow(
-                    title = stringResource(R.string.settings_language),
-                    icon = Icons.Default.Language, iconTint = SystemColors.Blue,
-                    value = languageLabel(settings.language),
-                    onClick = { onOpen("language") },
-                )
-                SettingsSwitchRow(
-                    title = stringResource(R.string.settings_haptics),
-                    icon = Icons.Default.Vibration, iconTint = SystemColors.Gray,
-                    checked = settings.haptics,
-                    onCheckedChange = { v -> SettingsRepository.update { it.copy(haptics = v) } },
-                    divider = false,
-                )
-            }
-        }
-        item(key = "storage") {
-            SettingsGroup(header = stringResource(R.string.settings_storage)) {
-                SettingsRow(
-                    title = stringResource(R.string.clear_search_history),
-                    icon = Icons.Default.SearchOff, iconTint = SystemColors.Gray,
-                    onClick = { SearchHistory.clear(); toast() },
-                )
-                SettingsRow(
-                    title = stringResource(R.string.clear_listening_history),
-                    icon = Icons.Default.History, iconTint = SystemColors.Gray,
-                    onClick = { confirm = ConfirmAction.HISTORY },
-                )
+    }
+    if (confirm) {
+        ConfirmDialog(
+            message = stringResource(R.string.confirm_remove_downloads),
+            onDismiss = { confirm = false },
+            onConfirm = {
+                confirm = false
+                com.vyora.music.data.download.Downloads.removeAll(context)
+                Toast.makeText(context, clearedText, Toast.LENGTH_SHORT).show()
+            },
+        )
+    }
+}
+
+/** Storage: song cache size, clearing caches and listening history. */
+@Composable
+fun StorageSettingsScreen(onBack: () -> Unit) {
+    val settings by SettingsRepository.settings.collectAsState()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var cacheBytes by remember { mutableStateOf<Long?>(null) }
+    var confirmHistory by remember { mutableStateOf(false) }
+    val clearedText = stringResource(R.string.cleared)
+    fun toast() = Toast.makeText(context, clearedText, Toast.LENGTH_SHORT).show()
+    LaunchedEffect(Unit) { cacheBytes = withContext(Dispatchers.IO) { cacheUsage(context) } }
+    SettingsPage(title = stringResource(R.string.settings_storage), onBack = onBack) {
+        item(key = "cache") {
+            SettingsGroup(footer = stringResource(R.string.clear_cache_usage, Formatter.formatShortFileSize(context, cacheBytes ?: 0L))) {
                 SettingsSliderRow(
                     title = stringResource(R.string.media_cache_size),
                     value = settings.mediaCache.ordinal.toFloat(),
@@ -312,13 +499,8 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                     steps = CacheSize.entries.size - 2,
                     valueLabel = cacheSizeLabel(settings.mediaCache),
                 )
-                SettingsRow(
+                SettingsActionRow(
                     title = stringResource(R.string.clear_cache),
-                    subtitle = stringResource(
-                        R.string.clear_cache_usage,
-                        Formatter.formatShortFileSize(context, cacheBytes ?: 0L),
-                    ),
-                    icon = Icons.Default.DeleteSweep, iconTint = SystemColors.Gray,
                     divider = false,
                     onClick = {
                         scope.launch {
@@ -336,102 +518,49 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                 )
             }
         }
-        item(key = "downloads") {
-            val downloads by com.vyora.music.data.download.Downloads.entries.collectAsState()
-            var offlineBytes by remember { mutableStateOf(0L) }
-            LaunchedEffect(downloads.size) {
-                offlineBytes = withContext(Dispatchers.IO) { com.vyora.music.data.download.Downloads.usedBytes(context) }
-            }
-            SettingsGroup(header = stringResource(R.string.downloads)) {
-                SettingsSwitchRow(
-                    title = stringResource(R.string.download_wifi_only),
-                    icon = Icons.Default.Wifi, iconTint = SystemColors.Blue,
-                    checked = settings.downloadWifiOnly,
-                    onCheckedChange = { v -> SettingsRepository.update { it.copy(downloadWifiOnly = v) } },
-                )
-                SettingsRow(
-                    title = stringResource(R.string.downloads_remove_all),
-                    subtitle = stringResource(
-                        R.string.downloads_usage,
-                        downloads.size,
-                        Formatter.formatShortFileSize(context, offlineBytes),
-                    ),
-                    icon = Icons.Default.FolderDelete, iconTint = SystemColors.Gray,
-                    divider = false,
-                    onClick = { if (downloads.isNotEmpty()) confirm = ConfirmAction.DOWNLOADS },
-                )
-            }
-        }
-        item(key = "integrations") {
-            SettingsGroup(header = stringResource(R.string.settings_integrations)) {
-                SettingsNavRow(
-                    title = stringResource(R.string.discord_title),
-                    icon = Icons.Default.Gamepad, iconTint = Color(0xFF5865F2),
-                    value = stringResource(if (settings.discordPresence) R.string.on else R.string.off),
-                    onClick = { onOpen("discord") },
-                )
-                SettingsNavRow(
-                    title = stringResource(R.string.spotify_title),
-                    icon = Icons.Default.MusicNote, iconTint = Color(0xFF1DB954),
-                    value = com.vyora.music.data.spotify.SpotifyAccount.profile.collectAsState().value?.name
-                        ?: stringResource(R.string.off),
-                    onClick = { onOpen("spotify") },
-                )
-                SettingsNavRow(
-                    title = stringResource(R.string.scrobble_title),
-                    icon = Icons.Default.GraphicEq, iconTint = Color(0xFFD51007),
-                    value = stringResource(if (settings.scrobbleLastFm || settings.scrobbleListenBrainz) R.string.on else R.string.off),
-                    onClick = { onOpen("scrobble") },
-                    divider = false,
-                )
-            }
-        }
-        item(key = "backup") { BackupGroup() }
-        item(key = "updates") {
-            UpdatesGroup(autoCheck = settings.autoUpdateCheck)
-        }
-        item(key = "about") {
+        item(key = "history") {
             SettingsGroup {
-                SettingsNavRow(
-                    title = stringResource(R.string.settings_about),
-                    icon = Icons.Default.Info, iconTint = SystemColors.Gray,
-                    onClick = { onOpen("about") },
+                SettingsActionRow(
+                    title = stringResource(R.string.clear_search_history),
+                    onClick = { SearchHistory.clear(); toast() },
                 )
                 SettingsActionRow(
-                    title = stringResource(R.string.reset_settings),
+                    title = stringResource(R.string.clear_listening_history),
                     destructive = true,
-                    icon = Icons.Default.RestartAlt, iconTint = SystemColors.Red,
-                    onClick = { confirm = ConfirmAction.RESET },
+                    onClick = { confirmHistory = true },
                     divider = false,
                 )
             }
         }
     }
-
-    confirm?.let { action ->
+    if (confirmHistory) {
         ConfirmDialog(
-            message = stringResource(
-                when (action) {
-                    ConfirmAction.RESET -> R.string.confirm_reset
-                    ConfirmAction.HISTORY -> R.string.confirm_clear_history
-                    ConfirmAction.DOWNLOADS -> R.string.confirm_remove_downloads
-                }
-            ),
-            onDismiss = { confirm = null },
+            message = stringResource(R.string.confirm_clear_history),
+            onDismiss = { confirmHistory = false },
             onConfirm = {
-                confirm = null
-                when (action) {
-                    ConfirmAction.RESET -> SettingsRepository.resetAll()
-                    ConfirmAction.HISTORY -> LibraryManager.clearRecent()
-                    ConfirmAction.DOWNLOADS -> com.vyora.music.data.download.Downloads.removeAll(context)
-                }
+                confirmHistory = false
+                LibraryManager.clearRecent()
                 toast()
             },
         )
     }
 }
 
-private enum class ConfirmAction { HISTORY, RESET, DOWNLOADS }
+@Composable
+fun BackupSettingsScreen(onBack: () -> Unit) {
+    SettingsPage(title = stringResource(R.string.backup_header), onBack = onBack) {
+        item(key = "backup") { BackupGroup() }
+    }
+}
+
+@Composable
+fun UpdatesSettingsScreen(onBack: () -> Unit) {
+    val settings by SettingsRepository.settings.collectAsState()
+    SettingsPage(title = stringResource(R.string.settings_updates), onBack = onBack) {
+        item(key = "updates") { UpdatesGroup(autoCheck = settings.autoUpdateCheck) }
+    }
+}
+
 
 @Composable
 private fun UpdatesGroup(autoCheck: Boolean) {
@@ -449,10 +578,7 @@ private fun UpdatesGroup(autoCheck: Boolean) {
         is UpdateState.ReadyToInstall -> stringResource(R.string.update_ready, s.release.version.toString())
         is UpdateState.Failed -> updateErrorText(s.reason)
     }
-    SettingsGroup(
-        header = stringResource(R.string.settings_updates),
-        footer = stringResource(R.string.update_footer),
-    ) {
+    SettingsGroup(footer = stringResource(R.string.update_footer)) {
         SettingsRow(
             title = stringResource(R.string.update_check_now),
             subtitle = status,

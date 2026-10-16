@@ -537,7 +537,6 @@
     <string name="spotify_connect_body">サインインすると Spotify のプレイリストとお気に入りの曲を表示できます。VYORA は YouTube Music で再生するか、プレイリストとして保存します。</string>
     <string name="spotify_connect_title">Spotify を接続</string>
     <string name="spotify_connected">Spotify に接続済み</string>
-    <string name="spotify_cookie_hint">デスクトップブラウザの open.spotify.com から sp_dc クッキーを貼り付けます。この端末に暗号化して保存されます。</string>
     <string name="spotify_footer">YumaPlayer と同じく Spotify ウェブプレーヤーのセッションを使います。Spotify 公式の機能ではなく、サイトの変更で動かなくなる場合があります。音声は常に YouTube Music から再生されます。</string>
     <string name="spotify_library">ライブラリ</string>
     <string name="spotify_liked">お気に入りの曲</string>
@@ -553,6 +552,7 @@
     <string name="spotify_signed_in">Spotify にサインインしました</string>
     <string name="spotify_starting">YouTube Music で曲を探しています…</string>
     <string name="spotify_title">Spotify</string>
-    <string name="spotify_use_cookie">sp_dc クッキーを使う</string>
     <string name="spotify_waiting_login">ログインすると VYORA が自動で続行します</string>
+    <string name="settings_transitions">曲のトランジション</string>
+    <string name="spotify_login_token">ログイン</string>
 </resources>

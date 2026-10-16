@@ -4,7 +4,6 @@ import com.vyora.music.data.update.ReleaseApi
 import com.vyora.music.data.update.UpdateSignature
 import com.vyora.music.data.update.UpdateSignature.Verdict
 import com.vyora.music.playback.cast.CastProxy
-import com.vyora.music.ui.screens.settings.isSpotifyLoginHost
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -56,15 +55,6 @@ class SecurityTest {
         assertNull(ReleaseApi.parse(plain))
         val noSum = """{"tag_name":"v1.7.0","assets":[{"name":"x.apk","browser_download_url":"https://e/x.apk","size":1}]}"""
         assertNull(ReleaseApi.parse(noSum)?.checksumUrl)
-    }
-
-    @Test fun spotifyLoginStaysOnSpotifyAndItsSignInProviders() {
-        assertTrue(isSpotifyLoginHost("accounts.spotify.com"))
-        assertTrue(isSpotifyLoginHost("open.spotify.com"))
-        assertTrue(isSpotifyLoginHost("accounts.google.com"))
-        assertFalse(isSpotifyLoginHost("spotify.com.evil.example"))
-        assertFalse(isSpotifyLoginHost("evilspotify.com"))
-        assertFalse(isSpotifyLoginHost(null))
     }
 
     @Test fun castProxyServesOnlyVideoIdsAndLocalFiles() {

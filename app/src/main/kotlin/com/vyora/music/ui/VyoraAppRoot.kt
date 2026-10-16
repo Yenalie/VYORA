@@ -537,6 +537,13 @@ fun VyoraAppRoot(settings: AppSettings) {
                     onDone = { navController.popBackStack() },
                 )
             }
+            screen("settings/appearance") { com.vyora.music.ui.screens.settings.AppearanceSettingsScreen(onBack = { navController.popBackStack() }) }
+            screen("settings/audio_quality") { com.vyora.music.ui.screens.settings.AudioQualityScreen(onBack = { navController.popBackStack() }) }
+            screen("settings/transitions") { com.vyora.music.ui.screens.settings.TransitionsScreen(onBack = { navController.popBackStack() }) }
+            screen("settings/downloads") { com.vyora.music.ui.screens.settings.DownloadsSettingsScreen(onBack = { navController.popBackStack() }) }
+            screen("settings/storage") { com.vyora.music.ui.screens.settings.StorageSettingsScreen(onBack = { navController.popBackStack() }) }
+            screen("settings/backup") { com.vyora.music.ui.screens.settings.BackupSettingsScreen(onBack = { navController.popBackStack() }) }
+            screen("settings/updates") { com.vyora.music.ui.screens.settings.UpdatesSettingsScreen(onBack = { navController.popBackStack() }) }
             screen("settings/glass") { GlassSettingsScreen(onBack = { navController.popBackStack() }) }
             screen("settings/equalizer") { EqualizerScreen(onBack = { navController.popBackStack() }) }
             screen("settings/language") { LanguageScreen(onBack = { navController.popBackStack() }) }

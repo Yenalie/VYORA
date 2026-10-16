@@ -545,7 +545,6 @@
     <string name="spotify_connect_body">Inicia sesión para ver tus playlists y Canciones que te gustan de Spotify. VYORA las reproduce con YouTube Music o las guarda como playlists.</string>
     <string name="spotify_connect_title">Conectar Spotify</string>
     <string name="spotify_connected">Conectado a Spotify</string>
-    <string name="spotify_cookie_hint">Pega la cookie sp_dc de open.spotify.com en un navegador de escritorio. Se guarda cifrada en este dispositivo.</string>
     <string name="spotify_footer">Usa la sesión del reproductor web de Spotify, igual que YumaPlayer. No es una función oficial de Spotify y puede dejar de funcionar si Spotify cambia su web. El audio siempre viene de YouTube Music.</string>
     <string name="spotify_library">Tu biblioteca</string>
     <string name="spotify_liked">Canciones que te gustan</string>
@@ -561,6 +560,7 @@
     <string name="spotify_signed_in">Sesión iniciada en Spotify</string>
     <string name="spotify_starting">Buscando canciones en YouTube Music…</string>
     <string name="spotify_title">Spotify</string>
-    <string name="spotify_use_cookie">Usar cookie sp_dc</string>
     <string name="spotify_waiting_login">Inicia sesión; VYORA continúa solo</string>
+    <string name="settings_transitions">Transiciones</string>
+    <string name="spotify_login_token">Entrar</string>
 </resources>

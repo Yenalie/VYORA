@@ -71,8 +71,16 @@ object SpotifyAccount {
         "https://gist.githubusercontent.com/sonic-liberation/22ed9c6ba463899e933427f7de1f0eef/raw/nuances.json"
     private const val GQL_URL = "https://api-partner.spotify.com/pathfinder/v2/query"
     const val LIKED_URI = "spotify:collection:tracks"
+    /** Token endpoint user agent (SpotifyTotpGenerator). */
     private const val USER_AGENT =
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    private const val REST_ME = "https://api.spotify.com/v1/me"
+
+    /** GraphQL user agent, picked once per process like Yuma's SpotifyGqlExecutor.randomUserAgent. */
+    private val gqlUserAgent: String by lazy {
+        val os = listOf("Windows NT 10.0; Win64; x64", "Macintosh; Intel Mac OS X 10_15_7", "X11; Linux x86_64").random()
+        "Mozilla/5.0 ($os) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${140 - (0..4).random()}.0.${(0..499).random()}.0 Safari/537.36"
+    }
 
     private const val PREFS = "vyora_spotify"
     private const val KEY_SP_DC = "spotify_sp_dc"
@@ -117,18 +125,28 @@ object SpotifyAccount {
 
     val isSignedIn: Boolean get() = _profile.value != null
 
-    /** Stores the cookies captured from the login WebView (or typed in) and loads the profile. */
+    /**
+     * Stores the cookies captured from the login WebView (or typed in), mints a token and loads the profile,
+     * like Yuma's SpotifySessionRepository.connectWithCookies: the token decides whether sign-in worked; a
+     * profile that can't be read (GraphQL, then REST /v1/me) never fails the login.
+     */
     suspend fun signIn(spDc: String, spKey: String = ""): Result<SpotifyProfile> = withContext(Dispatchers.IO) {
-        val dc = spDc.trim().trim('"')
+        val dc = cleanCookie(spDc)
         if (dc.length < 20 || dc.any { it.isWhitespace() || it == ';' }) {
             return@withContext Result.failure(IllegalArgumentException("Invalid sp_dc"))
         }
+        val key = cleanCookie(spKey)
         runCatching {
-            token = null
-            val access = mintToken(dc, spKey.trim())
-            val me = fetchProfile(access)
+            tokenLock.withLock {
+                token = null
+                tokenExpires = 0L
+                mintToken(dc, key)
+            }
             SecureBox.put(KEY_SP_DC, dc)
-            SecureBox.put(KEY_SP_KEY, spKey.trim().ifBlank { null })
+            SecureBox.put(KEY_SP_KEY, key.ifBlank { null })
+            val me = runCatching { fetchProfile(token!!) }
+                .onFailure { Log.w(TAG, "Spotify profile unavailable", it) }
+                .getOrElse { SpotifyProfile("me", "Spotify", null) }
             prefs()?.edit {
                 putString(KEY_ID, me.id)
                 putString(KEY_NAME, me.name)
@@ -137,6 +155,13 @@ object SpotifyAccount {
             _profile.value = me
             me
         }.onFailure { Log.w(TAG, "Spotify sign-in failed", it); token = null }
+    }
+
+    /** Accepts a bare value, `sp_dc=value` or a whole Cookie header pasted from a desktop browser. */
+    internal fun cleanCookie(raw: String, name: String = "sp_dc"): String {
+        val text = raw.trim().trim('"')
+        val pair = text.split(';').map(String::trim).firstOrNull { it.startsWith("$name=") }
+        return (pair?.substringAfter('=') ?: text.substringAfter("$name=", text)).trim().trim('"')
     }
 
     fun signOut() {
@@ -205,7 +230,7 @@ object SpotifyAccount {
             val body = gqlBody(operation, variables).toString().toRequestBody("application/json; charset=UTF-8".toMediaType())
             val request = Request.Builder().url(GQL_URL).post(body)
                 .header("Authorization", "Bearer $access")
-                .header("User-Agent", USER_AGENT)
+                .header("User-Agent", gqlUserAgent)
                 .header("app-platform", "WebPlayer")
                 .header("Origin", "https://open.spotify.com")
                 .header("Referer", "https://open.spotify.com/")
@@ -250,7 +275,12 @@ object SpotifyAccount {
         val code = totp(secret, serverTime)
         val url = "$TOKEN_URL?reason=transport&productType=web-player&totp=$code&totpServer=$code&totpVer=$version"
         val cookie = "sp_dc=$spDc" + if (spKey.isNotEmpty()) "; sp_key=$spKey" else ""
-        val json = JSONObject(get(url, mapOf("Cookie" to cookie)))
+        val json = try {
+            JSONObject(get(url, mapOf("Cookie" to cookie)))
+        } catch (e: SpotifyException) {
+            if (e.code == 401 || e.code == 403) throw SpotifyException(401, "Spotify session cookie is invalid or expired")
+            throw e
+        }
         val access = json.optString("accessToken")
         if (json.optBoolean("isAnonymous", false) || access.isBlank()) {
             throw SpotifyException(401, "Spotify session cookie is invalid or expired")
@@ -282,19 +312,36 @@ object SpotifyAccount {
         }
     }
 
+    /** SpotifyLibraryQueryApi.me(): GraphQL profileAttributes first, REST /v1/me when that fails. */
     private fun fetchProfile(access: String): SpotifyProfile {
-        val body = gqlBody("profileAttributes", JSONObject()).toString().toRequestBody("application/json; charset=UTF-8".toMediaType())
-        val request = Request.Builder().url(GQL_URL).post(body)
+        fun base(url: String) = Request.Builder().url(url)
             .header("Authorization", "Bearer $access")
-            .header("User-Agent", USER_AGENT)
+            .header("User-Agent", gqlUserAgent)
             .header("app-platform", "WebPlayer")
             .header("Origin", "https://open.spotify.com")
             .header("Referer", "https://open.spotify.com/")
-            .build()
-        client.newCall(request).execute().use { r ->
-            if (!r.isSuccessful) throw SpotifyException(r.code, "Spotify HTTP ${r.code}")
-            return parseProfile(JSONObject(r.body?.string().orEmpty()))
+            .header("Accept", "application/json")
+            .header("Accept-Language", Locale.getDefault().toLanguageTag())
+        return runCatching {
+            val body = gqlBody("profileAttributes", JSONObject()).toString().toRequestBody("application/json; charset=UTF-8".toMediaType())
+            client.newCall(base(GQL_URL).post(body).build()).execute().use { r ->
+                if (!r.isSuccessful) throw SpotifyException(r.code, "Spotify HTTP ${r.code}")
+                parseProfile(JSONObject(r.body?.string().orEmpty()))
+            }
+        }.getOrElse { gqlError ->
+            Log.w(TAG, "GQL profile failed, falling back to REST: ${gqlError.message}")
+            client.newCall(base(REST_ME).get().build()).execute().use { r ->
+                if (!r.isSuccessful) throw SpotifyException(r.code, "Spotify HTTP ${r.code}")
+                parseRestProfile(JSONObject(r.body?.string().orEmpty()))
+            }
         }
+    }
+
+    internal fun parseRestProfile(json: JSONObject): SpotifyProfile {
+        val id = json.str("id") ?: throw SpotifyException(500, "Invalid /v1/me response")
+        val images = json.optJSONArray("images")
+        val avatar = images?.let { arr -> (0 until arr.length()).mapNotNull { arr.optJSONObject(it)?.str("url") }.firstOrNull() }
+        return SpotifyProfile(id, json.str("display_name") ?: id, avatar)
     }
 
     // ---- TOTP (SpotifyTotpGenerator) --------------------------------------------------------------------

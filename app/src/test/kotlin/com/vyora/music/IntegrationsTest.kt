@@ -8,6 +8,9 @@ import com.vyora.music.data.settings.AppSettings
 import com.vyora.music.data.settings.DiscordActivityKind
 import com.vyora.music.data.spotify.SpotifyAccount
 import com.vyora.music.ui.player.speedLabel
+import com.vyora.music.ui.screens.settings.cleanUserAgent
+import com.vyora.music.ui.screens.settings.isWebViewLoadableUrl
+import com.vyora.music.ui.screens.settings.spotifyCookieOrigin
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -162,6 +165,37 @@ class IntegrationsTest {
         assertEquals(1, pl.items.size)
         assertEquals("Manusia", pl.items[0].album)
         assertEquals(SpotifyAccount.HASHES.keys, setOf("profileAttributes", "libraryV3", "fetchPlaylist", "fetchLibraryTracks"))
+    }
+
+    @Test fun spotifyLoginWebViewHelpers() {
+        // Yuma's getCleanChromeUserAgent: drop the WebView markers Google sign-in rejects.
+        val wv = "Mozilla/5.0 (Linux; Android 14; Pixel 8; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.0.0 Mobile Safari/537.36"
+        assertEquals("Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36", cleanUserAgent(wv))
+        assertEquals("https://accounts.spotify.com", spotifyCookieOrigin("https://accounts.spotify.com/en/login?continue=x"))
+        assertEquals("https://spotify.com", spotifyCookieOrigin("https://spotify.com/"))
+        assertNull(spotifyCookieOrigin("https://spotify.com.evil.example/"))
+        assertNull(spotifyCookieOrigin("https://accounts.google.com/"))
+        assertTrue(isWebViewLoadableUrl("https://accounts.google.com/o/oauth2"))
+        assertTrue(isWebViewLoadableUrl("blob:https://open.spotify.com/1"))
+        assertFalse(isWebViewLoadableUrl("intent://open#Intent;scheme=spotify;end"))
+        assertFalse(isWebViewLoadableUrl("spotify:track:1"))
+    }
+
+    @Test fun spotifyCookieInputIsCleaned() {
+        val v = "AQ" + "x".repeat(40)
+        assertEquals(v, SpotifyAccount.cleanCookie(v))
+        assertEquals(v, SpotifyAccount.cleanCookie("sp_dc=$v"))
+        assertEquals(v, SpotifyAccount.cleanCookie("sp_t=abc; sp_dc=$v; sp_key=k"))
+        assertEquals(v, SpotifyAccount.cleanCookie("  \"$v\"  "))
+        assertEquals("k", SpotifyAccount.cleanCookie("sp_dc=$v; sp_key=k", "sp_key"))
+    }
+
+    @Test fun spotifyRestProfileFallback() {
+        val me = SpotifyAccount.parseRestProfile(JSONObject("""{"id":"abc","display_name":"Yena","images":[{"url":"a","width":64}]}"""))
+        assertEquals("abc", me.id)
+        assertEquals("Yena", me.name)
+        assertEquals("a", me.avatarUrl)
+        assertEquals("abc", SpotifyAccount.parseRestProfile(JSONObject("""{"id":"abc","display_name":null,"images":[]}""")).name)
     }
 
     @Test fun speedLabels() {

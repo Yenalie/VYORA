@@ -1,6 +1,16 @@
 package com.vyora.music.ui.screens.settings
 
 import android.annotation.SuppressLint
+import android.content.Intent
+import android.os.Message
+import android.view.ViewGroup
+import android.webkit.WebChromeClient
+import android.webkit.WebSettings
+import android.widget.FrameLayout
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.core.net.toUri
 import android.graphics.Bitmap
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
@@ -30,19 +40,16 @@ import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -67,8 +74,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.vyora.music.R
 import com.vyora.music.data.importer.SpotifyImport
@@ -102,7 +107,6 @@ fun SpotifyAccountScreen(onBack: () -> Unit, onOpenPlaylist: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     val profile by SpotifyAccount.profile.collectAsState()
     var showLogin by remember { mutableStateOf(false) }
-    var showCookie by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var confirmSignOut by remember { mutableStateOf(false) }
     var playlists by remember { mutableStateOf<List<SpotifyPlaylistInfo>?>(null) }
@@ -114,7 +118,6 @@ fun SpotifyAccountScreen(onBack: () -> Unit, onOpenPlaylist: (String) -> Unit) {
         if (busy) return
         busy = true
         showLogin = false
-        showCookie = false
         scope.launch {
             SpotifyAccount.signIn(spDc, spKey)
                 .onSuccess { Toast.makeText(context, signedIn, Toast.LENGTH_SHORT).show() }
@@ -135,6 +138,11 @@ fun SpotifyAccountScreen(onBack: () -> Unit, onOpenPlaylist: (String) -> Unit) {
             } while (page.items.isNotEmpty() && out.size < page.total && out.size < 500)
             out
         }.onSuccess { playlists = it }.onFailure { loadError = it.message ?: "Error" }
+    }
+
+    if (showLogin) {
+        SpotifyLoginPage(onDismiss = { showLogin = false }, onCookies = ::accept)
+        return
     }
 
     SettingsPage(title = stringResource(R.string.spotify_title), onBack = onBack) {
@@ -184,14 +192,12 @@ fun SpotifyAccountScreen(onBack: () -> Unit, onOpenPlaylist: (String) -> Unit) {
             }
         }
         if (profile == null) {
-            item(key = "cookie") {
-                SettingsGroup(footer = stringResource(R.string.spotify_footer)) {
-                    SettingsRow(
-                        title = stringResource(R.string.spotify_use_cookie),
-                        icon = Icons.Default.Key, iconTint = SystemColors.Gray,
-                        onClick = { showCookie = true }, divider = false,
-                    )
-                }
+            item(key = "footer") {
+                Text(
+                    stringResource(R.string.spotify_footer), color = VyoraTextMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                )
             }
         } else {
             item(key = "liked") {
@@ -247,8 +253,6 @@ fun SpotifyAccountScreen(onBack: () -> Unit, onOpenPlaylist: (String) -> Unit) {
         }
     }
 
-    if (showLogin) SpotifyLoginDialog(onDismiss = { showLogin = false }, onCookies = ::accept)
-    if (showCookie) CookieDialog(onDismiss = { showCookie = false }, onSave = { accept(it, "") })
     if (confirmSignOut) {
         ConfirmDialog(
             message = stringResource(R.string.spotify_sign_out_confirm),
@@ -404,10 +408,11 @@ fun SpotifyListScreen(uri: String, onBack: () -> Unit, onOpenPlaylist: (String) 
     }
 }
 
-private fun cleanUserAgent(ua: String): String =
-    ua.replace("; wv", "").replace(Regex("""Version/\d+(\.\d+)*\s"""), "")
+/** Yuma's getCleanChromeUserAgent: Google and Facebook refuse sign-in from a user agent that says "wv". */
+internal fun cleanUserAgent(ua: String): String =
+    ua.replace("; wv", "").replace(Regex("""Version/\d+\.\d+\s?"""), "")
 
-/** Removes only Spotify's cookies and storage; the YouTube sign-in shares the same CookieManager. */
+/** Removes only Spotify's cookies and storage (used on sign-out). */
 internal fun clearSpotifyWebData() {
     val cookies = CookieManager.getInstance()
     listOf("https://open.spotify.com", "https://accounts.spotify.com", "https://www.spotify.com", "https://spotify.com").forEach { origin ->
@@ -423,10 +428,31 @@ internal fun clearSpotifyWebData() {
     cookies.flush()
 }
 
-private fun readSpotifyCookies(manager: CookieManager): Map<String, String> {
+/** Yuma's resetAuthWebViewSession: start every login from an empty browser so a stale session can't win. */
+private fun resetLoginSession(webView: WebView, onReady: () -> Unit) {
+    webView.stopLoading()
+    webView.clearHistory()
+    webView.clearFormData()
+    webView.clearCache(true)
+    WebStorage.getInstance().deleteAllData()
+    val cookies = CookieManager.getInstance()
+    cookies.setAcceptCookie(true)
+    cookies.setAcceptThirdPartyCookies(webView, true)
+    cookies.removeSessionCookies {
+        cookies.removeAllCookies {
+            cookies.flush()
+            onReady()
+        }
+    }
+}
+
+/** Reads cookies from every Spotify origin plus the page currently shown (Yuma's readSpotifyCookies). */
+private fun readSpotifyCookies(manager: CookieManager, currentUrl: String?): Map<String, String> {
+    val urls = linkedSetOf("https://open.spotify.com", "https://accounts.spotify.com", "https://spotify.com")
+    currentUrl?.let(::spotifyCookieOrigin)?.let(urls::add)
     val out = linkedMapOf<String, String>()
     manager.flush()
-    listOf("https://open.spotify.com", "https://accounts.spotify.com", "https://spotify.com").forEach { url ->
+    urls.forEach { url ->
         manager.getCookie(url)?.split(';')?.map(String::trim)?.forEach { part ->
             val i = part.indexOf('=')
             if (i > 0) out[part.substring(0, i).trim()] = part.substring(i + 1).trim()
@@ -435,100 +461,194 @@ private fun readSpotifyCookies(manager: CookieManager): Map<String, String> {
     return out
 }
 
-internal fun isSpotifyLoginHost(host: String?): Boolean {
-    val h = host?.lowercase() ?: return false
-    return h == "spotify.com" || h.endsWith(".spotify.com") || h.endsWith(".scdn.co") ||
-        h == "accounts.google.com" || h.endsWith(".facebook.com") || h == "appleid.apple.com"
+internal fun spotifyCookieOrigin(url: String): String? {
+    val uri = runCatching { url.toUri() }.getOrNull() ?: return null
+    val host = uri.host?.lowercase() ?: return null
+    if (host != "spotify.com" && !host.endsWith(".spotify.com")) return null
+    val scheme = uri.scheme?.lowercase()?.takeIf { it == "https" || it == "http" } ?: "https"
+    return "$scheme://$host"
 }
 
-/** Spotify's own login page in a WebView (Yuma's SpotifyLoginSheet); the sp_dc cookie is all VYORA keeps. */
+internal fun isWebViewLoadableUrl(url: String): Boolean =
+    runCatching { url.toUri().scheme?.lowercase() }.getOrNull() in setOf("http", "https", "javascript", "data", "blob")
+
+/** `intent://` links (for example "open in the Spotify app") carry a web fallback; load that instead. */
+private fun intentFallbackUrl(url: String): String? =
+    runCatching { Intent.parseUri(url, Intent.URI_INTENT_SCHEME) }.getOrNull()
+        ?.getStringExtra("browser_fallback_url")
+        ?.takeIf(::isWebViewLoadableUrl)
+
+private class LoginWebState {
+    var captured = false
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+private fun WebView.configureSpotifyLogin() {
+    val ua = cleanUserAgent(WebSettings.getDefaultUserAgent(context))
+    settings.apply {
+        javaScriptEnabled = true
+        domStorageEnabled = true
+        javaScriptCanOpenWindowsAutomatically = true
+        setSupportMultipleWindows(true)
+        setSupportZoom(true)
+        builtInZoomControls = true
+        displayZoomControls = false
+        cacheMode = WebSettings.LOAD_DEFAULT
+        userAgentString = ua
+    }
+    val cookies = CookieManager.getInstance()
+    cookies.setAcceptCookie(true)
+    cookies.setAcceptThirdPartyCookies(this, true)
+}
+
+private fun WebView.destroyLoginView() {
+    stopLoading()
+    loadUrl("about:blank")
+    (parent as? ViewGroup)?.removeView(this)
+    destroy()
+}
+
+/** Shared page client: try to grab sp_dc on every navigation, keep http(s) inside, unwrap intent:// links. */
+private fun loginClient(capture: (String?) -> Boolean, onLoading: (Boolean) -> Unit) = object : WebViewClient() {
+    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+        val url = request.url?.toString()
+        if (capture(url)) return true
+        if (url.isNullOrBlank() || isWebViewLoadableUrl(url)) return false
+        intentFallbackUrl(url)?.let(view::loadUrl)
+        return true
+    }
+
+    override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+        super.onPageStarted(view, url, favicon)
+        onLoading(true)
+        capture(url)
+    }
+
+    override fun onPageFinished(view: WebView, url: String?) {
+        super.onPageFinished(view, url)
+        onLoading(false)
+        capture(url)
+    }
+}
+
+/** Google / Facebook / Apple sign-in on Spotify opens popup windows; host them on top of the login page. */
+private class LoginChromeClient(
+    private val container: FrameLayout,
+    private val root: WebView,
+    private val capture: (String?) -> Boolean,
+    private val onLoading: (Boolean) -> Unit,
+    private val onActive: (WebView) -> Unit,
+) : WebChromeClient() {
+    override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message): Boolean {
+        val transport = resultMsg.obj as? WebView.WebViewTransport ?: return false
+        closePopups()
+        val popup = WebView(view.context).apply {
+            configureSpotifyLogin()
+            webViewClient = loginClient(capture, onLoading)
+            webChromeClient = LoginChromeClient(container, root, capture, onLoading, onActive)
+        }
+        container.addView(popup, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        popup.bringToFront()
+        popup.requestFocus()
+        onActive(popup)
+        transport.webView = popup
+        resultMsg.sendToTarget()
+        return true
+    }
+
+    override fun onCloseWindow(window: WebView) {
+        window.destroyLoginView()
+        onActive(root)
+    }
+
+    private fun closePopups() {
+        for (i in container.childCount - 1 downTo 0) {
+            val child = container.getChildAt(i) as? WebView ?: continue
+            if (child !== root) child.destroyLoginView()
+        }
+        onActive(root)
+    }
+}
+
+/**
+ * Spotify's own login page, ported from YumaPlayer's SpotifyLoginSheet: a clean Chrome user agent, popups for
+ * third-party sign-in, sp_dc captured from any Spotify origin, and an sp_dc field for logging in by token.
+ */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun SpotifyLoginDialog(onDismiss: () -> Unit, onCookies: (String, String) -> Unit) {
+private fun SpotifyLoginPage(onDismiss: () -> Unit, onCookies: (String, String) -> Unit) {
     var loading by remember { mutableStateOf(true) }
-    var webView by remember { mutableStateOf<WebView?>(null) }
-    var captured by remember { mutableStateOf(false) }
+    var active by remember { mutableStateOf<WebView?>(null) }
+    var root by remember { mutableStateOf<WebView?>(null) }
+    var token by rememberSaveable { mutableStateOf("") }
+    val state = remember { LoginWebState() }
+    val currentOnCookies by rememberUpdatedState(onCookies)
 
     BackHandler {
-        val view = webView
-        if (view?.canGoBack() == true) view.goBack() else onDismiss()
-    }
-
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        Column(Modifier.fillMaxSize().background(VyoraGroupedBackground)) {
-            Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                GlassIconButton(Icons.Rounded.Close, stringResource(R.string.cancel), onDismiss, size = 44.dp, iconSize = 20.dp)
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.spotify_sign_in), color = VyoraText, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(stringResource(R.string.spotify_waiting_login), color = VyoraTextMuted, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = SpotifyGreen)
-            AndroidView(
-                modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)),
-                factory = { ctx ->
-                    WebView(ctx).apply {
-                        val manager = CookieManager.getInstance()
-                        manager.setAcceptCookie(true)
-                        manager.setAcceptThirdPartyCookies(this, true)
-                        settings.javaScriptEnabled = true
-                        settings.domStorageEnabled = true
-                        settings.userAgentString = cleanUserAgent(settings.userAgentString)
-                        fun capture(): Boolean {
-                            if (captured) return true
-                            val c = readSpotifyCookies(manager)
-                            val dc = c["sp_dc"].orEmpty()
-                            if (dc.isBlank()) return false
-                            captured = true
-                            onCookies(dc, c["sp_key"].orEmpty())
-                            return true
-                        }
-                        webViewClient = object : WebViewClient() {
-                            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) { loading = true; capture() }
-                            override fun onPageFinished(view: WebView?, url: String?) { loading = false; capture() }
-                            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                                if (capture()) return true
-                                val scheme = request?.url?.scheme
-                                if (scheme != "https" && scheme != "http") return true
-                                return !isSpotifyLoginHost(request.url?.host)
-                            }
-                        }
-                        clearSpotifyWebData()
-                        loadUrl(SpotifyAccount.LOGIN_URL)
-                        webView = this
-                    }
-                },
-                onRelease = { it.stopLoading(); it.destroy() },
-            )
+        val view = active
+        val main = root
+        when {
+            view?.canGoBack() == true -> view.goBack()
+            view != null && main != null && view !== main -> { view.destroyLoginView(); active = main }
+            else -> onDismiss()
         }
     }
-    DisposableEffect(Unit) { onDispose { webView = null } }
-}
 
-@Composable
-private fun CookieDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
-    var value by rememberSaveable { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = VyoraGroupedCell,
-        titleContentColor = VyoraText,
-        textContentColor = VyoraTextMuted,
-        shape = RoundedCornerShape(26.dp),
-        title = { Text(stringResource(R.string.spotify_use_cookie)) },
-        text = {
-            Column {
-                Text(stringResource(R.string.spotify_cookie_hint), style = MaterialTheme.typography.bodySmall)
-                Spacer(Modifier.height(12.dp))
-                VyoraTextField(value, { value = it }, "sp_dc", password = true)
+    Column(Modifier.fillMaxSize().background(VyoraGroupedBackground).statusBarsPadding().navigationBarsPadding().imePadding()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            GlassIconButton(Icons.Rounded.Close, stringResource(R.string.cancel), onDismiss, size = 44.dp, iconSize = 20.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.spotify_sign_in), color = VyoraText, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.spotify_waiting_login), color = VyoraTextMuted, style = MaterialTheme.typography.bodySmall)
             }
-        },
-        confirmButton = {
-            TextButton(enabled = value.isNotBlank(), onClick = { onSave(value) }) { Text(stringResource(R.string.save), color = VyoraAccent) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel), color = VyoraText) } },
-    )
+        }
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            VyoraTextField(token, { token = it }, "sp_dc", modifier = Modifier.weight(1f), password = true)
+            Spacer(Modifier.width(10.dp))
+            GlassButton(
+                text = stringResource(R.string.spotify_login_token),
+                onClick = { token.trim().takeIf(String::isNotBlank)?.let { currentOnCookies(it, "") } },
+                enabled = token.isNotBlank(),
+                content = Color.Black,
+                fill = SpotifyGreen,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Box(Modifier.fillMaxWidth().height(3.dp)) {
+            if (loading) LinearProgressIndicator(Modifier.fillMaxSize(), color = SpotifyGreen)
+        }
+        AndroidView(
+            modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)),
+            factory = { ctx ->
+                val container = FrameLayout(ctx)
+                val manager = CookieManager.getInstance()
+                val capture: (String?) -> Boolean = capture@{ url ->
+                    if (state.captured) return@capture true
+                    val c = readSpotifyCookies(manager, url)
+                    val dc = c["sp_dc"].orEmpty()
+                    if (dc.isBlank()) return@capture false
+                    state.captured = true
+                    manager.flush()
+                    currentOnCookies(dc, c["sp_key"].orEmpty())
+                    true
+                }
+                val onLoading: (Boolean) -> Unit = { loading = it }
+                val main = WebView(ctx).apply {
+                    configureSpotifyLogin()
+                    webViewClient = loginClient(capture, onLoading)
+                }
+                main.webChromeClient = LoginChromeClient(container, main, capture, onLoading) { active = it }
+                container.addView(main, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+                root = main
+                active = main
+                resetLoginSession(main) { main.loadUrl(SpotifyAccount.LOGIN_URL) }
+                container
+            },
+            onRelease = { container ->
+                for (i in container.childCount - 1 downTo 0) (container.getChildAt(i) as? WebView)?.destroyLoginView()
+            },
+        )
+    }
+    DisposableEffect(Unit) { onDispose { active = null; root = null } }
 }

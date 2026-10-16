@@ -542,7 +542,6 @@
     <string name="spotify_connect_body">Sign in to browse your Spotify playlists and Liked Songs. VYORA plays them through YouTube Music or saves them as playlists.</string>
     <string name="spotify_connect_title">Connect Spotify</string>
     <string name="spotify_connected">Connected to Spotify</string>
-    <string name="spotify_cookie_hint">Paste the sp_dc cookie from open.spotify.com in a desktop browser. It is stored encrypted on this device.</string>
     <string name="spotify_footer">Uses Spotify\'s web player session, the same way YumaPlayer does. It is not an official Spotify feature and may stop working when Spotify changes its site. Audio always comes from YouTube Music.</string>
     <string name="spotify_library">Your Library</string>
     <string name="spotify_liked">Liked Songs</string>
@@ -558,6 +557,7 @@
     <string name="spotify_signed_in">Signed in to Spotify</string>
     <string name="spotify_starting">Finding songs on YouTube Music…</string>
     <string name="spotify_title">Spotify</string>
-    <string name="spotify_use_cookie">Use sp_dc cookie</string>
     <string name="spotify_waiting_login">Log in; VYORA continues automatically</string>
+    <string name="settings_transitions">Song Transitions</string>
+    <string name="spotify_login_token">Log in</string>
 </resources>

@@ -50,17 +50,15 @@ Dengarkan jutaan lagu dari katalog YouTube Music, simpan favoritmu, dan sinkronk
 ### Musik
 - Cari lagu, album, artis, dan playlist dari katalog YouTube Music
 - **Lossless:** putar file FLAC, ALAC, WAV, dan AIFF dari perangkat dalam kualitas penuh, hingga Hi-Res (24-bit / 192 kHz)
-- **Server musik:** stream FLAC/ALAC asli dari server Subsonic milikmu (Navidrome, Gonic, Airsonic, Ampache…)
-- Lencana kualitas di Now Playing yang menunjukkan codec, bit depth, sample rate, dan apakah output (kabel, USB DAC, Bluetooth) mendukung lossless
+- Lencana kualitas di Now Playing yang menunjukkan codec, bit depth, dan sample rate
 - **Rekap:** statistik mendengarkan berisi total menit, lagu dan artis teratas, serta grafik harian
-- Lirik yang berjalan mengikuti lagu, termasuk **lirik per kata** (karaoke) dari BetterLyrics, dengan cache offline
+- Lirik yang berjalan mengikuti lagu
 - **Kartu lirik:** pilih beberapa baris lirik dan bagikan sebagai gambar dengan latar artwork
 - **Unduh lagu** untuk diputar offline, termasuk unduh semua isi playlist
 - **Cast** ke Chromecast dan speaker Google Cast
 - Autoplay: lagu serupa terus diputar setelah antrean habis
 - Antrean lengkap: putar berikutnya, putar terakhir, acak, ulangi
-- Sleep timer, crossfade antar lagu, lewati bagian hening, serta **kecepatan dan nada** pemutaran
-- **Android Auto**, pencarian suara, dan **widget** layar utama
+- Sleep timer, crossfade antar lagu, dan lewati bagian hening
 
 ### Tampilan
 - Desain bergaya iOS 26 dengan efek **Liquid Glass** yang bisa diatur sesukamu
@@ -73,21 +71,17 @@ Dengarkan jutaan lagu dari katalog YouTube Music, simpan favoritmu, dan sinkronk
 - Equalizer 10 band dengan berbagai preset
 - Bass, surround, dan loudness
 - Limiter bawaan agar suara tetap jernih, tidak pecah atau teredam
-- Tiga pilihan kualitas streaming, termasuk mode hemat data, dan kualitas terpisah untuk Wi-Fi dan data seluler
+- Tiga pilihan kualitas streaming, termasuk mode hemat data
 
 ### Library & Akun
 - Simpan lagu favorit, buat playlist, dan simpan album
 - Masuk dengan akun YouTube Music untuk sinkron dua arah: lagu yang disukai, playlist, dan album
 - Perubahan saat offline otomatis dikirim begitu online
-- **Impor playlist Spotify** publik ke playlist VYORA
-- **Login Spotify:** buka Lagu yang Disukai dan playlist Spotify-mu, putar lewat YouTube Music atau simpan sebagai playlist VYORA
-- **Cadangkan & pulihkan** library dan pengaturan ke satu file
-- **Scrobbling** ke Last.fm dan ListenBrainz
 - Sesi akun disimpan terenkripsi di perangkat, dan cookie login dihapus dari WebView setelah masuk
 
 ### Lainnya
 - **Pembaruan otomatis:** VYORA memberi tahu lewat notifikasi saat ada versi baru, lalu mengunduh dan memasangnya langsung dari aplikasi
-- **Discord Rich Presence:** tampilkan lagu yang sedang diputar di profil Discord (login OAuth2 resmi lewat browser, sampul album, sisa waktu, tombol)
+- **Discord Rich Presence:** tampilkan lagu yang sedang diputar di profil Discord
 - Lagu yang pernah diputar disimpan di cache, jadi lebih hemat kuota
 - Tersedia dalam 5 bahasa: Indonesia, Inggris, Melayu, Spanyol, dan Jepang
 
@@ -114,13 +108,6 @@ cd VYORA
 Butuh JDK 17 dan Android SDK 36. Detail struktur project, penyimpanan data, dan signing ada
 di [Panduan Developer](docs/DEVELOPMENT.md).
 
-Login Discord memakai OAuth2 (PKCE). Secara default dipakai Discord application ID milik
-YumaPlayer/ArchiveTune. Untuk build sendiri, sebaiknya buat aplikasi di
-[Discord Developer Portal](https://discord.com/developers/applications), aktifkan Public Client,
-tambahkan redirect `discord-<APPLICATION_ID>:/authorize/callback`, lalu build dengan
-`./gradlew assembleRelease -PDISCORD_APPLICATION_ID=<APPLICATION_ID>` (atau isi
-`DISCORD_APPLICATION_ID=` di `local.properties`).
-
 ## Dibangun dengan
 
 - [Jetpack Compose](https://developer.android.com/jetpack/compose) dan Material 3
@@ -129,18 +116,12 @@ tambahkan redirect `discord-<APPLICATION_ID>:/authorize/callback`, lalu build de
 - [Room](https://developer.android.com/training/data-storage/room)
 - [Coil](https://github.com/coil-kt/coil)
 - [Google Cast SDK](https://developers.google.com/cast) lewat Media3 Cast
-- [BetterLyrics](https://lyrics-api.boidu.dev) dan [LRCLIB](https://lrclib.net) untuk lirik
-- Deteksi output lossless di-port dari [BitChord](https://github.com/kushagrasinghx/BitChord) (GPL-3.0); login Discord/Rich Presence dan login Spotify di-port dari [YumaPlayer](https://github.com/MuwMx/YumaPlayer) (GPL-3.0); pendekatan lirik per kata terinspirasi YumaPlayer
+- [LRCLIB](https://lrclib.net) untuk lirik
 - Efek glass dari [Kyant0/backdrop](https://github.com/Kyant0/backdrop) dan [Kyant0/Capsule](https://github.com/Kyant0/Capsule), tab bar dari [compose-floating-tab-bar](https://github.com/elyesmansour/compose-floating-tab-bar). Daftar lengkap ada di `NOTICE.md`
-
-## Kontak
-
-Laporan bug, ide, atau pertanyaan bisa langsung ke pembuat lewat Telegram: [t.me/My_bini_siapa](https://t.me/My_bini_siapa)
 
 ## Lisensi
 
-VYORA dirilis di bawah lisensi [GPL-3.0](LICENSE). Daftar komponen pihak ketiga ada di [NOTICE.md](NOTICE.md),
-dan teks lisensi lengkap juga tersedia di aplikasi: **Pengaturan > Tentang > Lisensi**.
+VYORA dirilis di bawah lisensi [GPL-3.0](LICENSE). Daftar komponen pihak ketiga ada di [NOTICE.md](NOTICE.md).
 
 ## Disclaimer
 

@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
 import androidx.media3.session.MediaSessionService
 import androidx.test.core.app.ApplicationProvider
@@ -259,14 +260,23 @@ class ScreenshotTest {
     private fun v19Features() {
         val found = runBlocking { YouTubeClient.search("Tulus", SearchFilter.SONGS).getOrThrow().items.take(6) }
         waitReal(5000)
-        step("library") { clickText("Library"); shot("30_library", minMs = 1500) }
-        step("discord") {
-            clickText("Home"); waitReal(800)
-            clickDesc("Settings"); waitReal(1200)
-            repeat(4) { swipeUp(); waitReal(600) }
-            clickLastText("Discord"); shot("31_discord", minMs = 1500)
+        step("settings") {
+            clickDesc("Settings"); shot("40_settings", minMs = 1500)
+            swipeUp(); shot("41_settings_2", minMs = 1000)
+            swipeUp(); shot("42_settings_3", minMs = 1000)
+            clickLastText("Spotify"); shot("43_spotify", minMs = 1500)
+            clickLastText("Sign in with Spotify"); shot("44_spotify_login", minMs = 1500)
+            compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(800)
             compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
-            clickLastText("Spotify"); shot("32_spotify", minMs = 1500)
+            repeat(3) { compose.onRoot().performTouchInput { swipeDown(startY = bottom * 0.25f, endY = bottom * 0.85f, durationMillis = 300) }; waitReal(400) }
+            clickLastText("Appearance"); shot("45_appearance", minMs = 1200)
+            compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
+            clickLastText("Streaming quality"); shot("46_quality", minMs = 1200)
+            compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
+            clickLastText("Song Transitions"); shot("47_transitions", minMs = 1200)
+            compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
+            swipeUp(); waitReal(600)
+            clickLastText("Storage and privacy"); shot("48_storage", minMs = 1200)
             compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
             compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
         }
