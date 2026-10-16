@@ -578,13 +578,23 @@ fun VyoraAppRoot(settings: AppSettings) {
                 )
             }
             screen("settings/discord") {
-                com.vyora.music.ui.screens.settings.DiscordScreen(
+                com.vyora.music.ui.screens.settings.DiscordScreen(onBack = { navController.popBackStack() })
+            }
+            screen("settings/spotify") {
+                com.vyora.music.ui.screens.settings.SpotifyAccountScreen(
                     onBack = { navController.popBackStack() },
-                    onLogin = { navController.navigate("settings/discord/login") },
+                    onOpenPlaylist = { uri -> navController.navigate("spotify/list/" + android.net.Uri.encode(uri)) },
                 )
             }
-            screen("settings/discord/login") {
-                com.vyora.music.ui.screens.settings.DiscordLoginScreen(onDone = { navController.popBackStack() })
+            screen(
+                route = "spotify/list/{uri}",
+                arguments = listOf(navArgument("uri") { type = NavType.StringType })
+            ) { entry ->
+                com.vyora.music.ui.screens.settings.SpotifyListScreen(
+                    uri = entry.arguments?.getString("uri").orEmpty(),
+                    onBack = { navController.popBackStack() },
+                    onOpenPlaylist = { id -> navController.navigate(LibraryPages.playlist(id)) },
+                )
             }
             screen(
                 route = "collection/{kind}",

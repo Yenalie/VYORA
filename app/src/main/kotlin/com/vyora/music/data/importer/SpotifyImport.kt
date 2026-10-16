@@ -82,23 +82,15 @@ object SpotifyImport {
         }
         val l = listing.getOrElse { return Progress.Failed(Reason.NETWORK).also { _progress.value = it } }
             ?: return Progress.Failed(Reason.NOT_FOUND).also { _progress.value = it }
+        return importListing(l)
+    }
+
+    /** Matches every track on YouTube Music and saves the hits as a new VYORA playlist. */
+    suspend fun importListing(l: Listing): Progress {
         if (l.tracks.isEmpty()) return Progress.Failed(Reason.EMPTY).also { _progress.value = it }
 
-        var done = 0
         _progress.value = Progress.Matching(0, l.tracks.size)
-        val gate = Semaphore(4)
-        val matched: List<SimpleItem?> = coroutineScope {
-            l.tracks.map { track ->
-                async {
-                    gate.withPermit {
-                        match(track).also {
-                            synchronized(this@SpotifyImport) { done++ }
-                            _progress.value = Progress.Matching(done, l.tracks.size)
-                        }
-                    }
-                }
-            }.awaitAll()
-        }
+        val matched: List<SimpleItem?> = matchAll(l.tracks) { d -> _progress.value = Progress.Matching(d, l.tracks.size) }
         val songs = matched.filterNotNull()
         if (songs.isEmpty()) return Progress.Failed(Reason.NETWORK).also { _progress.value = it }
         val id = LibraryManager.createPlaylistWith(l.name.ifBlank { "Spotify" }, songs)
@@ -106,7 +98,25 @@ object SpotifyImport {
         return Progress.Done(id, l.name, songs.size, l.tracks.size).also { _progress.value = it }
     }
 
-    private suspend fun match(track: Track): SimpleItem? {
+    /** Finds the YouTube Music song for each track (4 searches at a time), keeping the input order. */
+    suspend fun matchAll(tracks: List<Track>, onProgress: (Int) -> Unit = {}): List<SimpleItem?> {
+        var done = 0
+        val gate = Semaphore(4)
+        return coroutineScope {
+            tracks.map { track ->
+                async {
+                    gate.withPermit {
+                        match(track).also {
+                            val d = synchronized(this@SpotifyImport) { ++done }
+                            onProgress(d)
+                        }
+                    }
+                }
+            }.awaitAll()
+        }
+    }
+
+    suspend fun match(track: Track): SimpleItem? {
         val firstArtist = track.artist.split(',').first().trim()
         val results = YouTubeClient.search("${track.title} $firstArtist", SearchFilter.SONGS).getOrNull()?.items.orEmpty()
             .filter { it.isSong }

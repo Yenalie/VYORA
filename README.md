@@ -80,13 +80,14 @@ Dengarkan jutaan lagu dari katalog YouTube Music, simpan favoritmu, dan sinkronk
 - Masuk dengan akun YouTube Music untuk sinkron dua arah: lagu yang disukai, playlist, dan album
 - Perubahan saat offline otomatis dikirim begitu online
 - **Impor playlist Spotify** publik ke playlist VYORA
+- **Login Spotify:** buka Lagu yang Disukai dan playlist Spotify-mu, putar lewat YouTube Music atau simpan sebagai playlist VYORA
 - **Cadangkan & pulihkan** library dan pengaturan ke satu file
 - **Scrobbling** ke Last.fm dan ListenBrainz
 - Sesi akun disimpan terenkripsi di perangkat, dan cookie login dihapus dari WebView setelah masuk
 
 ### Lainnya
 - **Pembaruan otomatis:** VYORA memberi tahu lewat notifikasi saat ada versi baru, lalu mengunduh dan memasangnya langsung dari aplikasi
-- **Discord Rich Presence:** tampilkan lagu yang sedang diputar di profil Discord
+- **Discord Rich Presence:** tampilkan lagu yang sedang diputar di profil Discord (login OAuth2 resmi lewat browser, sampul album, sisa waktu, tombol)
 - Lagu yang pernah diputar disimpan di cache, jadi lebih hemat kuota
 - Tersedia dalam 5 bahasa: Indonesia, Inggris, Melayu, Spanyol, dan Jepang
 
@@ -113,6 +114,13 @@ cd VYORA
 Butuh JDK 17 dan Android SDK 36. Detail struktur project, penyimpanan data, dan signing ada
 di [Panduan Developer](docs/DEVELOPMENT.md).
 
+Login Discord memakai OAuth2 (PKCE). Secara default dipakai Discord application ID milik
+YumaPlayer/ArchiveTune. Untuk build sendiri, sebaiknya buat aplikasi di
+[Discord Developer Portal](https://discord.com/developers/applications), aktifkan Public Client,
+tambahkan redirect `discord-<APPLICATION_ID>:/authorize/callback`, lalu build dengan
+`./gradlew assembleRelease -PDISCORD_APPLICATION_ID=<APPLICATION_ID>` (atau isi
+`DISCORD_APPLICATION_ID=` di `local.properties`).
+
 ## Dibangun dengan
 
 - [Jetpack Compose](https://developer.android.com/jetpack/compose) dan Material 3
@@ -122,7 +130,7 @@ di [Panduan Developer](docs/DEVELOPMENT.md).
 - [Coil](https://github.com/coil-kt/coil)
 - [Google Cast SDK](https://developers.google.com/cast) lewat Media3 Cast
 - [BetterLyrics](https://lyrics-api.boidu.dev) dan [LRCLIB](https://lrclib.net) untuk lirik
-- Deteksi output lossless di-port dari [BitChord](https://github.com/kushagrasinghx/BitChord) (GPL-3.0); pendekatan lirik per kata terinspirasi [YumaPlayer](https://github.com/MuwMx/YumaPlayer)
+- Deteksi output lossless di-port dari [BitChord](https://github.com/kushagrasinghx/BitChord) (GPL-3.0); login Discord/Rich Presence dan login Spotify di-port dari [YumaPlayer](https://github.com/MuwMx/YumaPlayer) (GPL-3.0); pendekatan lirik per kata terinspirasi YumaPlayer
 - Efek glass dari [Kyant0/backdrop](https://github.com/Kyant0/backdrop) dan [Kyant0/Capsule](https://github.com/Kyant0/Capsule), tab bar dari [compose-floating-tab-bar](https://github.com/elyesmansour/compose-floating-tab-bar). Daftar lengkap ada di `NOTICE.md`
 
 ## Kontak

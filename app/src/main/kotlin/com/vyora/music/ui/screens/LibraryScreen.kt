@@ -135,6 +135,9 @@ fun LibraryScreen(
                 CategoryRow(Icons.AutoMirrored.Filled.PlaylistAdd, stringResource(R.string.import_title), 0) {
                     onOpenPage(LibraryPages.IMPORT)
                 }
+                CategoryRow(Icons.Default.LibraryMusic, stringResource(R.string.spotify_title), 0) {
+                    onOpenPage("settings/spotify")
+                }
                 CategoryRow(Icons.Default.Insights, stringResource(R.string.recap_title), 0, last = true) {
                     onOpenPage(LibraryPages.RECAP)
                 }

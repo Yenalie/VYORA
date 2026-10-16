@@ -183,6 +183,7 @@ class ScreenshotTest {
     @Test fun tour() {
         org.junit.Assume.assumeTrue(System.getProperty("shots.only").orEmpty().isNotBlank())
         if (System.getProperty("shots.only") == "new") return newFeatures()
+        if (System.getProperty("shots.only") == "v19") return v19Features()
         val found = runBlocking { YouTubeClient.search("Tulus", SearchFilter.SONGS).getOrThrow().items.take(8) }
         val lead = found.firstOrNull { song ->
             val lyr = runBlocking { com.vyora.music.data.lyrics.LyricsRepository.lyricsFor(song.id, song.title, song.artist, song.duration) }
@@ -251,6 +252,32 @@ class ScreenshotTest {
         step("artist") {
             clickTopDesc("More"); waitReal(1000)
             clickText("Go to Artist"); shot("14_artist", minMs = 6000)
+        }
+    }
+
+    /** `-Dshots.only=v19`: Discord and Spotify sign-in pages, Library and the Now Playing speed control. */
+    private fun v19Features() {
+        val found = runBlocking { YouTubeClient.search("Tulus", SearchFilter.SONGS).getOrThrow().items.take(6) }
+        waitReal(5000)
+        step("library") { clickText("Library"); shot("30_library", minMs = 1500) }
+        step("discord") {
+            clickText("Home"); waitReal(800)
+            clickDesc("Settings"); waitReal(1200)
+            repeat(4) { swipeUp(); waitReal(600) }
+            clickLastText("Discord"); shot("31_discord", minMs = 1500)
+            compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
+            clickLastText("Spotify"); shot("32_spotify", minMs = 1500)
+            compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
+            compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
+        }
+        step("player") {
+            SettingsRepository.update { it.copy(skipUnavailable = false, playbackSpeed = 1.25f) }
+            compose.runOnUiThread { PlayerManager.setQueue(found, 0) }
+            fakeTrack = found[0]
+            compose.mainClock.autoAdvance = false
+            shot("33_mini", minMs = 3000)
+            clickLastText(found[0].title); shot("34_now_playing", minMs = 2500)
+            compose.onAllNodesWithText("1.25×", useUnmergedTree = true)[0].performClick(); shot("35_speed", minMs = 1200)
         }
     }
 

@@ -12,10 +12,22 @@ android {
         applicationId = 'com.vyora.music'
         minSdk = 29
         targetSdk = 35
-        versionCode = 10
-        versionName = '1.8.0'
+        versionCode = 11
+        versionName = '1.9.0'
 
         testInstrumentationRunner = 'androidx.test.runner.AndroidJUnitRunner'
+
+        // Discord OAuth2 (PKCE) application used for Rich Presence, same flow as YumaPlayer/ArchiveTune.
+        // Override with -PDISCORD_APPLICATION_ID=..., local.properties or the DISCORD_APPLICATION_ID env var.
+        def localProps = new Properties()
+        def localFile = rootProject.file('local.properties')
+        if (localFile.exists()) localFile.withInputStream { localProps.load(it) }
+        def discordAppId = (project.findProperty('DISCORD_APPLICATION_ID') ?: localProps.getProperty('DISCORD_APPLICATION_ID')
+            ?: System.getenv('DISCORD_APPLICATION_ID') ?: '1165706613961789445').toString().trim()
+        if (!(discordAppId ==~ /[0-9]{17,20}/)) throw new GradleException("DISCORD_APPLICATION_ID must be a Discord snowflake")
+        buildConfigField 'String', 'DISCORD_APPLICATION_ID', "\"${discordAppId}\""
+        buildConfigField 'String', 'DISCORD_REDIRECT_SCHEME', "\"discord-${discordAppId}\""
+        manifestPlaceholders = [discordRedirectScheme: "discord-${discordAppId}"]
     }
 
     def keystoreProps = new Properties()

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.9.0
+- **Login Discord baru (port dari YumaPlayer):** tidak ada lagi login WebView atau token akun. Tombol "Masuk dengan Discord" membuka halaman persetujuan resmi Discord (OAuth2 + PKCE) di Chrome / aplikasi Discord, lalu otomatis kembali ke VYORA. Token disimpan terenkripsi dan diperbarui otomatis
+- **Rich Presence seperti Yuma:** judul lagu, artis, sampul album, sisa waktu, ikon jeda saat lagu dihentikan, tombol "Listen on YouTube Music" dan "Get VYORA". Bisa pilih tipe aktivitas (Listening/Playing), status (Online/Idle/Jangan ganggu), tampil saat dijeda, dan tombol. Ada pratinjau kartu profil Discord
+- **Login Spotify (port dari YumaPlayer):** masuk lewat halaman login Spotify (atau tempel cookie sp_dc), lalu lihat Lagu yang Disukai dan semua playlist Spotify. Putar langsung (dicocokkan ke YouTube Music, mulai dalam beberapa detik) atau simpan sebagai playlist VYORA
+- **Kecepatan & nada dipindah ke Now Playing:** tombol "1×" di baris bawah pemutar membuka pengaturan kecepatan (preset 0,5×–2×) dan nada. Tidak ada lagi di Pengaturan
+- **Rapikan UI ala Apple Music:** tombol bawah Now Playing kini ikon polos dan hanya terisi saat aktif, halaman Discord/Spotify dengan kartu akun bergaya Apple, baris Spotify di Library dan Pengaturan
+- Tes baru untuk PKCE, TOTP Spotify, parser GraphQL, dan payload presence
+
 ## 1.8.0
 - **Server musik (lossless):** sambungkan server Subsonic milikmu sendiri (Navidrome, Gonic, Airsonic, Ampache…) lalu putar file FLAC/ALAC aslinya tanpa dikompres ulang, lengkap dengan pencarian, album, dan acak koleksi
 - **Deteksi output lossless** (port dari BitChord): detail format di Now Playing kini menunjukkan output yang dipakai (kabel, USB DAC, HDMI, Bluetooth, speaker) dan apakah output itu benar-benar membawa audio lossless

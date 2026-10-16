@@ -364,7 +364,7 @@ private data class ThirdPartyLicense(val name: String, val license: String, val 
 private val ThirdParty = listOf(
     ThirdPartyLicense("NewPipe Extractor", "GPL-3.0", "https://github.com/TeamNewPipe/NewPipeExtractor", "YouTube Music streams and metadata"),
     ThirdPartyLicense("BitChord", "GPL-3.0", "https://github.com/kushagrasinghx/BitChord", "Lossless output path detection (ported)"),
-    ThirdPartyLicense("YumaPlayer / ArchiveTune", "GPL-3.0", "https://github.com/MuwMx/YumaPlayer", "Word-synced lyrics approach (BetterLyrics TTML)"),
+    ThirdPartyLicense("YumaPlayer / ArchiveTune", "GPL-3.0", "https://github.com/MuwMx/YumaPlayer", "Discord OAuth2 + Rich Presence, Spotify login (ported); word-synced lyrics approach"),
     ThirdPartyLicense("Convx", "GPL-3.0", "https://github.com/cosmictaserdev-creator/Convx", "Glass modifier, nav bar, mini player"),
     ThirdPartyLicense("Kyant0 / backdrop", "Apache-2.0", "https://github.com/Kyant0/backdrop", "Backdrop effects"),
     ThirdPartyLicense("Kyant0 / Capsule", "Apache-2.0", "https://github.com/Kyant0/Capsule", "Continuous corner shapes"),

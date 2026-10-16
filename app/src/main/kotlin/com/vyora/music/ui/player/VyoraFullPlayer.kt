@@ -413,6 +413,9 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
                     if (castStatus.available) outputs = true else openOutputSwitcher(context)
                 }
                 if (outputs) OutputPickerDialog(onDismiss = { outputs = false })
+                var speedDialog by remember { mutableStateOf(false) }
+                SpeedToggle(appSettings.playbackSpeed, appSettings.playbackSpeed != 1f || appSettings.playbackPitch != 1f) { speedDialog = true }
+                if (speedDialog) PlaybackSpeedDialog(onDismiss = { speedDialog = false })
                 BottomToggle(Icons.AutoMirrored.Filled.QueueMusic, stringResource(R.string.queue), mode == MODE_QUEUE) {
                     mode = if (mode == MODE_QUEUE) MODE_ART else MODE_QUEUE
                 }
@@ -1056,17 +1059,35 @@ private fun GlyphButton(description: String, size: androidx.compose.ui.unit.Dp, 
 
 @Composable
 private fun BottomToggle(icon: ImageVector, description: String, active: Boolean, onClick: () -> Unit) {
-    val fill by animateColorAsState(if (active) Color.White.copy(alpha = 0.92f) else Color.White.copy(alpha = 0.08f), tween(180), label = "bottomFill")
+    val fill by animateColorAsState(if (active) Color.White.copy(alpha = 0.92f) else Color.Transparent, tween(180), label = "bottomFill")
     val tint by animateColorAsState(if (active) Color.Black.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.75f), tween(180), label = "bottomTint")
     Box(
         Modifier
             .size(44.dp)
             .glassClickable(pressedScale = 0.86f, onClick = onClick)
-            .liquidFill(shape = CircleShape, fill = fill)
+            .then(if (fill.alpha > 0.02f) Modifier.liquidFill(shape = CircleShape, fill = fill) else Modifier)
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, null, tint = tint, modifier = Modifier.size(22.dp))
+    }
+}
+
+/** Speed pill in the bottom row ("1×"), filled when the speed or pitch is not normal. */
+@Composable
+private fun SpeedToggle(speed: Float, active: Boolean, onClick: () -> Unit) {
+    val fill by animateColorAsState(if (active) Color.White.copy(alpha = 0.92f) else Color.Transparent, tween(180), label = "speedFill")
+    val tint by animateColorAsState(if (active) Color.Black.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.75f), tween(180), label = "speedTint")
+    val description = stringResource(R.string.playback_speed)
+    Box(
+        Modifier
+            .size(44.dp)
+            .glassClickable(pressedScale = 0.86f, onClick = onClick)
+            .then(if (fill.alpha > 0.02f) Modifier.liquidFill(shape = CircleShape, fill = fill) else Modifier)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(speedLabel(speed), color = tint, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 

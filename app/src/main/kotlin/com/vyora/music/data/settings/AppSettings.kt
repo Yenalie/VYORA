@@ -41,6 +41,12 @@ enum class CacheSize(val megabytes: Long) {
 
 enum class VideoArtwork { ALWAYS, WIFI_ONLY, OFF }
 
+/** Online status Discord shows while VYORA's activity is set. */
+enum class DiscordOnlineStatus(val wire: String) { ONLINE("online"), IDLE("idle"), DND("dnd") }
+
+/** Activity verb on the Discord profile ("Listening to" / "Playing"). */
+enum class DiscordActivityKind(val wire: Int) { LISTENING(2), PLAYING(0) }
+
 enum class AppLanguage(val tag: String, val nativeName: String) {
     SYSTEM("", ""),
     ENGLISH("en", "English"),
@@ -103,6 +109,10 @@ data class AppSettings(
     val autoUpdateCheck: Boolean = true,
     val downloadWifiOnly: Boolean = false,
     val discordPresence: Boolean = false,
+    val discordButtons: Boolean = true,
+    val discordShowPaused: Boolean = true,
+    val discordStatus: DiscordOnlineStatus = DiscordOnlineStatus.ONLINE,
+    val discordActivity: DiscordActivityKind = DiscordActivityKind.LISTENING,
 )
 
 /** The streaming quality to use right now: the mobile-data choice on metered networks when the user split them. */
@@ -249,6 +259,10 @@ object SettingsRepository {
             autoUpdateCheck = p.getBoolean("update_auto", d.autoUpdateCheck),
             downloadWifiOnly = p.getBoolean("download_wifi_only", d.downloadWifiOnly),
             discordPresence = p.getBoolean("discord_presence", d.discordPresence),
+            discordButtons = p.getBoolean("discord_buttons", d.discordButtons),
+            discordShowPaused = p.getBoolean("discord_show_paused", d.discordShowPaused),
+            discordStatus = p.enum("discord_status", d.discordStatus),
+            discordActivity = p.enum("discord_activity", d.discordActivity),
         )
     }
 
@@ -301,5 +315,9 @@ object SettingsRepository {
         putBoolean("update_auto", s.autoUpdateCheck)
         putBoolean("download_wifi_only", s.downloadWifiOnly)
         putBoolean("discord_presence", s.discordPresence)
+        putBoolean("discord_buttons", s.discordButtons)
+        putBoolean("discord_show_paused", s.discordShowPaused)
+        putString("discord_status", s.discordStatus.name)
+        putString("discord_activity", s.discordActivity.name)
     }
 }

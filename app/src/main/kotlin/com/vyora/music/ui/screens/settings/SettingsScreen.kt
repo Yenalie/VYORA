@@ -48,6 +48,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -253,29 +254,6 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                 )
             }
         }
-        item(key = "speed") {
-            SettingsGroup(footer = stringResource(R.string.speed_footer)) {
-                SettingsSliderRow(
-                    title = stringResource(R.string.playback_speed),
-                    value = settings.playbackSpeed,
-                    onValueChange = { v -> SettingsRepository.update { it.copy(playbackSpeed = (v * 20).roundToInt() / 20f) } },
-                    valueRange = 0.5f..2f,
-                    valueLabel = "%.2f×".format(java.util.Locale.ROOT, settings.playbackSpeed),
-                )
-                SettingsSliderRow(
-                    title = stringResource(R.string.playback_pitch),
-                    value = settings.playbackPitch,
-                    onValueChange = { v -> SettingsRepository.update { it.copy(playbackPitch = (v * 20).roundToInt() / 20f) } },
-                    valueRange = 0.5f..2f,
-                    valueLabel = "%.2f×".format(java.util.Locale.ROOT, settings.playbackPitch),
-                )
-                SettingsActionRow(
-                    title = stringResource(R.string.playback_speed_reset),
-                    onClick = { SettingsRepository.update { it.copy(playbackSpeed = 1f, playbackPitch = 1f) } },
-                    divider = false,
-                )
-            }
-        }
         item(key = "sources") {
             SettingsGroup(header = stringResource(R.string.settings_sources)) {
                 val server by com.vyora.music.data.server.MusicServer.config.collectAsState()
@@ -391,6 +369,13 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                     icon = Icons.Default.Gamepad, iconTint = Color(0xFF5865F2),
                     value = stringResource(if (settings.discordPresence) R.string.on else R.string.off),
                     onClick = { onOpen("discord") },
+                )
+                SettingsNavRow(
+                    title = stringResource(R.string.spotify_title),
+                    icon = Icons.Default.MusicNote, iconTint = Color(0xFF1DB954),
+                    value = com.vyora.music.data.spotify.SpotifyAccount.profile.collectAsState().value?.name
+                        ?: stringResource(R.string.off),
+                    onClick = { onOpen("spotify") },
                 )
                 SettingsNavRow(
                     title = stringResource(R.string.scrobble_title),

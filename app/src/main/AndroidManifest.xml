@@ -43,6 +43,23 @@
             </intent-filter>
         </activity>
 
+        <!-- Discord OAuth2 redirect (discord-<app id>:/authorize/callback), opened by the browser after consent. -->
+        <activity
+            android:name=".data.discord.DiscordOAuthCallbackActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="${discordRedirectScheme}" />
+            </intent-filter>
+        </activity>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

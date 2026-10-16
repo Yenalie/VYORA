@@ -346,7 +346,8 @@ class PlaybackService : MediaLibraryService() {
         val item = p.currentMediaItem
         val playing = p.playWhenReady &&
             (p.playbackState == Player.STATE_READY || p.playbackState == Player.STATE_BUFFERING)
-        if (item == null || !playing) {
+        val paused = !p.playWhenReady && p.playbackState != Player.STATE_IDLE && p.playbackState != Player.STATE_ENDED
+        if (item == null || (!playing && !paused)) {
             DiscordPresence.update(null)
             return
         }
@@ -355,12 +356,20 @@ class PlaybackService : MediaLibraryService() {
         val started = now - p.currentPosition.coerceAtLeast(0L)
         val duration = p.duration.takeIf { it != C.TIME_UNSET && it > 0 }
             ?: (md.extras?.getLong(MediaItems.EXTRA_DURATION_SEC, 0L) ?: 0L) * 1000L
+        val id = item.mediaId
+        val youtube = com.vyora.music.data.youtube.SimpleItem.isYouTubeId(id)
+        // Only public artwork goes to Discord: server cover URLs carry credentials, local covers are content:// URIs.
+        val artwork = md.artworkUri?.toString()?.takeIf { youtube && it.startsWith("https://") }
         DiscordPresence.update(
             PresenceTrack(
-                title = md.title?.toString().orEmpty().ifBlank { item.mediaId },
+                title = md.title?.toString().orEmpty().ifBlank { id },
                 artist = md.artist?.toString().orEmpty(),
+                album = md.albumTitle?.toString().orEmpty(),
                 startedAt = started,
                 endsAt = if (duration > 0) started + duration else 0L,
+                artworkUrl = artwork,
+                youtubeId = id.takeIf { youtube },
+                paused = paused,
             )
         )
     }

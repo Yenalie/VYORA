@@ -10,6 +10,8 @@ projects below. Original copyright headers are kept at the top of each vendored 
 | Continuous-corner shapes | `ui/glass/shapes/` | Kyant0/Capsule — https://github.com/Kyant0/Capsule | Apache-2.0 |
 | Floating tab bar | `ui/glass/floatingtabbar/` | elyesmansour/compose-floating-tab-bar v1.0.1 — https://github.com/elyesmansour/compose-floating-tab-bar | Apache-2.0 |
 | Lossless output detection | `data/local/LosslessOutput.kt` | Ported from BitChord — https://github.com/kushagrasinghx/BitChord (`playback/audio/LosslessOutput.kt`) | GPL-3.0 |
+| Discord OAuth2 (PKCE) sign-in, gateway Rich Presence, external-assets images | `data/discord/` | Ported from YumaPlayer / ArchiveTune — https://github.com/MuwMx/YumaPlayer (`discord/DiscordOAuthRepository.kt`, `GatewayClient.kt`, `DiscordSocialPresenceClient.kt`, `DiscordAssetRegistrar.kt`, `utils/DiscordRPC.kt`) | GPL-3.0 |
+| Spotify web login, TOTP token, GraphQL library queries | `data/spotify/`, `ui/screens/settings/SpotifyScreens.kt` | Ported from YumaPlayer — https://github.com/MuwMx/YumaPlayer (`spotifycore/`, `ui/screens/settings/SpotifyLoginSheet.kt`) | GPL-3.0 |
 | Word-synced lyrics approach (BetterLyrics TTML, then LRCLIB) | `data/lyrics/` | Approach from YumaPlayer / ArchiveTune — https://github.com/MuwMx/YumaPlayer (re-implemented, no code copied) | GPL-3.0 |
 | Liquid-glass modifier, `VyoraNavBar.kt`, `VyoraMiniAccessory.kt` | `ui/glass/GlassEffect.kt`, `ui/glass/VyoraNavBar.kt`, `ui/player/VyoraMiniAccessory.kt` | Adapted from Convx — https://github.com/cosmictaserdev-creator/Convx | GPL-3.0 |
 
