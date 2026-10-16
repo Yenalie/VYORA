@@ -37,7 +37,7 @@ object DiscordAccount {
     val user: StateFlow<DiscordUser?> = _user.asStateFlow()
 
     val client: OkHttpClient by lazy {
-        OkHttpClient.Builder()
+        com.vyora.music.core.Http.base.newBuilder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.SECONDS)
             .pingInterval(0, TimeUnit.SECONDS)

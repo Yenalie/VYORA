@@ -178,3 +178,24 @@ data class PlayEventEntity(
     @ColumnInfo(name = "played_at") val playedAt: Long,
     @ColumnInfo(name = "listened_ms") val listenedMs: Long,
 )
+
+/** Lyrics already looked up, so they open instantly and survive restarts. `payload` is null for "none found". */
+@Entity(tableName = "lyrics_cache")
+data class LyricsCacheEntity(
+    @PrimaryKey @ColumnInfo(name = "item_id") val itemId: String,
+    val payload: String?,
+    @ColumnInfo(name = "fetched_at") val fetchedAt: Long,
+)
+
+/** A listen waiting to be sent to Last.fm / ListenBrainz (kept while offline). */
+@Entity(tableName = "pending_scrobbles")
+data class PendingScrobbleEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val artist: String,
+    val title: String,
+    val album: String?,
+    @ColumnInfo(name = "duration_sec") val durationSec: Long,
+    @ColumnInfo(name = "played_at") val playedAt: Long,
+    /** Bitmask of [com.vyora.music.data.scrobble.Scrobbler] services still owed this listen. */
+    val targets: Int,
+)

@@ -12,8 +12,8 @@ android {
         applicationId = 'com.vyora.music'
         minSdk = 29
         targetSdk = 35
-        versionCode = 9
-        versionName = '1.7.0'
+        versionCode = 10
+        versionName = '1.8.0'
 
         testInstrumentationRunner = 'androidx.test.runner.AndroidJUnitRunner'
     }
@@ -125,6 +125,8 @@ dependencies {
     implementation libs.androidx.core.splashscreen
     // Media3 Cast pulls an old Fragment through AppCompat; ActivityResult APIs need >= 1.3.
     implementation libs.androidx.fragment
+    // Installs the bundled baseline profile so first launches are AOT-compiled instead of interpreted.
+    implementation libs.androidx.profileinstaller
 
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20240303'

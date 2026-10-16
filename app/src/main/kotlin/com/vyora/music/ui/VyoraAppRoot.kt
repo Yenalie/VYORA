@@ -459,6 +459,48 @@ fun VyoraAppRoot(settings: AppSettings) {
                     onPlay = { songs, index, shuffle -> PlayerManager.setQueue(songs, index, shuffle) },
                 )
             }
+            screen(LibraryPages.SERVER) {
+                com.vyora.music.ui.screens.sources.ServerScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenAlbum = { album -> navController.navigate(LibraryPages.serverAlbum(album)) },
+                    onPlay = { songs, index, shuffle -> PlayerManager.setQueue(songs, index, shuffle) },
+                )
+            }
+            screen(
+                route = "server/album/{id}?title={title}&artist={artist}&art={art}",
+                arguments = listOf(
+                    navArgument("id") { type = NavType.StringType },
+                    navArgument("title") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("artist") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("art") { type = NavType.StringType; defaultValue = "" },
+                )
+            ) { entry ->
+                val args = entry.arguments
+                val album = remember(args) {
+                    com.vyora.music.data.youtube.SimpleItem(
+                        id = args?.getString("id").orEmpty(),
+                        title = args?.getString("title").orEmpty(),
+                        artist = args?.getString("artist").orEmpty(),
+                        thumbnail = args?.getString("art")?.takeIf { it.isNotBlank() },
+                        url = "",
+                        type = com.vyora.music.data.youtube.ItemType.ALBUM,
+                    )
+                }
+                com.vyora.music.ui.screens.sources.ServerAlbumScreen(
+                    album = album,
+                    onBack = { navController.popBackStack() },
+                    onPlay = { songs, index, shuffle -> PlayerManager.setQueue(songs, index, shuffle) },
+                )
+            }
+            screen(LibraryPages.IMPORT) {
+                com.vyora.music.ui.screens.settings.SpotifyImportScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenPlaylist = { id ->
+                        navController.popBackStack()
+                        navController.navigate(LibraryPages.playlist(id))
+                    },
+                )
+            }
             screen(LibraryPages.RECAP) {
                 RecapScreen(
                     onBack = { navController.popBackStack() },
@@ -498,7 +540,43 @@ fun VyoraAppRoot(settings: AppSettings) {
             screen("settings/glass") { GlassSettingsScreen(onBack = { navController.popBackStack() }) }
             screen("settings/equalizer") { EqualizerScreen(onBack = { navController.popBackStack() }) }
             screen("settings/language") { LanguageScreen(onBack = { navController.popBackStack() }) }
-            screen("settings/about") { AboutScreen(onBack = { navController.popBackStack() }) }
+            screen("settings/about") {
+                AboutScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenLicenses = { navController.navigate("settings/licenses") },
+                )
+            }
+            screen("settings/licenses") {
+                com.vyora.music.ui.screens.settings.LicensesScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenText = { name -> navController.navigate("settings/license/$name") },
+                )
+            }
+            screen(
+                route = "settings/license/{name}",
+                arguments = listOf(navArgument("name") { type = NavType.StringType }),
+            ) { entry ->
+                com.vyora.music.ui.screens.settings.LicenseTextScreen(
+                    name = entry.arguments?.getString("name").orEmpty(),
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            screen("settings/scrobble") {
+                com.vyora.music.ui.screens.settings.ScrobbleScreen(onBack = { navController.popBackStack() })
+            }
+            screen("settings/server") {
+                com.vyora.music.ui.screens.sources.ServerScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenAlbum = { album -> navController.navigate(LibraryPages.serverAlbum(album)) },
+                    onPlay = { songs, index, shuffle -> PlayerManager.setQueue(songs, index, shuffle) },
+                )
+            }
+            screen("settings/import") {
+                com.vyora.music.ui.screens.settings.SpotifyImportScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenPlaylist = { id -> navController.navigate(LibraryPages.playlist(id)) },
+                )
+            }
             screen("settings/discord") {
                 com.vyora.music.ui.screens.settings.DiscordScreen(
                     onBack = { navController.popBackStack() },

@@ -2,6 +2,8 @@ package com.vyora.music
 
 import android.content.Context
 import android.content.Intent
+import kotlinx.coroutines.launch
+import androidx.lifecycle.lifecycleScope
 import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -68,6 +70,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         UpdateManager.handleIntent(this, intent)
+        handleVoiceSearch(intent)
         askForNotifications()
     }
 
@@ -107,6 +110,23 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         UpdateManager.handleIntent(this, intent)
+        handleVoiceSearch(intent)
+    }
+
+    /** Assistant voice search ("play … on VYORA"): play the best YouTube Music match, or resume if no query. */
+    private fun handleVoiceSearch(intent: Intent?) {
+        if (intent?.action != android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH) return
+        val query = intent.getStringExtra(android.app.SearchManager.QUERY).orEmpty().trim()
+        intent.action = Intent.ACTION_MAIN
+        lifecycleScope.launch {
+            if (query.isEmpty()) {
+                if (!com.vyora.music.playback.PlayerManager.isPlaying.value) com.vyora.music.playback.PlayerManager.togglePlayPause()
+                return@launch
+            }
+            val songs = com.vyora.music.data.youtube.YouTubeClient.search(query, com.vyora.music.data.youtube.SearchFilter.SONGS)
+                .getOrNull()?.items.orEmpty().filter { it.isSong }
+            if (songs.isNotEmpty()) com.vyora.music.playback.PlayerManager.setQueue(songs.take(20), 0)
+        }
     }
 
     override fun onResume() {

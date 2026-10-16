@@ -98,6 +98,7 @@ class Crossfader(
         val drift = main.currentPosition - handoffAtMs
         if (drift > MAX_DRIFT_MS) t.seekTo(handoffAtMs + drift)
         t.volume = main.volume
+        t.playbackParameters = main.playbackParameters
         t.play()
         expectedIndex = main.nextMediaItemIndex
         main.volume = 0f

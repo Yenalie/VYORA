@@ -35,6 +35,10 @@ fun VideoArtwork(videoId: String, modifier: Modifier = Modifier) {
     val video = remember { VideoArtworkPlayer(context.applicationContext) }
     var texture by remember { mutableStateOf<TextureView?>(null) }
     val hasFrame by video.hasFrame.collectAsState()
+    // Video only runs while the screen is visible: no decoding, network or bitmap sampling with the screen off
+    // or the app in the background (the audio keeps playing from the service).
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    fun visible() = lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
 
     DisposableEffect(video) {
         onDispose {
@@ -45,10 +49,10 @@ fun VideoArtwork(videoId: String, modifier: Modifier = Modifier) {
 
     LaunchedEffect(videoId) {
         VideoAmbience.clear()
-        video.load(videoId, PlayerManager.currentPositionMs(), PlayerManager.isPlaying.value)
+        video.load(videoId, PlayerManager.currentPositionMs(), PlayerManager.isPlaying.value && visible())
         while (isActive) {
-            video.follow(PlayerManager.currentPositionMs(), PlayerManager.isPlaying.value)
-            delay(FOLLOW_INTERVAL_MS)
+            video.follow(PlayerManager.currentPositionMs(), PlayerManager.isPlaying.value && visible())
+            delay(if (visible()) FOLLOW_INTERVAL_MS else FOLLOW_INTERVAL_MS * 4)
         }
     }
 
@@ -56,6 +60,7 @@ fun VideoArtwork(videoId: String, modifier: Modifier = Modifier) {
         val view = texture ?: return@LaunchedEffect
         if (!hasFrame) return@LaunchedEffect
         while (isActive) {
+            if (!visible()) { delay(SAMPLE_INTERVAL_MS * 2); continue }
             val frame: Bitmap? = runCatching { view.getBitmap(SAMPLE_WIDTH, SAMPLE_HEIGHT) }.getOrNull()
             if (frame != null) withContext(Dispatchers.Default) { VideoAmbience.publish(frame) }
             delay(SAMPLE_INTERVAL_MS)

@@ -23,11 +23,7 @@ object ReleaseApi {
     const val RELEASES_PAGE = "https://github.com/$REPO/releases"
     private const val LATEST = "https://api.github.com/repos/$REPO/releases/latest"
 
-    val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build()
+    val client: OkHttpClient = com.vyora.music.core.Http.with(10, 30)
 
     @Throws(IOException::class)
     fun latest(): ReleaseInfo? {

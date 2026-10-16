@@ -19,11 +19,14 @@ import androidx.room.RoomDatabase
         QueueStateEntity::class,
         SyncActionEntity::class,
         PlayEventEntity::class,
+        LyricsCacheEntity::class,
+        PendingScrobbleEntity::class,
     ],
     version = VyoraDatabase.VERSION,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
+        AutoMigration(from = 2, to = 3),
     ],
 )
 abstract class VyoraDatabase : RoomDatabase() {
@@ -31,6 +34,7 @@ abstract class VyoraDatabase : RoomDatabase() {
     abstract fun queue(): QueueDao
     abstract fun sync(): SyncDao
     abstract fun stats(): StatsDao
+    abstract fun cache(): CacheDao
 
     companion object {
         const val NAME = "vyora.db"
@@ -40,7 +44,7 @@ abstract class VyoraDatabase : RoomDatabase() {
          * infer (renames, splits, data rewrites) goes in [Migrations.ALL]. The exported JSON in
          * `app/schemas/` must be committed, and [com.vyora.music.MigrationTest] must cover the new step.
          */
-        const val VERSION = 2
+        const val VERSION = 3
 
         @Volatile
         private var instance: VyoraDatabase? = null

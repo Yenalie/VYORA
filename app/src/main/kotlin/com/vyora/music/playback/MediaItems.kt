@@ -14,6 +14,7 @@ object MediaItems {
     const val EXTRA_ARTIST_ID = "vyora_artist_id"
     const val EXTRA_VIDEO = "vyora_video"
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     fun from(item: SimpleItem, autoplay: Boolean = false): MediaItem {
         val extras = Bundle().apply {
             putLong(EXTRA_DURATION_SEC, item.duration)
@@ -25,6 +26,8 @@ object MediaItems {
         return MediaItem.Builder()
             .setMediaId(item.id)
             .setUri(SimpleItem.playbackUrl(item.id))
+            // Server stream URLs carry auth parameters; key the cache on the song instead.
+            .apply { if (item.isServer) setCustomCacheKey("srv/${item.id}") }
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(item.title)

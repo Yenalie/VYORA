@@ -182,6 +182,34 @@ fun GlassSettingsScreen(onBack: () -> Unit) {
                 )
             }
         }
+        item(key = "battery") {
+            val saver = g.blur <= 2f && g.refraction == 0f && !g.chromaticAberration && !g.depth && !settings.animatedPlayerBackground
+            SettingsGroup(footer = stringResource(R.string.glass_saver_footer)) {
+                SettingsSwitchRow(
+                    title = stringResource(R.string.glass_saver),
+                    checked = saver,
+                    onCheckedChange = { v ->
+                        if (v) {
+                            SettingsRepository.update {
+                                it.copy(
+                                    animatedPlayerBackground = false,
+                                    glass = it.glass.copy(blur = 2f, refraction = 0f, chromaticAberration = false, depth = false, vibrancy = 1f),
+                                )
+                            }
+                        } else {
+                            val d = com.vyora.music.data.settings.GlassSettings()
+                            SettingsRepository.update {
+                                it.copy(
+                                    animatedPlayerBackground = true,
+                                    glass = it.glass.copy(blur = d.blur, refraction = d.refraction, vibrancy = d.vibrancy),
+                                )
+                            }
+                        }
+                    },
+                    divider = false,
+                )
+            }
+        }
         item(key = "reset") {
             SettingsGroup {
                 SettingsActionRow(

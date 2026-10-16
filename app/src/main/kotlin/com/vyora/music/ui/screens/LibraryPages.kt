@@ -82,6 +82,11 @@ object LibraryPages {
     const val ARTISTS = "library/artists"
     const val LOCAL = "library/local"
     const val RECAP = "library/recap"
+    const val SERVER = "library/server"
+    const val IMPORT = "library/import"
+    fun serverAlbum(item: com.vyora.music.data.youtube.SimpleItem) =
+        "server/album/" + android.net.Uri.encode(item.id) + "?title=" + android.net.Uri.encode(item.title) +
+            "&artist=" + android.net.Uri.encode(item.artist) + "&art=" + android.net.Uri.encode(item.thumbnail.orEmpty())
     fun playlist(id: String) = "userplaylist/$id"
 }
 

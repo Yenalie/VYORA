@@ -1,5 +1,6 @@
 package com.vyora.music.ui.screens.settings
 
+import androidx.compose.material.icons.automirrored.filled.Send
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -59,6 +60,8 @@ fun LanguageScreen(onBack: () -> Unit) {
     }
 }
 
+const val TELEGRAM_URL = "https://t.me/My_bini_siapa"
+
 private data class Credit(val name: String, val license: String, val url: String)
 
 private val Credits = listOf(
@@ -69,11 +72,14 @@ private val Credits = listOf(
     Credit("compose-floating-tab-bar", "Apache-2.0", "https://github.com/elyesmansour/compose-floating-tab-bar"),
     Credit("AndroidX Media3", "Apache-2.0", "https://github.com/androidx/media"),
     Credit("Coil", "Apache-2.0", "https://github.com/coil-kt/coil"),
+    Credit("BitChord (lossless output detection)", "GPL-3.0", "https://github.com/kushagrasinghx/BitChord"),
+    Credit("YumaPlayer (word-synced lyrics approach)", "GPL-3.0", "https://github.com/MuwMx/YumaPlayer"),
+    Credit("BetterLyrics (word-synced lyrics)", "", "https://lyrics-api.boidu.dev"),
     Credit("LRCLIB (lyrics)", "", "https://lrclib.net"),
 )
 
 @Composable
-fun AboutScreen(onBack: () -> Unit) {
+fun AboutScreen(onBack: () -> Unit, onOpenLicenses: () -> Unit = {}) {
     val context = LocalContext.current
     val version = remember {
         runCatching {
@@ -116,7 +122,27 @@ fun AboutScreen(onBack: () -> Unit) {
                 SettingsNavRow(
                     title = stringResource(R.string.about_license),
                     value = "GPL-3.0",
-                    onClick = { open("https://www.gnu.org/licenses/gpl-3.0.html") },
+                    onClick = onOpenLicenses,
+                )
+                SettingsNavRow(
+                    title = stringResource(R.string.about_source_code),
+                    value = "GitHub",
+                    onClick = { open("https://github.com/Yenalie/VYORA") },
+                    divider = false,
+                )
+            }
+        }
+        item(key = "contact") {
+            SettingsGroup(
+                header = stringResource(R.string.about_contact),
+                footer = stringResource(R.string.about_contact_footer),
+            ) {
+                SettingsNavRow(
+                    title = stringResource(R.string.about_contact_telegram),
+                    icon = androidx.compose.material.icons.Icons.AutoMirrored.Filled.Send,
+                    iconTint = androidx.compose.ui.graphics.Color(0xFF229ED9),
+                    value = "@My_bini_siapa",
+                    onClick = { open(TELEGRAM_URL) },
                     divider = false,
                 )
             }

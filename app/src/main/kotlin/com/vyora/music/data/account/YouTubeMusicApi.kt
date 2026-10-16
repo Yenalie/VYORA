@@ -20,10 +20,9 @@ object YouTubeMusicApi {
     private const val MAX_PAGES = 40
     private val JSON = "application/json; charset=utf-8".toMediaType()
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(YouTubeConfig.CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS)
-        .readTimeout(YouTubeConfig.READ_TIMEOUT_SEC, TimeUnit.SECONDS)
-        .build()
+    private val client = com.vyora.music.core.Http.with(
+        YouTubeConfig.CONNECT_TIMEOUT_SEC, YouTubeConfig.READ_TIMEOUT_SEC,
+    )
 
     suspend fun account(cookie: String, authUser: Int = 0): YouTubeAccount? =
         InnerTubeParser.account(post("account/account_menu", JSONObject(), cookie, authUser))?.copy(authUser = authUser)

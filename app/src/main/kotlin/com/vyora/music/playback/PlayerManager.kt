@@ -189,7 +189,7 @@ object PlayerManager {
             .flatMap { group -> (0 until group.length).asSequence().filter(group::isTrackSelected).map(group::getTrackFormat) }
             .firstOrNull() ?: return null
         val mime = format.sampleMimeType ?: format.containerMimeType ?: return null
-        val stream = mediaId?.takeUnless(SimpleItem::isLocalId)?.let(StreamResolver::pickedAudio)
+        val stream = mediaId?.takeIf(SimpleItem::isYouTubeId)?.let(StreamResolver::pickedAudio)
         val bits = when (format.pcmEncoding) {
             C.ENCODING_PCM_8BIT -> 8
             C.ENCODING_PCM_16BIT, C.ENCODING_PCM_16BIT_BIG_ENDIAN -> 16
@@ -308,7 +308,7 @@ object PlayerManager {
     }
 
     fun startRadio(item: SimpleItem) {
-        if (item.isLocal) return
+        if (!item.isYouTube) return
         setQueue(listOf(item), 0, shuffle = false)
         scope.launch {
             val songs = YouTubeClient.radio(item.id).getOrNull().orEmpty()

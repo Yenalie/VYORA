@@ -39,6 +39,12 @@ interface StatsDao {
     @Insert
     suspend fun insert(event: PlayEventEntity)
 
+    @Insert
+    suspend fun insertAll(events: List<PlayEventEntity>)
+
+    @Query("SELECT * FROM play_events ORDER BY played_at")
+    suspend fun allEvents(): List<PlayEventEntity>
+
     @Query(
         "SELECT COUNT(*) AS plays, COALESCE(SUM(listened_ms), 0) AS listened_ms, " +
             "COUNT(DISTINCT item_id) AS songs, COUNT(DISTINCT artist) AS artists " +

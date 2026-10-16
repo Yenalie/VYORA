@@ -51,7 +51,7 @@ object Downloads {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val http by lazy { OkHttpClient() }
+    private val http by lazy { com.vyora.music.core.Http.base }
 
     @Volatile private var manager: DownloadManager? = null
     private var appContext: Context? = null
@@ -110,7 +110,7 @@ object Downloads {
 
     fun downloadAll(context: Context, items: List<SimpleItem>) {
         val app = context.applicationContext
-        val songs = items.filter { it.isSong && it.id.isNotBlank() && !it.isLocal }
+        val songs = items.filter { it.isSong && it.id.isNotBlank() && it.isYouTube }
             .filter { _entries.value[it.id]?.status.let { s -> s == null || s == DownloadStatus.FAILED } }
             .distinctBy { it.id }
         if (songs.isEmpty()) return

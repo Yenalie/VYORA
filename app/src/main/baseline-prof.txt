@@ -1,0 +1,16 @@
+# Startup and hot paths: app start, navigation, playback, lists and the glass renderer.
+HSPLcom/vyora/music/VyoraApp;->**(**)**
+HSPLcom/vyora/music/MainActivity;->**(**)**
+HSPLcom/vyora/music/ui/**;->**(**)**
+HSPLcom/vyora/music/playback/**;->**(**)**
+HSPLcom/vyora/music/data/library/**;->**(**)**
+HSPLcom/vyora/music/data/settings/**;->**(**)**
+HSPLcom/vyora/music/data/youtube/**;->**(**)**
+HSPLcom/vyora/music/data/lyrics/**;->**(**)**
+Lcom/vyora/music/**;
+HSPLandroidx/compose/runtime/**;->**(**)**
+HSPLandroidx/compose/ui/**;->**(**)**
+HSPLandroidx/compose/foundation/**;->**(**)**
+HSPLandroidx/compose/animation/**;->**(**)**
+HSPLandroidx/media3/exoplayer/**;->**(**)**
+HSPLandroidx/media3/session/**;->**(**)**

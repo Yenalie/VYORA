@@ -15,6 +15,7 @@ import androidx.media3.datasource.cache.ContentMetadata
 import androidx.media3.datasource.cache.ContentMetadataMutations
 import com.vyora.music.data.settings.AudioQuality
 import com.vyora.music.data.settings.SettingsRepository
+import com.vyora.music.data.settings.effectiveQuality
 import com.vyora.music.data.youtube.ResolvedStream
 import com.vyora.music.data.youtube.SimpleItem
 import com.vyora.music.data.youtube.StreamResolver
@@ -81,7 +82,7 @@ object YouTubeDataSource {
     private fun cacheKey(spec: DataSpec, kind: Kind): String {
         val id = videoIdOf(spec.uri) ?: return spec.key ?: spec.uri.toString()
         return when (kind) {
-            Kind.AUDIO -> "$KEY_AUDIO/$id/${SettingsRepository.current.audioQuality.name}"
+            Kind.AUDIO -> "$KEY_AUDIO/$id/${SettingsRepository.current.effectiveQuality(com.vyora.music.core.NetworkState.isMetered).name}"
             Kind.VIDEO -> "$KEY_VIDEO/$id"
         }
     }
@@ -119,6 +120,6 @@ object YouTubeDataSource {
 
         private fun qualityOf(key: String?): AudioQuality = fixedQuality ?:
             key?.substringAfterLast('/')?.let { name -> AudioQuality.entries.firstOrNull { it.name == name } }
-                ?: SettingsRepository.current.audioQuality
+                ?: SettingsRepository.current.effectiveQuality(com.vyora.music.core.NetworkState.isMetered)
     }
 }

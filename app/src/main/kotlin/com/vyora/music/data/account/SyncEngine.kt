@@ -303,7 +303,7 @@ object SyncEngine {
         val dao = database.library()
         for (playlist in dao.playlists().filter { it.remoteId == null }) {
             if (!isSignedIn()) return
-            val songs = dao.playlistSongs(playlist.id).map { it.itemId }.filterNot(SimpleItem::isLocalId)
+            val songs = dao.playlistSongs(playlist.id).map { it.itemId }.filter(SimpleItem::isYouTubeId)
             val remoteId = YouTubeMusicApi.createPlaylist(playlist.name, songs)
             dao.setPlaylistRemote(playlist.id, remoteId)
             runCatching { YouTubeMusicApi.playlist(remoteId) }.getOrNull()?.songs?.items?.forEach {

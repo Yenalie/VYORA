@@ -28,6 +28,12 @@ data class SimpleItem(
     /** A file on this device (MediaStore), not a YouTube video. */
     val isLocal: Boolean get() = isLocalId(id)
 
+    /** A song on the user's own music server (Subsonic / Navidrome). */
+    val isServer: Boolean get() = com.vyora.music.data.server.MusicServer.isSongId(id)
+
+    /** Backed by YouTube Music: radio, sharing, YouTube sync and downloads only apply to these. */
+    val isYouTube: Boolean get() = isYouTubeId(id)
+
     companion object {
         /** YouTube ids never contain ':', so this prefix can't collide with a video id. */
         const val LOCAL_PREFIX = "local:"
@@ -35,11 +41,18 @@ data class SimpleItem(
 
         fun watchUrl(id: String) = "https://www.youtube.com/watch?v=$id"
         fun isLocalId(id: String?) = id != null && id.startsWith(LOCAL_PREFIX)
+        fun isYouTubeId(id: String?) = id != null && !isLocalId(id) &&
+            !com.vyora.music.data.server.MusicServer.isSongId(id) && !com.vyora.music.data.server.MusicServer.isAlbumId(id)
         fun localId(mediaStoreId: Long) = "$LOCAL_PREFIX$mediaStoreId"
         fun localUri(id: String) = LOCAL_AUDIO_URI + id.removePrefix(LOCAL_PREFIX)
 
         /** What the player opens for [id]: the content URI for local files, the watch page otherwise. */
-        fun playbackUrl(id: String) = if (isLocalId(id)) localUri(id) else watchUrl(id)
+        fun playbackUrl(id: String) = when {
+            isLocalId(id) -> localUri(id)
+            com.vyora.music.data.server.MusicServer.isSongId(id) ->
+                com.vyora.music.data.server.MusicServer.streamUrl(com.vyora.music.data.server.MusicServer.songIdOf(id))
+            else -> watchUrl(id)
+        }
     }
 }
 

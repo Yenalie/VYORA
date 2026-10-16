@@ -25,6 +25,8 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RestartAlt
@@ -190,13 +192,32 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
         }
         item(key = "quality") {
             SettingsGroup(footer = stringResource(R.string.audio_quality_footer)) {
-                SettingsControlRow(title = stringResource(R.string.audio_quality), divider = false) {
+                SettingsControlRow(
+                    title = stringResource(if (settings.separateMobileQuality) R.string.audio_quality_wifi else R.string.audio_quality),
+                ) {
                     SegmentedControl(
                         options = AudioQuality.entries,
                         selected = settings.audioQuality,
                         onSelect = { q -> SettingsRepository.update { it.copy(audioQuality = q) } },
                         label = { qualityLabel(it) },
                     )
+                }
+                SettingsSwitchRow(
+                    title = stringResource(R.string.audio_quality_split),
+                    icon = Icons.Default.Wifi, iconTint = SystemColors.Green,
+                    checked = settings.separateMobileQuality,
+                    onCheckedChange = { v -> SettingsRepository.update { it.copy(separateMobileQuality = v) } },
+                    divider = settings.separateMobileQuality,
+                )
+                if (settings.separateMobileQuality) {
+                    SettingsControlRow(title = stringResource(R.string.audio_quality_mobile), divider = false) {
+                        SegmentedControl(
+                            options = AudioQuality.entries,
+                            selected = settings.mobileQuality,
+                            onSelect = { q -> SettingsRepository.update { it.copy(mobileQuality = q) } },
+                            label = { qualityLabel(it) },
+                        )
+                    }
                 }
             }
         }
@@ -228,6 +249,47 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                     icon = Icons.Default.SkipNext, iconTint = SystemColors.Indigo,
                     checked = settings.skipUnavailable,
                     onCheckedChange = { v -> SettingsRepository.update { it.copy(skipUnavailable = v) } },
+                    divider = false,
+                )
+            }
+        }
+        item(key = "speed") {
+            SettingsGroup(footer = stringResource(R.string.speed_footer)) {
+                SettingsSliderRow(
+                    title = stringResource(R.string.playback_speed),
+                    value = settings.playbackSpeed,
+                    onValueChange = { v -> SettingsRepository.update { it.copy(playbackSpeed = (v * 20).roundToInt() / 20f) } },
+                    valueRange = 0.5f..2f,
+                    valueLabel = "%.2f×".format(java.util.Locale.ROOT, settings.playbackSpeed),
+                )
+                SettingsSliderRow(
+                    title = stringResource(R.string.playback_pitch),
+                    value = settings.playbackPitch,
+                    onValueChange = { v -> SettingsRepository.update { it.copy(playbackPitch = (v * 20).roundToInt() / 20f) } },
+                    valueRange = 0.5f..2f,
+                    valueLabel = "%.2f×".format(java.util.Locale.ROOT, settings.playbackPitch),
+                )
+                SettingsActionRow(
+                    title = stringResource(R.string.playback_speed_reset),
+                    onClick = { SettingsRepository.update { it.copy(playbackSpeed = 1f, playbackPitch = 1f) } },
+                    divider = false,
+                )
+            }
+        }
+        item(key = "sources") {
+            SettingsGroup(header = stringResource(R.string.settings_sources)) {
+                val server by com.vyora.music.data.server.MusicServer.config.collectAsState()
+                SettingsNavRow(
+                    title = stringResource(R.string.server_title),
+                    subtitle = stringResource(R.string.server_subtitle),
+                    icon = Icons.Default.Dns, iconTint = SystemColors.Indigo,
+                    value = stringResource(if (server != null) R.string.on else R.string.off),
+                    onClick = { onOpen("server") },
+                )
+                SettingsNavRow(
+                    title = stringResource(R.string.import_title),
+                    icon = Icons.AutoMirrored.Filled.PlaylistAdd, iconTint = Color(0xFF1DB954),
+                    onClick = { onOpen("import") },
                     divider = false,
                 )
             }
@@ -329,10 +391,17 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                     icon = Icons.Default.Gamepad, iconTint = Color(0xFF5865F2),
                     value = stringResource(if (settings.discordPresence) R.string.on else R.string.off),
                     onClick = { onOpen("discord") },
+                )
+                SettingsNavRow(
+                    title = stringResource(R.string.scrobble_title),
+                    icon = Icons.Default.GraphicEq, iconTint = Color(0xFFD51007),
+                    value = stringResource(if (settings.scrobbleLastFm || settings.scrobbleListenBrainz) R.string.on else R.string.off),
+                    onClick = { onOpen("scrobble") },
                     divider = false,
                 )
             }
         }
+        item(key = "backup") { BackupGroup() }
         item(key = "updates") {
             UpdatesGroup(autoCheck = settings.autoUpdateCheck)
         }

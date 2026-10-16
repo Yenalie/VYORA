@@ -59,7 +59,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.automirrored.filled.VolumeMute
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Airplay
+import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.CastConnected
 import com.vyora.music.playback.cast.CastSupport
 import androidx.compose.material.icons.filled.AllInclusive
@@ -134,6 +134,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -405,7 +406,7 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
                 val castStatus by CastSupport.status.collectAsState()
                 var outputs by remember { mutableStateOf(false) }
                 BottomToggle(
-                    if (castStatus.connected) Icons.Default.CastConnected else Icons.Default.Airplay,
+                    if (castStatus.connected) Icons.Default.CastConnected else Icons.Default.Cast,
                     stringResource(R.string.output),
                     castStatus.connected,
                 ) {
@@ -745,21 +746,65 @@ private fun SyncedLyrics(
             }
             val alpha by animateFloatAsState(target, tween(300), label = "lineAlpha")
             val lineScale by animateFloatAsState(if (!selecting && i == active) 1f else 0.97f, tween(300), label = "lineScale")
-            LyricText(
-                text = line.text.ifBlank { "♪" },
-                chosen = chosen,
-                style = MaterialTheme.typography.headlineMedium.copy(fontSize = 28.sp, lineHeight = 35.sp),
-                modifier = Modifier
+            val lineStyle = MaterialTheme.typography.headlineMedium.copy(fontSize = 28.sp, lineHeight = 35.sp)
+            val lineModifier = Modifier
                     .fillMaxWidth()
                     .graphicsLayer {
                         this.alpha = alpha
                         scaleX = lineScale; scaleY = lineScale
                         transformOrigin = TransformOrigin(0f, 0.5f)
                     }
-                    .lyricGestures(i, selecting, onTap = { PlayerManager.seekTo(line.timeMs) }, onLongPress = onLongPress, onToggle = onToggle),
-            )
+                    .lyricGestures(i, selecting, onTap = { PlayerManager.seekTo(line.timeMs) }, onLongPress = onLongPress, onToggle = onToggle)
+            if (line.hasWords && i == active && !selecting) {
+                KaraokeLine(line, lineStyle, lineModifier)
+            } else {
+                LyricText(text = line.text.ifBlank { "♪" }, chosen = chosen, style = lineStyle, modifier = lineModifier)
+            }
         }
     }
+}
+
+/**
+ * Playback position between the player's coarse updates, advanced every frame while playing so word-timed lyrics
+ * fill smoothly instead of jumping a few times a second.
+ */
+@Composable
+private fun rememberSmoothPositionMs(): androidx.compose.runtime.State<Long> {
+    val coarse by PlayerManager.positionMs.collectAsState()
+    val playing by PlayerManager.isPlaying.collectAsState()
+    val speed = SettingsRepository.settings.collectAsState().value.playbackSpeed
+    val out = remember { androidx.compose.runtime.mutableLongStateOf(coarse) }
+    LaunchedEffect(coarse, playing, speed) {
+        out.longValue = coarse
+        if (!playing) return@LaunchedEffect
+        var first = -1L
+        while (true) {
+            androidx.compose.runtime.withFrameNanos { now ->
+                if (first < 0) first = now
+                out.longValue = coarse + ((now - first) / 1_000_000 * speed).toLong()
+            }
+        }
+    }
+    return out
+}
+
+/** The current line, word by word: sung words full white, the word being sung filling in, the rest dimmed. */
+@Composable
+private fun KaraokeLine(line: LyricLine, style: androidx.compose.ui.text.TextStyle, modifier: Modifier) {
+    val position by rememberSmoothPositionMs()
+    val t = position + 120
+    val text = androidx.compose.ui.text.buildAnnotatedString {
+        line.words.forEach { w ->
+            val progress = when {
+                t >= w.endMs -> 1f
+                t <= w.startMs -> 0f
+                else -> ((t - w.startMs).toFloat() / (w.endMs - w.startMs).coerceAtLeast(1)).coerceIn(0f, 1f)
+            }
+            val alpha = 0.38f + 0.62f * progress
+            withStyle(androidx.compose.ui.text.SpanStyle(color = Color.White.copy(alpha = alpha))) { append(w.text) }
+        }
+    }
+    Text(text = text, style = style, modifier = modifier.padding(vertical = 10.dp))
 }
 
 @Composable
@@ -1208,7 +1253,7 @@ private fun NowPlayingQuality() {
         modifier = Modifier.padding(horizontal = 6.dp),
     )
     if (details) {
-        com.vyora.music.ui.components.AudioFormatDialog(f, current?.isLocal == true) { details = false }
+        com.vyora.music.ui.components.AudioFormatDialog(f, current?.isLocal == true, onDismiss = { details = false }, isServer = current?.isServer == true)
     }
 }
 

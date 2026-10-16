@@ -19,6 +19,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -80,7 +82,8 @@ fun QualityBadge(
 
 /** "What am I hearing?" — codec, resolution, bitrate and where the audio comes from. */
 @Composable
-fun AudioFormatDialog(format: AudioFormatInfo, isLocal: Boolean, onDismiss: () -> Unit) {
+fun AudioFormatDialog(format: AudioFormatInfo, isLocal: Boolean, onDismiss: () -> Unit, isServer: Boolean = false) {
+    val output by com.vyora.music.data.local.LosslessOutput.state.collectAsState()
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = VyoraGroupedCell,
@@ -99,7 +102,28 @@ fun AudioFormatDialog(format: AudioFormatInfo, isLocal: Boolean, onDismiss: () -
                     stringResource(R.string.format_channels),
                     if (format.channels == 2) stringResource(R.string.format_stereo) else if (format.channels == 1) stringResource(R.string.format_mono) else format.channels.toString(),
                 )
-                FormatLine(stringResource(R.string.format_source), stringResource(if (isLocal) R.string.format_source_device else R.string.format_source_stream))
+                FormatLine(
+                    stringResource(R.string.format_source),
+                    stringResource(
+                        when {
+                            isLocal -> R.string.format_source_device
+                            isServer -> R.string.format_source_server
+                            else -> R.string.format_source_stream
+                        }
+                    ),
+                )
+                val via = stringResource(
+                    when (output.via) {
+                        com.vyora.music.data.local.LosslessOutput.Kind.WIRED -> R.string.output_wired
+                        com.vyora.music.data.local.LosslessOutput.Kind.USB -> R.string.output_usb
+                        com.vyora.music.data.local.LosslessOutput.Kind.HDMI -> R.string.output_hdmi
+                        com.vyora.music.data.local.LosslessOutput.Kind.DOCK -> R.string.output_dock
+                        com.vyora.music.data.local.LosslessOutput.Kind.BLUETOOTH -> R.string.output_bluetooth
+                        com.vyora.music.data.local.LosslessOutput.Kind.SPEAKER -> R.string.output_speaker
+                        null -> if (output.bluetoothCodecUnknown) R.string.output_bluetooth else R.string.output_speaker
+                    }
+                )
+                FormatLine(stringResource(R.string.format_output), output.deviceName?.let { "$via · $it" } ?: via)
                 Spacer(Modifier.height(12.dp))
                 Text(
                     stringResource(
@@ -111,6 +135,19 @@ fun AudioFormatDialog(format: AudioFormatInfo, isLocal: Boolean, onDismiss: () -
                     ),
                     style = MaterialTheme.typography.bodySmall,
                 )
+                if (format.isLossless) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        stringResource(
+                            when {
+                                output.capable -> R.string.output_note_capable
+                                output.bluetoothCodecUnknown -> R.string.output_note_bluetooth
+                                else -> R.string.output_note_speaker
+                            }
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.done), color = VyoraText) } },

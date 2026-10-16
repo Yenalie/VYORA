@@ -4,6 +4,7 @@
         <exclude domain="sharedpref" path="vyora_account.xml" />
         <exclude domain="sharedpref" path="vyora_sync.xml" />
         <exclude domain="sharedpref" path="vyora_discord.xml" />
+        <exclude domain="sharedpref" path="vyora_secure.xml" />
         <exclude domain="file" path="offline_audio/" />
         <exclude domain="file" path="offline_art/" />
         <exclude domain="database" path="exoplayer_internal.db" />
@@ -13,6 +14,7 @@
         <exclude domain="sharedpref" path="vyora_account.xml" />
         <exclude domain="sharedpref" path="vyora_sync.xml" />
         <exclude domain="sharedpref" path="vyora_discord.xml" />
+        <exclude domain="sharedpref" path="vyora_secure.xml" />
         <exclude domain="file" path="offline_audio/" />
         <exclude domain="file" path="offline_art/" />
         <exclude domain="database" path="exoplayer_internal.db" />

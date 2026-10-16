@@ -84,6 +84,13 @@ data class AppSettings(
     val haptics: Boolean = true,
     val glass: GlassSettings = GlassSettings(),
     val audioQuality: AudioQuality = AudioQuality.HIGH,
+    /** Quality on metered networks (mobile data, hotspot); [audioQuality] applies on Wi-Fi. */
+    val mobileQuality: AudioQuality = AudioQuality.NORMAL,
+    val separateMobileQuality: Boolean = false,
+    val playbackSpeed: Float = 1f,
+    val playbackPitch: Float = 1f,
+    val scrobbleLastFm: Boolean = false,
+    val scrobbleListenBrainz: Boolean = false,
     val skipSilence: Boolean = false,
     val pauseOnDisconnect: Boolean = true,
     val skipUnavailable: Boolean = true,
@@ -97,6 +104,10 @@ data class AppSettings(
     val downloadWifiOnly: Boolean = false,
     val discordPresence: Boolean = false,
 )
+
+/** The streaming quality to use right now: the mobile-data choice on metered networks when the user split them. */
+fun AppSettings.effectiveQuality(metered: Boolean): AudioQuality =
+    if (separateMobileQuality && metered) mobileQuality else audioQuality
 
 object SettingsRepository {
     private const val PREFS = "vyora_settings"
@@ -152,6 +163,35 @@ object SettingsRepository {
 
     fun resetAll() = update { AppSettings(language = it.language) }
 
+    /** Every stored preference, for backups. */
+    @Synchronized
+    fun exportRaw(): Map<String, Any?> {
+        flush()
+        return if (::prefs.isInitialized) prefs.all.toMap() else emptyMap()
+    }
+
+    /** Replaces stored preferences with a backup's and reloads them. */
+    @Synchronized
+    fun importRaw(values: Map<String, Any?>) {
+        if (!::prefs.isInitialized) return
+        pendingWrite?.cancel(false)
+        pendingWrite = null
+        prefs.edit(commit = true) {
+            clear()
+            values.forEach { (k, v) ->
+                when (v) {
+                    is Boolean -> putBoolean(k, v)
+                    is Int -> putInt(k, v)
+                    is Long -> putLong(k, v)
+                    is Float -> putFloat(k, v)
+                    is Double -> putFloat(k, v.toFloat())
+                    is String -> putString(k, v)
+                }
+            }
+        }
+        state.value = read(prefs)
+    }
+
     private inline fun <reified T : Enum<T>> SharedPreferences.enum(key: String, default: T): T =
         getString(key, null)?.let { name -> enumValues<T>().firstOrNull { it.name == name } } ?: default
 
@@ -182,6 +222,12 @@ object SettingsRepository {
                 content = p.getBoolean("glass_content", g.content),
             ),
             audioQuality = p.enum("audio_quality", d.audioQuality),
+            mobileQuality = p.enum("audio_quality_mobile", d.mobileQuality),
+            separateMobileQuality = p.getBoolean("audio_quality_split", d.separateMobileQuality),
+            playbackSpeed = p.getFloat("playback_speed", d.playbackSpeed).coerceIn(0.5f, 2f),
+            playbackPitch = p.getFloat("playback_pitch", d.playbackPitch).coerceIn(0.5f, 2f),
+            scrobbleLastFm = p.getBoolean("scrobble_lastfm", d.scrobbleLastFm),
+            scrobbleListenBrainz = p.getBoolean("scrobble_lb", d.scrobbleListenBrainz),
             skipSilence = p.getBoolean("skip_silence", d.skipSilence),
             pauseOnDisconnect = p.getBoolean("pause_noisy", d.pauseOnDisconnect),
             skipUnavailable = p.getBoolean("skip_unavailable", d.skipUnavailable),
@@ -229,6 +275,12 @@ object SettingsRepository {
             putBoolean("glass_content", content)
         }
         putString("audio_quality", s.audioQuality.name)
+        putString("audio_quality_mobile", s.mobileQuality.name)
+        putBoolean("audio_quality_split", s.separateMobileQuality)
+        putFloat("playback_speed", s.playbackSpeed)
+        putFloat("playback_pitch", s.playbackPitch)
+        putBoolean("scrobble_lastfm", s.scrobbleLastFm)
+        putBoolean("scrobble_lb", s.scrobbleListenBrainz)
         putBoolean("skip_silence", s.skipSilence)
         putBoolean("pause_noisy", s.pauseOnDisconnect)
         putBoolean("skip_unavailable", s.skipUnavailable)

@@ -161,6 +161,66 @@ object LibraryManager {
         return id
     }
 
+    /** Creates a playlist with all [songs] in order, in one transaction (imports). Returns its id. */
+    suspend fun createPlaylistWith(name: String, songs: List<SimpleItem>): String? {
+        val database = db ?: return null
+        val id = "vy_" + UUID.randomUUID().toString().take(12)
+        val now = System.currentTimeMillis()
+        val unique = songs.distinctBy { it.id }
+        database.withTransaction {
+            val dao = database.library()
+            dao.insertPlaylist(PlaylistEntity(id, name.trim().ifBlank { "Playlist" }, now))
+            dao.upsertItems(unique.map(ItemEntity::of))
+            dao.insertPlaylistSongs(unique.mapIndexed { i, song -> PlaylistSongEntity(id, song.id, i) })
+        }
+        SyncEngine.kick()
+        return id
+    }
+
+    /**
+     * Merges a backup into the library: likes and saved collections are added (existing ones kept), playlists are
+     * added unless one with the same name already exists, and listening events missing locally are inserted.
+     */
+    suspend fun restore(
+        liked: List<SimpleItem>,
+        saved: List<SimpleItem>,
+        playlists: List<Pair<String, List<SimpleItem>>>,
+        events: List<com.vyora.music.data.db.PlayEventEntity>,
+    ): Int {
+        val database = db ?: return 0
+        var added = 0
+        val now = System.currentTimeMillis()
+        database.withTransaction {
+            val dao = database.library()
+            val all = (liked + saved + playlists.flatMap { it.second }).distinctBy { it.id }
+            dao.upsertItems(all.map(ItemEntity::of))
+            val haveLiked = dao.likedRows().map { it.itemId }.toSet()
+            val newLikes = liked.filter { it.id !in haveLiked }
+            dao.upsertLiked(newLikes.mapIndexed { i, item -> LikedEntity(item.id, now - i) })
+            added += newLikes.size
+            val haveSaved = dao.savedRows().map { it.itemId }.toSet()
+            val newSaved = saved.filter { it.id !in haveSaved }
+            dao.upsertSaved(newSaved.mapIndexed { i, item -> SavedEntity(item.id, now - i) })
+            added += newSaved.size
+            val names = dao.playlists().map { it.name.lowercase() }.toSet()
+            playlists.filter { it.first.lowercase() !in names }.forEachIndexed { n, (name, songs) ->
+                val id = "vy_" + UUID.randomUUID().toString().take(12)
+                dao.insertPlaylist(PlaylistEntity(id, name, now - n))
+                dao.insertPlaylistSongs(songs.distinctBy { it.id }.mapIndexed { i, song -> PlaylistSongEntity(id, song.id, i) })
+                added++
+            }
+            val stats = database.stats()
+            val seen = stats.allEvents().map { it.itemId to it.playedAt }.toSet()
+            val fresh = events.filter { (it.itemId to it.playedAt) !in seen }.map { it.copy(id = 0) }
+            if (fresh.isNotEmpty()) stats.insertAll(fresh)
+            added += fresh.size
+        }
+        SyncEngine.kick()
+        return added
+    }
+
+    suspend fun allPlayEvents(): List<com.vyora.music.data.db.PlayEventEntity> = db?.stats()?.allEvents().orEmpty()
+
     fun renamePlaylist(id: String, name: String) {
         val clean = name.trim().takeIf { it.isNotBlank() } ?: return
         write { database ->
@@ -208,7 +268,7 @@ object LibraryManager {
     private suspend fun queue(database: VyoraDatabase, kind: String, target: String, extra: String? = null, replaces: List<String> = emptyList()) {
         if (!SyncEngine.isSignedIn()) return
         // Files on this device have no YouTube Music counterpart; keep them local-only.
-        if (SimpleItem.isLocalId(target) || SimpleItem.isLocalId(extra)) return
+        if (!SimpleItem.isYouTubeId(target) || (extra != null && !SimpleItem.isYouTubeId(extra.substringBefore('|')))) return
         val sync = database.sync()
         if (replaces.isNotEmpty()) sync.deleteFor(target, replaces)
         sync.insert(SyncActionEntity(kind = kind, target = target, extra = extra))

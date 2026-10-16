@@ -39,6 +39,21 @@ class MigrationTest {
         db.query("SELECT COUNT(*) FROM play_events").use { c -> c.moveToFirst(); assertEquals(1, c.getInt(0)) }
     }
 
+    @Test fun v2ToV3KeepsLibraryAndAddsCaches() {
+        helper.createDatabase(name, 2).apply {
+            execSQL(
+                "INSERT INTO items (id, title, artist, thumbnail, url, duration, type, artist_id, is_video, count) " +
+                    "VALUES ('abcdefghijk', 'Sial', 'Mahalini', NULL, 'u', 240, 'song', NULL, 0, 0)"
+            )
+            execSQL("INSERT INTO liked (item_id, liked_at, synced) VALUES ('abcdefghijk', 1, 0)")
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(name, 3, true, *Migrations.ALL)
+        db.query("SELECT COUNT(*) FROM liked").use { c -> c.moveToFirst(); assertEquals(1, c.getInt(0)) }
+        db.query("SELECT COUNT(*) FROM lyrics_cache").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
+        db.query("SELECT COUNT(*) FROM pending_scrobbles").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
+    }
+
     @Test fun everyVersionHasACommittedSchema() {
         // KSP exports app/schemas/<db>/<version>.json; a missing file means a schema change wasn't committed.
         (1..VyoraDatabase.VERSION).forEach { v ->

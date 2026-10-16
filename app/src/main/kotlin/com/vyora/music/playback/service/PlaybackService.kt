@@ -23,8 +23,11 @@ import androidx.media3.common.Player
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.common.PlaybackParameters
+import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
+import com.vyora.music.data.scrobble.Scrobbler
+import com.vyora.music.ui.widget.NowPlayingWidget
 import com.vyora.music.MainActivity
 import com.vyora.music.data.library.LibraryManager
 import com.vyora.music.data.settings.SettingsRepository
@@ -44,15 +47,18 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
-class PlaybackService : MediaSessionService() {
+class PlaybackService : MediaLibraryService() {
 
-    private var mediaSession: MediaSession? = null
+    private var mediaSession: MediaLibrarySession? = null
     private lateinit var player: ExoPlayer
     private val scope = MainScope()
     private var settingsJob: Job? = null
     private val retriedIds = mutableSetOf<String>()
     private lateinit var crossfader: Crossfader
-    private val listening = ListeningTracker { item, ms -> LibraryManager.recordPlay(item, ms) }
+    private val listening = ListeningTracker { item, ms ->
+        LibraryManager.recordPlay(item, ms)
+        Scrobbler.onListened(item, ms)
+    }
     private var tickerJob: Job? = null
     private var autoplayJob: Job? = null
     private val autoplayed = LinkedHashSet<String>()
@@ -81,7 +87,13 @@ class PlaybackService : MediaSessionService() {
                     Player.EVENT_POSITION_DISCONTINUITY,
                     Player.EVENT_MEDIA_METADATA_CHANGED,
                 )
-            ) pushPresence(player)
+            ) {
+                pushPresence(player)
+                NowPlayingWidget.update(this@PlaybackService, player)
+            }
+            if (events.containsAny(Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_IS_PLAYING_CHANGED) && player.isPlaying) {
+                Scrobbler.nowPlaying(player.currentMediaItem?.let(MediaItems::toSimpleItem))
+            }
         }
     }
 
@@ -193,6 +205,8 @@ class PlaybackService : MediaSessionService() {
                     discordWas = s.discordPresence
                 }
                 player.skipSilenceEnabled = s.skipSilence
+                val params = PlaybackParameters(s.playbackSpeed, s.playbackPitch)
+                if (player.playbackParameters != params) player.playbackParameters = params
                 MediaCache.setMaxBytes(s.mediaCache.bytes)
                 player.setHandleAudioBecomingNoisy(s.pauseOnDisconnect)
                 if (s.crossfade && player.playWhenReady) startTicker()
@@ -217,7 +231,7 @@ class PlaybackService : MediaSessionService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        mediaSession = MediaSession.Builder(this, player)
+        mediaSession = MediaLibrarySession.Builder(this, player, LibraryCallback(this, scope))
             .setSessionActivity(sessionActivity)
             .build()
         setupCast()
@@ -443,7 +457,7 @@ class PlaybackService : MediaSessionService() {
         // Radio needs a YouTube seed; for a queue of device files use the last streamed song, if any.
         val seed = (lastIndex downTo 0).asSequence()
             .map { player.getMediaItemAt(it).mediaId }
-            .firstOrNull { it.isNotBlank() && !SimpleItem.isLocalId(it) } ?: return
+            .firstOrNull { it.isNotBlank() && SimpleItem.isYouTubeId(it) } ?: return
         if (seed == autoplayFailedSeed) return
 
         autoplayJob = scope.launch {
@@ -505,7 +519,7 @@ class PlaybackService : MediaSessionService() {
         player.setMediaItems(saved.items, saved.index, saved.positionMs)
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? {
         return mediaSession
     }
 
@@ -534,6 +548,7 @@ class PlaybackService : MediaSessionService() {
         }
         castPlayer = null
         CastSupport.publish(false, null)
+        NowPlayingWidget.update(this, null)
         mediaSession?.run {
             release()
             mediaSession = null

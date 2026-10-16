@@ -24,6 +24,8 @@ import androidx.compose.material.icons.filled.DownloadForOffline
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Star
@@ -126,6 +128,12 @@ fun LibraryScreen(
                 }
                 CategoryRow(Icons.Default.GraphicEq, stringResource(R.string.local_title), 0) {
                     onOpenPage(LibraryPages.LOCAL)
+                }
+                CategoryRow(Icons.Default.Dns, stringResource(R.string.server_title), 0) {
+                    onOpenPage(LibraryPages.SERVER)
+                }
+                CategoryRow(Icons.AutoMirrored.Filled.PlaylistAdd, stringResource(R.string.import_title), 0) {
+                    onOpenPage(LibraryPages.IMPORT)
                 }
                 CategoryRow(Icons.Default.Insights, stringResource(R.string.recap_title), 0, last = true) {
                     onOpenPage(LibraryPages.RECAP)

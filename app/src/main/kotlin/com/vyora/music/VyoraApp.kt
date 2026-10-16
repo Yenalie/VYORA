@@ -23,6 +23,12 @@ class VyoraApp : Application(), ImageLoaderFactory {
         UpdateManager.init(this)
         Downloads.init(this)
         com.vyora.music.data.discord.DiscordAccount.init(this)
+        com.vyora.music.core.SecureBox.init(this)
+        com.vyora.music.core.NetworkState.init(this)
+        com.vyora.music.data.server.MusicServer.init(this)
+        com.vyora.music.data.lyrics.LyricsRepository.init(this)
+        com.vyora.music.data.scrobble.Scrobbler.init(this)
+        com.vyora.music.data.local.LosslessOutput.init(this)
     }
 
     override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)

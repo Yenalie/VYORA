@@ -11,13 +11,9 @@ import org.schabi.newpipe.extractor.exceptions.ReCaptchaException
 
 class OkHttpDownloader : Downloader() {
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(YouTubeConfig.CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS)
-        .readTimeout(YouTubeConfig.READ_TIMEOUT_SEC, TimeUnit.SECONDS)
-        .writeTimeout(YouTubeConfig.READ_TIMEOUT_SEC, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .followSslRedirects(true)
-        .build()
+    private val client = com.vyora.music.core.Http.with(
+        YouTubeConfig.CONNECT_TIMEOUT_SEC, YouTubeConfig.READ_TIMEOUT_SEC,
+    )
 
     @Throws(IOException::class, ReCaptchaException::class)
     override fun execute(request: Request): Response {
