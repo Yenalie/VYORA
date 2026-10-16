@@ -37,7 +37,7 @@ jobs:
       - name: Check tag matches versionName
         id: version
         run: |
-          NAME=$(sed -nE "s/^\s*versionName '([^']+)'.*/\1/p" app/build.gradle | head -1)
+          NAME=$(sed -nE "s/^\s*versionName\s*=?\s*['\"]([^'\"]+)['\"].*/\1/p" app/build.gradle | head -1)
           echo "versionName=$NAME tag=$TAG"
           if [ "v$NAME" != "$TAG" ]; then
             echo "::error::Tag $TAG does not match versionName $NAME in app/build.gradle"
