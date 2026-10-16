@@ -1,13 +1,13 @@
 [versions]
 agp = "9.4.1"
 kotlin = "2.3.10"
-coreKtx = "1.17.0"
+coreKtx = "1.19.1"
 lifecycleRuntimeKtx = "2.9.2"
 activityCompose = "1.11.0"
 compose = "1.10.2"
 material3 = "1.4.0"
 materialIconsExtended = "1.7.8"
-navigationCompose = "2.8.5"
+navigationCompose = "2.10.2"
 media3 = "1.11.1"
 newpipe = "0.26.5"
 okhttp = "4.12.0"
@@ -15,9 +15,9 @@ coil = "2.7.0"
 datastore = "1.1.7"
 room = "2.8.5"
 ksp = "2.3.12"
-work = "2.10.5"
+work = "2.12.0"
 splashscreen = "1.2.0"
-fragment = "1.8.9"
+fragment = "1.9.1"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
