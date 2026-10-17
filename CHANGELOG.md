@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.6
+- **Karaoke per kata di lyric strip:** kata yang sedang dinyanyikan menyala mengikuti timing vokal dari BetterLyrics atau enhanced LRC
+- Bila sumber lirik tidak menyediakan timestamp kata, strip tetap mengikuti lirik per baris seperti biasa
+
 ## 1.9.5
 - **Lyric strip ala BitChord:** satu baris lirik aktif tampil sederhana di bawah judul dan artis; ketuk untuk membuka panel lirik penuh
 - Lirik panjang di strip membungkus ke beberapa baris, sementara pergantian lirik memakai transisi fade dan slide yang ringan

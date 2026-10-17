@@ -812,7 +812,8 @@ private fun CurrentLyricsPeek(
     val activeIndex = remember(synced, positionMs) {
         synced.indexOfLast { it.timeMs <= positionMs + 250 }.coerceAtLeast(0)
     }
-    val currentLine = if (synced.isNotEmpty()) synced.getOrNull(activeIndex)?.text else plain.firstOrNull()
+    val activeLyric = synced.getOrNull(activeIndex)
+    val currentLine = if (synced.isNotEmpty()) activeLyric?.text else plain.firstOrNull()
     if (currentLine.isNullOrBlank()) return
 
     Row(
@@ -827,7 +828,7 @@ private fun CurrentLyricsPeek(
         Icon(Icons.Default.Lyrics, contentDescription = null, tint = Color.White.copy(alpha = 0.82f), modifier = Modifier.size(19.dp))
         Spacer(Modifier.width(10.dp))
         AnimatedContent(
-            targetState = currentLine,
+            targetState = activeLyric to currentLine,
             transitionSpec = {
                 (fadeIn(tween(260)) + slideInVertically(tween(260)) { height -> height / 3 }) togetherWith
                     (fadeOut(tween(180)) + slideOutVertically(tween(180)) { height -> -height / 3 }) using
@@ -835,13 +836,18 @@ private fun CurrentLyricsPeek(
             },
             modifier = Modifier.weight(1f),
             label = "currentLyricStrip",
-        ) { line ->
-            Text(
-                text = line,
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
-                softWrap = true,
-            )
+        ) { (line, text) ->
+            val lyricStyle = MaterialTheme.typography.titleMedium
+            if (line?.hasWords == true) {
+                KaraokeLine(line, lyricStyle, Modifier.fillMaxWidth())
+            } else {
+                Text(
+                    text = text,
+                    color = Color.White,
+                    style = lyricStyle,
+                    softWrap = true,
+                )
+            }
         }
         Spacer(Modifier.width(6.dp))
         Text("›", color = Color.White.copy(alpha = 0.55f), style = MaterialTheme.typography.titleLarge)
