@@ -14,7 +14,13 @@ import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.Spring
@@ -251,6 +257,7 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
     val title by PlayerManager.currentTitle.collectAsState()
     val artist by PlayerManager.currentArtist.collectAsState()
     val thumbnail by PlayerManager.currentThumbnail.collectAsState()
+    val durationMs by PlayerManager.durationMs.collectAsState()
     val isPlaying by PlayerManager.isPlaying.collectAsState()
     val currentItem by PlayerManager.currentItem.collectAsState()
     val likedSongs by LibraryManager.likedSongs.collectAsState()
@@ -373,9 +380,15 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
                 }
             }
 
-            Crossfade(
+            AnimatedContent(
                 targetState = mode,
-                animationSpec = tween(260),
+                transitionSpec = {
+                    val forward = targetState >= initialState
+                    val enterOffset: (Int) -> Int = { width -> if (forward) width / 14 else -width / 14 }
+                    val exitOffset: (Int) -> Int = { width -> if (forward) -width / 18 else width / 18 }
+                    (slideInHorizontally(tween(260), initialOffsetX = enterOffset) + fadeIn(tween(190))) togetherWith
+                        (slideOutHorizontally(tween(220), targetOffsetX = exitOffset) + fadeOut(tween(150)))
+                },
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 label = "playerMode",
             ) { m ->
@@ -404,31 +417,45 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
                             )
                         }
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    text = title.orEmpty(),
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 2500),
-                                )
-                                val appActions = com.vyora.music.ui.components.LocalAppActions.current
-                                val artistName = com.vyora.music.data.library.primaryArtist(artist.orEmpty())
-                                Text(
-                                    text = artist.orEmpty(),
-                                    color = Color.White.copy(alpha = 0.6f),
-                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Normal),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = if (artistName.isNotBlank()) {
-                                        Modifier.glassClickable(pressedScale = 0.97f) { appActions.openArtist(artistName, null, currentItem?.artistId) }
-                                    } else Modifier,
-                                )
+                            Crossfade(
+                                targetState = title.orEmpty() to artist.orEmpty(),
+                                animationSpec = tween(220),
+                                modifier = Modifier.weight(1f),
+                                label = "trackMetadata",
+                            ) { (trackTitle, trackArtist) ->
+                                Column {
+                                    Text(
+                                        text = trackTitle,
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.titleLarge,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 2500),
+                                    )
+                                    val appActions = com.vyora.music.ui.components.LocalAppActions.current
+                                    val artistName = com.vyora.music.data.library.primaryArtist(trackArtist)
+                                    Text(
+                                        text = trackArtist,
+                                        color = Color.White.copy(alpha = 0.6f),
+                                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Normal),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = if (artistName.isNotBlank()) {
+                                            Modifier.glassClickable(pressedScale = 0.97f) { appActions.openArtist(artistName, null, currentItem?.artistId) }
+                                        } else Modifier,
+                                    )
+                                }
                             }
                             Spacer(Modifier.width(12.dp))
                             actions()
                         }
+                        CurrentLyricsPeek(
+                            itemId = currentItem?.id,
+                            title = title.orEmpty(),
+                            artist = artist.orEmpty(),
+                            durationMs = durationMs,
+                            onOpen = { mode = MODE_LYRICS },
+                        )
                     }
                 } else {
                     Column(Modifier.fillMaxSize()) {
@@ -758,6 +785,76 @@ private fun Modifier.edgeFade(): Modifier = this
             blendMode = BlendMode.DstIn,
         )
     }
+
+@Composable
+private fun CurrentLyricsPeek(
+    itemId: String?,
+    title: String,
+    artist: String,
+    durationMs: Long,
+    onOpen: () -> Unit,
+) {
+    if (itemId.isNullOrBlank()) return
+
+    val positionMs by PlayerManager.positionMs.collectAsState()
+    var lyrics by remember(itemId) { mutableStateOf<Lyrics?>(null) }
+    LaunchedEffect(itemId, title, artist, durationMs) {
+        val seconds = (durationMs / 1000).coerceAtLeast(0)
+        lyrics = LyricsRepository.lyricsFor(itemId, title, artist, seconds)
+    }
+
+    val data = lyrics ?: return
+    val synced = data.synced
+    val plain = remember(data) { data.plain.orEmpty().lineSequence().map(String::trim).filter(String::isNotBlank).toList() }
+    val activeIndex = remember(synced, positionMs) {
+        synced.indexOfLast { it.timeMs <= positionMs + 250 }.coerceAtLeast(0)
+    }
+    val currentLine = if (synced.isNotEmpty()) synced.getOrNull(activeIndex)?.text else plain.firstOrNull()
+    val nextLine = if (synced.isNotEmpty()) {
+        synced.drop(activeIndex + 1).firstOrNull { it.text.isNotBlank() }?.text
+    } else plain.getOrNull(1)
+    if (currentLine.isNullOrBlank()) return
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .liquidFill(
+                shape = RoundedCornerShape(22.dp),
+                fill = Color.White.copy(alpha = 0.12f),
+                rimAlpha = 0.78f,
+            )
+            .glassClickable(pressedScale = 0.985f, onClick = onOpen)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Default.Lyrics, contentDescription = null, tint = Color.White.copy(alpha = 0.78f), modifier = Modifier.size(19.dp))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Crossfade(targetState = currentLine, animationSpec = tween(180), label = "currentLyricLine") { line ->
+                Text(
+                    text = line,
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (!nextLine.isNullOrBlank()) {
+                Crossfade(targetState = nextLine, animationSpec = tween(220), label = "nextLyricLine") { line ->
+                    Text(
+                        text = line,
+                        color = Color.White.copy(alpha = 0.48f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun LyricsPanel() {

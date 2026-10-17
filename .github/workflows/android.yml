@@ -32,11 +32,9 @@ jobs:
       - name: Release build (R8)
         run: ./gradlew assembleRelease
 
-      - name: Upload APK and reports
+      - name: Upload build reports
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: vyora-build
-          path: |
-            app/build/outputs/apk/release/*.apk
-            app/build/reports/
+          name: vyora-build-reports
+          path: app/build/reports/

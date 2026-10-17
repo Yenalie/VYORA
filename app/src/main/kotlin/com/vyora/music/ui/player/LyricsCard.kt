@@ -19,9 +19,12 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.text.TextUtils
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,6 +71,7 @@ import com.vyora.music.ui.theme.VyoraAccent
 import com.vyora.music.ui.theme.VyoraGroupedCell
 import com.vyora.music.ui.theme.VyoraText
 import com.vyora.music.ui.theme.VyoraTextMuted
+import com.vyora.music.ui.design.liquidFill
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -149,20 +153,45 @@ object LyricsCardRenderer {
         val top = ((HEIGHT - cardHeight) / 2f).coerceAtLeast(120f)
         val card = RectF(marginX, top, marginX + cardWidth, top + cardHeight)
         val radius = 56f
+        val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x4A000000 }
+        canvas.drawRoundRect(RectF(card.left, card.top + 12f, card.right, card.bottom + 12f), radius, radius, shadow)
         val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = when (style) {
-                LyricsCardStyle.ARTWORK -> 0x2EFFFFFF
-                LyricsCardStyle.COLOR -> 0x33000000
-                LyricsCardStyle.DARK -> ColorUtils.setAlphaComponent(tint, 0x66)
+                LyricsCardStyle.ARTWORK -> 0x37FFFFFF
+                LyricsCardStyle.COLOR -> 0x39000000
+                LyricsCardStyle.DARK -> ColorUtils.setAlphaComponent(tint, 0x72)
             }
         }
         canvas.drawRoundRect(card, radius, radius, fill)
+        val sheen = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                card.left, card.top, card.right, card.bottom,
+                intArrayOf(0x42FFFFFF, 0x16FFFFFF, 0x06FFFFFF, 0x18FFFFFF),
+                floatArrayOf(0f, 0.38f, 0.76f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawRoundRect(card, radius, radius, sheen)
         val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.style = Paint.Style.STROKE
-            strokeWidth = 2.5f
-            color = 0x47FFFFFF
+            strokeWidth = 2.2f
+            color = 0x75FFFFFF
         }
         canvas.drawRoundRect(card, radius, radius, stroke)
+        val inner = RectF(card.left + 5f, card.top + 5f, card.right - 5f, card.bottom - 5f)
+        val innerStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.style = Paint.Style.STROKE
+            strokeWidth = 1.2f
+            color = 0x22FFFFFF
+        }
+        canvas.drawRoundRect(inner, radius - 5f, radius - 5f, innerStroke)
+        val glint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.style = Paint.Style.STROKE
+            strokeWidth = 3f
+            strokeCap = Paint.Cap.ROUND
+            color = 0x68FFFFFF
+        }
+        canvas.drawLine(card.left + radius, card.top + 2f, card.right - radius, card.top + 2f, glint)
 
         val artRect = RectF(card.left + pad, card.top + pad, card.left + pad + artSize, card.top + pad + artSize)
         if (art != null) {
@@ -331,7 +360,12 @@ fun LyricsCardDialog(item: SimpleItem, lines: List<String>, onDismiss: () -> Uni
             Modifier
                 .padding(horizontal = 24.dp)
                 .clip(RoundedCornerShape(28.dp))
-                .background(VyoraGroupedCell)
+                .liquidFill(
+                    shape = RoundedCornerShape(28.dp),
+                    fill = VyoraGroupedCell.copy(alpha = 0.88f),
+                    rimAlpha = 0.82f,
+                )
+                .border(1.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.14f), RoundedCornerShape(28.dp))
                 .padding(18.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -345,11 +379,12 @@ fun LyricsCardDialog(item: SimpleItem, lines: List<String>, onDismiss: () -> Uni
                     .background(androidx.compose.ui.graphics.Color.Black),
                 contentAlignment = Alignment.Center,
             ) {
-                val bmp = card
-                if (bmp == null) {
-                    CircularProgressIndicator(color = VyoraAccent, strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
-                } else {
-                    Image(bmp.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxWidth())
+                Crossfade(targetState = card, animationSpec = tween(240), label = "lyricsCardPreview") { bmp ->
+                    if (bmp == null) {
+                        CircularProgressIndicator(color = VyoraAccent, strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
+                    } else {
+                        Image(bmp.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxWidth())
+                    }
                 }
             }
             Spacer(Modifier.height(14.dp))
