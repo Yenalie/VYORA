@@ -190,18 +190,9 @@ fun VyoraFloatingNavBar(
 
             if (standalone != null) {
                 val color = searchInk.value
+                // Search is icon-only, like Apple Music's separate search button.
                 standaloneTab(
                     key = standalone.route,
-                    title = {
-                        Text(
-                            text = standalone.label,
-                            color = color,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    },
                     icon = {
                         Icon(
                             imageVector = standalone.icon,

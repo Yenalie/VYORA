@@ -199,14 +199,7 @@ fun DiscordScreen(onBack: () -> Unit) {
                 }
             }
         }
-        item(key = "note") {
-            Text(
-                stringResource(R.string.discord_app_note, DiscordAccount.applicationId),
-                color = VyoraTextMuted,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
-            )
-        }
+
     }
 
     if (confirmSignOut) {

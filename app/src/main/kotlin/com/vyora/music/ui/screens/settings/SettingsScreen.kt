@@ -145,7 +145,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
             }
         }
         item(key = "audio") {
-            SettingsGroup(header = stringResource(R.string.settings_audio), footer = stringResource(R.string.sound_check_footer)) {
+            SettingsGroup(header = stringResource(R.string.settings_audio)) {
                 SettingsNavRow(
                     title = stringResource(R.string.audio_quality),
                     icon = Icons.Default.HighQuality, iconTint = SystemColors.Red,
@@ -423,7 +423,6 @@ fun DownloadsSettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
                 SettingsNavRow(
                     title = stringResource(R.string.download_quality),
                     value = downloadQualityLabel(settings.downloadQuality),
-                    subtitle = stringResource(R.string.download_per_track, settings.downloadQuality.perTrackMb),
                     onClick = { onOpen("quality/download") },
                 )
                 SettingsSwitchRow(

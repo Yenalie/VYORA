@@ -6,6 +6,9 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -92,20 +95,33 @@ fun SettingsPage(
     content: LazyListScope.() -> Unit,
 ) {
     val bottomInset = LocalBottomBarInset.current
-    Box(modifier.fillMaxSize().background(VyoraGroupedBackground)) {
+    com.vyora.music.ui.design.GlassPage(
+        background = VyoraGroupedBackground,
+        modifier = modifier,
+        overlay = {
+            if (onBack != null) {
+                // A thin fade under the status bar so rows scrolling up do not collide with the clock.
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .windowInsetsTopHeight(WindowInsets.statusBars)
+                        .background(VyoraGroupedBackground.copy(alpha = 0.92f)),
+                )
+                GlassIconButton(
+                    Icons.Rounded.ArrowBackIosNew, stringResource(R.string.back), onBack,
+                    size = 44.dp, iconSize = 20.dp,
+                    modifier = Modifier.statusBarsPadding().padding(start = 20.dp, top = 8.dp),
+                )
+            }
+        },
+    ) {
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 36.dp + bottomInset),
         ) {
             item(key = "settings_top") {
                 Column(Modifier.statusBarsPadding().padding(top = 8.dp, start = 4.dp, end = 4.dp)) {
-                    if (onBack != null) {
-                        GlassIconButton(
-                            Icons.Rounded.ArrowBackIosNew, stringResource(R.string.back), onBack,
-                            size = 44.dp, iconSize = 20.dp,
-                        )
-                        Spacer(Modifier.height(10.dp))
-                    }
+                    if (onBack != null) Spacer(Modifier.height(54.dp))
                     LargeTitleHeader(title = title, modifier = Modifier.padding(bottom = 6.dp))
                 }
             }

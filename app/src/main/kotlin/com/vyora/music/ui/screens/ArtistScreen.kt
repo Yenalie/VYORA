@@ -151,7 +151,20 @@ fun ArtistScreen(
     val bg by animateColorAsState(if (dark) lerp(tint, Color.Black, 0.7f) else lerp(tint, Color.White, 0.85f), tween(600), label = "artistBg")
     val songs = page?.topSongs.orEmpty()
 
-    Box(modifier.fillMaxSize().background(bg)) {
+    com.vyora.music.ui.design.GlassPage(
+        background = bg,
+        modifier = modifier,
+        overlay = {
+            GlassIconButton(
+                icon = Icons.Rounded.ArrowBackIosNew,
+                contentDescription = stringResource(R.string.back),
+                onClick = onBack,
+                size = 44.dp,
+                iconSize = 20.dp,
+                modifier = Modifier.statusBarsPadding().padding(horizontal = 14.dp, vertical = 8.dp),
+            )
+        },
+    ) {
         LazyColumn(
             state = rememberLazyListState(),
             modifier = Modifier.fillMaxSize(),
@@ -264,14 +277,6 @@ fun ArtistScreen(
             }
         }
 
-        GlassIconButton(
-            icon = Icons.Rounded.ArrowBackIosNew,
-            contentDescription = stringResource(R.string.back),
-            onClick = onBack,
-            size = 44.dp,
-            iconSize = 20.dp,
-            modifier = Modifier.statusBarsPadding().padding(horizontal = 14.dp, vertical = 8.dp),
-        )
     }
 }
 

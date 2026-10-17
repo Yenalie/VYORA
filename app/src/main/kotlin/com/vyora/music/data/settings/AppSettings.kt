@@ -254,7 +254,7 @@ object SettingsRepository {
     private inline fun <reified T : Enum<T>> SharedPreferences.enum(key: String, default: T): T =
         getString(key, null)?.let { name -> enumValues<T>().firstOrNull { it.name == name } } ?: default
 
-    /** Bumped when the quality ladder gained LOSSLESS (1.10.0). */
+    /** Bumped when the quality ladder gained LOSSLESS (1.9.2). */
     private const val QUALITY_LADDER = 2
 
     private fun read(p: SharedPreferences): AppSettings = migrate(p, readStored(p))

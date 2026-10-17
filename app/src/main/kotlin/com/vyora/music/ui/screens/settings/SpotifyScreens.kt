@@ -594,7 +594,8 @@ private fun SpotifyLoginPage(onDismiss: () -> Unit, onCookies: (String, String) 
         }
     }
 
-    Column(Modifier.fillMaxSize().background(VyoraGroupedBackground).statusBarsPadding().navigationBarsPadding().imePadding()) {
+    com.vyora.music.ui.design.GlassPage(background = VyoraGroupedBackground) {
+    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             GlassIconButton(Icons.Rounded.Close, stringResource(R.string.cancel), onDismiss, size = 44.dp, iconSize = 20.dp)
             Spacer(Modifier.width(12.dp))
@@ -649,6 +650,7 @@ private fun SpotifyLoginPage(onDismiss: () -> Unit, onCookies: (String, String) 
                 for (i in container.childCount - 1 downTo 0) (container.getChildAt(i) as? WebView)?.destroyLoginView()
             },
         )
+    }
     }
     DisposableEffect(Unit) { onDispose { active = null; root = null } }
 }

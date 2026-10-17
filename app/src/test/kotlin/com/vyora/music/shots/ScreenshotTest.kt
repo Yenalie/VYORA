@@ -263,7 +263,7 @@ class ScreenshotTest {
     private fun v110Features() {
         waitReal(5000)
         step("search") {
-            clickText("Search"); shot("50_search", minMs = 1500)
+            clickTopDesc("Search"); shot("50_search", minMs = 1500)
             swipeUp(); shot("51_search_2", minMs = 1000)
             val field = compose.onAllNodes(androidx.compose.ui.test.hasSetTextAction())[0]
             field.performClick()
@@ -296,11 +296,21 @@ class ScreenshotTest {
             compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
             shot("59_settings_audio", minMs = 1000)
             reach("Audio Output"); shot("60_output", minMs = 1200)
-            swipeUp(); shot("61_output_2", minMs = 1000)
+            compose.onRoot().performTouchInput { swipeUp(startY = bottom * 0.6f, endY = bottom * 0.45f, durationMillis = 400) }
+            shot("61_output_2", minMs = 1000)
             compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
             swipeUp(); waitReal(600)
             shot("62_settings_playback", minMs = 1000)
             reach("Downloads"); shot("63_downloads", minMs = 1200)
+            compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
+            compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
+        }
+        step("artist") {
+            clickTopDesc("Search"); waitReal(1000)
+            val field = compose.onAllNodes(androidx.compose.ui.test.hasSetTextAction())[0]
+            field.performClick(); field.performTextInput("tulus"); field.performImeAction()
+            waitReal(6000)
+            clickLastText("Artist", lowest = false); shot("64_artist", minMs = 6000)
         }
     }
 

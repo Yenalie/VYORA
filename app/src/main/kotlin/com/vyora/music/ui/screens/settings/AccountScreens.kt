@@ -326,7 +326,7 @@ fun YouTubeSignInScreen(onBack: () -> Unit, onDone: () -> Unit) {
     var loading by remember { mutableStateOf(true) }
     val failed = stringResource(R.string.account_sign_in_failed)
 
-    Box(Modifier.fillMaxSize().background(VyoraGroupedBackground)) {
+    com.vyora.music.ui.design.GlassPage(background = VyoraGroupedBackground) {
         Column(Modifier.fillMaxSize()) {
             Row(
                 Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),

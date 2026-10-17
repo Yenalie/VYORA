@@ -56,7 +56,6 @@ fun AudioQualityScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
                 SettingsNavRow(
                     title = stringResource(R.string.download_quality),
                     value = downloadQualityLabel(settings.downloadQuality),
-                    subtitle = stringResource(R.string.download_per_track, settings.downloadQuality.perTrackMb),
                     onClick = { onOpen("quality/download") },
                     divider = false,
                 )
@@ -76,7 +75,7 @@ fun QualityPickerScreen(target: String, onBack: () -> Unit) {
                     DownloadQuality.entries.reversed().forEachIndexed { i, q ->
                         SettingsChoiceRow(
                             title = downloadQualityLabel(q),
-                            subtitle = downloadQualityDetail(q) + " · " + stringResource(R.string.download_per_track, q.perTrackMb),
+                            subtitle = stringResource(R.string.download_per_track, q.perTrackMb),
                             selected = settings.downloadQuality == q,
                             onClick = { SettingsRepository.update { it.copy(downloadQuality = q) } },
                             divider = i < DownloadQuality.entries.lastIndex,
@@ -97,7 +96,7 @@ fun QualityPickerScreen(target: String, onBack: () -> Unit) {
                         AudioQuality.entries.reversed().forEachIndexed { i, q ->
                             SettingsChoiceRow(
                                 title = qualityLabel(q),
-                                subtitle = qualityDetail(q) + " · " + qualityHourly(q),
+                                subtitle = qualityHourly(q),
                                 selected = selected == q,
                                 onClick = {
                                     SettingsRepository.update {
@@ -142,7 +141,6 @@ fun AudioOutputScreen(onBack: () -> Unit) {
                 }
                 SettingsSwitchRow(
                     title = stringResource(R.string.prefer_usb_dac),
-                    subtitle = stringResource(R.string.prefer_usb_footer),
                     checked = settings.preferUsbDac,
                     onCheckedChange = { v -> SettingsRepository.update { it.copy(preferUsbDac = v) } },
                     badge = stringResource(R.string.connected).takeIf { output.usbConnected },
@@ -151,10 +149,7 @@ fun AudioOutputScreen(onBack: () -> Unit) {
             }
         }
         item(key = "sound_check") {
-            SettingsGroup(
-                header = stringResource(R.string.sound_check),
-                footer = stringResource(R.string.sound_check_footer),
-            ) {
+            SettingsGroup(footer = stringResource(R.string.sound_check_footer)) {
                 SettingsSwitchRow(
                     title = stringResource(R.string.sound_check),
                     subtitle = status.loudnessGainDb?.takeIf { settings.loudnessNormalization }?.let { db ->
@@ -194,7 +189,7 @@ fun AudioOutputScreen(onBack: () -> Unit) {
     }
 }
 
-/** "AudioTrack · USB DAC · 96 kHz · 32-bit float", or which output is connected while nothing plays. */
+/** "USB DAC · 96 kHz · 32-bit float" while playing, otherwise just the connected output. */
 @Composable
 private fun outputStatusLine(output: LosslessOutput.State, status: OutputStatus.State): String {
     val device = output.deviceName ?: stringResource(
@@ -207,8 +202,8 @@ private fun outputStatusLine(output: LosslessOutput.State, status: OutputStatus.
             LosslessOutput.Kind.SPEAKER, null -> R.string.output_speaker
         }
     )
-    if (!status.active) return listOf(device, stringResource(R.string.output_status_idle)).joinToString(" · ")
-    val parts = mutableListOf(if (status.offload) "Offload" else "AudioTrack", device)
+    if (!status.active) return device
+    val parts = mutableListOf(device)
     if (status.sinkSampleRateHz > 0) parts += OutputStatus.kiloHertz(status.sinkSampleRateHz)
     OutputStatus.encodingLabel(status.sinkEncoding)?.let { parts += it }
     return parts.joinToString(" · ")
@@ -237,25 +232,6 @@ fun downloadQualityLabel(q: DownloadQuality) = stringResource(
         DownloadQuality.STANDARD -> R.string.download_standard
         DownloadQuality.HIGH -> R.string.quality_high
         DownloadQuality.LOSSLESS -> R.string.quality_lossless
-    }
-)
-
-@Composable
-private fun downloadQualityDetail(q: DownloadQuality) = stringResource(
-    when (q) {
-        DownloadQuality.STANDARD -> R.string.download_detail_standard
-        DownloadQuality.HIGH -> R.string.download_detail_high
-        DownloadQuality.LOSSLESS -> R.string.download_detail_lossless
-    }
-)
-
-@Composable
-private fun qualityDetail(q: AudioQuality) = stringResource(
-    when (q) {
-        AudioQuality.LOW -> R.string.quality_detail_low
-        AudioQuality.NORMAL -> R.string.quality_detail_normal
-        AudioQuality.HIGH -> R.string.quality_detail_high
-        AudioQuality.LOSSLESS -> R.string.quality_detail_lossless
     }
 )
 

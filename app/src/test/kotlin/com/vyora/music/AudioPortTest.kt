@@ -21,7 +21,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 1.10.0: BitChord audio ports, recommendations and Top Results. */
+/** 1.9.2: BitChord audio ports, recommendations and Top Results. */
 class AudioPortTest {
     private fun song(id: String, title: String, artist: String, video: Boolean = false) =
         SimpleItem(id, title, artist, null, "", isVideo = video)
