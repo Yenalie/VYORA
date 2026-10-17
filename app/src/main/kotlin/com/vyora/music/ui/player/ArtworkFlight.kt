@@ -13,6 +13,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.TransformOrigin
@@ -35,6 +42,8 @@ class ArtworkFlight {
 
     var full by mutableStateOf(Rect.Zero)
     var fullCornerPx by mutableFloatStateOf(0f)
+    /** Lower fraction of the target that dissolves into the background (the full-bleed sleeve); 0 for the card. */
+    var fullFade by mutableFloatStateOf(0f)
 
     internal var sheetContainer: LayoutCoordinates? = null
     internal var sheetContent: LayoutCoordinates? = null
@@ -56,13 +65,10 @@ fun Modifier.miniFlightSource(sheet: PlayerSheetState?, corner: Dp): Modifier {
 }
 
 @Composable
-fun Modifier.fullFlightTarget(sheet: PlayerSheetState, corner: Dp, enabled: Boolean): Modifier {
+fun Modifier.fullFlightTarget(sheet: PlayerSheetState, corner: Dp, enabled: Boolean, fade: Float = 0f): Modifier {
     val flight = LocalArtworkFlight.current ?: return this
     val cornerPx = with(LocalDensity.current) { corner.toPx() }
-    if (!enabled) {
-        androidx.compose.runtime.SideEffect { flight.full = Rect.Zero }
-        return this
-    }
+    if (!enabled) return this
     return this
         .onGloballyPositioned { art ->
             val content = flight.sheetContent ?: return@onGloballyPositioned
@@ -70,6 +76,7 @@ fun Modifier.fullFlightTarget(sheet: PlayerSheetState, corner: Dp, enabled: Bool
             if (!content.isAttached || !container.isAttached) return@onGloballyPositioned
             flight.full = content.localBoundingBoxOf(art, clipBounds = false).translate(container.positionInRoot())
             flight.fullCornerPx = cornerPx
+            flight.fullFade = fade
         }
         .graphicsLayer { alpha = if (flight.inFlight(sheet.progress.value)) 0f else 1f }
 }
@@ -96,7 +103,7 @@ fun ArtworkFlightOverlay(sheet: PlayerSheetState, flight: ArtworkFlight) {
                     alpha = 0f
                     return@graphicsLayer
                 }
-                val t = 1f - (1f - p) * (1f - p)
+                val t = flightT(p)
                 val from = flight.mini
                 val to = flight.full
                 val w = from.width + (to.width - from.width) * t
@@ -114,11 +121,36 @@ fun ArtworkFlightOverlay(sheet: PlayerSheetState, flight: ArtworkFlight) {
                 val corner = flight.miniCornerPx + (flight.fullCornerPx - flight.miniCornerPx) * t
                 shape = RoundedCornerShape(corner / s.coerceAtLeast(0.01f))
                 clip = true
-                shadowElevation = 24.dp.toPx() * t
+                // The full-bleed sleeve has no card edge to cast a shadow from.
+                shadowElevation = 24.dp.toPx() * t * (1f - flight.fullFade / HERO_FADE_FRACTION).coerceIn(0f, 1f)
+                compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+            }
+            .drawWithContent {
+                drawContent()
+                // Lands already dissolving into the background when the target is the full-bleed sleeve.
+                val fade = flight.fullFade * flightT(sheet.progress.value)
+                if (fade > 0.001f) {
+                    drawRect(
+                        Brush.verticalGradient(0f to Color.Black, (1f - fade) to Color.Black, 1f to Color.Transparent),
+                        blendMode = BlendMode.DstIn,
+                    )
+                }
             },
     ) {
         Artwork(url = sharp, placeholderKey = thumbnail, shape = androidx.compose.ui.graphics.RectangleShape, modifier = Modifier.size(with(density) { full.width.toDp() }))
+        if (flight.fullFade > 0f) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(HERO_SCRIM_FRACTION)
+                    .graphicsLayer { alpha = flightT(sheet.progress.value) }
+                    .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = HERO_SCRIM_ALPHA), Color.Transparent))),
+            )
+        }
     }
 }
+
+/** Eased flight position for sheet progress [p]. */
+private fun flightT(p: Float): Float = 1f - (1f - p) * (1f - p)
 
 val LocalPlayerSheet = staticCompositionLocalOf<PlayerSheetState?> { null }

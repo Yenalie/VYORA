@@ -28,6 +28,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.foundation.layout.aspectRatio
@@ -274,11 +276,21 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
     // BitChord's full-bleed artwork: the sleeve edge to edge at the top, its lower part dissolving into the
     // background. Pinch out on the artwork to switch it on, pinch in to go back; the choice is remembered.
     val heroWanted = appSettings.fullBleedArtwork && mode == MODE_ART && videoItem == null
-    val hero by animateFloatAsState(
-        targetValue = if (heroWanted) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
-        label = "heroArtwork",
-    )
+    val heroAnim = remember { androidx.compose.animation.core.Animatable(if (heroWanted) 1f else 0f) }
+    LaunchedEffect(heroWanted) {
+        val target = if (heroWanted) 1f else 0f
+        // Toggled from Settings while the player is down: nothing to watch, so arrive already there.
+        if (sheet.isVisible) heroAnim.animateTo(target, spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow))
+        else heroAnim.snapTo(target)
+    }
+    val heroState = heroAnim.asState()
+    val hero by heroState
+    // The card's bounds inside the player, so the full-bleed sleeve can grow out of it (and shrink back into it).
+    var rootCoords by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
+    var cardRect by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
+    val flightState = LocalArtworkFlight.current
+    // No artwork on screen (lyrics / queue): the mini player's cover has nowhere to fly to.
+    androidx.compose.runtime.SideEffect { if (mode != MODE_ART) flightState?.full = androidx.compose.ui.geometry.Rect.Zero }
     val heroHaptics = LocalHapticFeedback.current
     val setHero: (Boolean) -> Unit = { on ->
         if (com.vyora.music.data.settings.SettingsRepository.current.fullBleedArtwork != on) {
@@ -287,7 +299,7 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().onGloballyPositioned { rootCoords = it }) {
         Box(Modifier.fillMaxSize().layerBackdrop(playerBackdrop)) {
             LivingBackground(
                 thumbnail = thumbnail,
@@ -295,7 +307,17 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
                 tint = animatedTint,
                 animate = sheet.isVisible && isPlaying && animatedBackground,
             )
-            if (hero > 0.001f) HeroArtwork(thumbnail, title, hero)
+            // Kept composed on the artwork page even while hidden, so the sharp cover is already decoded when
+            // a pinch starts the morph instead of the first frames being blank.
+            if (hero > 0.001f || (mode == MODE_ART && videoItem == null)) {
+                HeroArtwork(
+                    thumbnail, title, sheet,
+                    progress = { heroState.value },
+                    cardRect = { cardRect },
+                    morph = mode == MODE_ART,
+                    flightEnabled = heroWanted,
+                )
+            }
         }
 
         CompositionLocalProvider(LocalAppBackdrop provides playerBackdrop, LocalMenuBackdrop provides playerBackdrop) {
@@ -373,7 +395,12 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
                                 flightEnabled = mode == MODE_ART,
                                 wide = videoItem != null,
                                 videoId = videoId,
-                                heroProgress = hero,
+                                hidden = hero > 0.001f,
+                                flightToCard = !heroWanted,
+                                onBounds = { c ->
+                                    val r = rootCoords
+                                    if (r != null && r.isAttached && c.isAttached) cardRect = r.localBoundingBoxOf(c, clipBounds = false)
+                                },
                             )
                         }
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -519,34 +546,65 @@ private fun BackgroundCopy(
     }
 }
 
-private const val HERO_FADE_FRACTION = 0.42f
+internal const val HERO_FADE_FRACTION = 0.42f
+internal const val HERO_SCRIM_FRACTION = 0.3f
+internal const val HERO_SCRIM_ALPHA = 0.38f
 
-/** The full-bleed sleeve: square, edge to edge from the top of the screen, fading out over its lower part. */
+/**
+ * The full-bleed sleeve: square, edge to edge from the top of the screen, fading out over its lower part.
+ *
+ * While [progress] runs it is a morph, not a crossfade: the same picture travels from the card's bounds
+ * ([cardRect]) to the top of the screen, its corners straightening and the bottom fade growing in, so pinching
+ * reads as the cover itself being enlarged. Off the artwork page ([morph] false) it simply fades.
+ * When up it is also where the mini player's artwork flies to.
+ */
 @Composable
-private fun HeroArtwork(thumbnail: String?, title: String?, progress: Float) {
+private fun HeroArtwork(
+    thumbnail: String?,
+    title: String?,
+    sheet: PlayerSheetState,
+    progress: () -> Float,
+    cardRect: () -> androidx.compose.ui.geometry.Rect,
+    morph: Boolean,
+    flightEnabled: Boolean,
+) {
     val sharp = remember(thumbnail) { com.vyora.music.data.youtube.YouTubeClient.artUrl(thumbnail, 1080) ?: thumbnail }
+    val cardCorner = with(androidx.compose.ui.platform.LocalDensity.current) { GlassCardCorner.toPx() }
+    val shadow = with(androidx.compose.ui.platform.LocalDensity.current) { 24.dp.toPx() }
     Box(
         Modifier
             .fillMaxWidth()
             .aspectRatio(1f)
+            .fullFlightTarget(sheet, corner = 0.dp, enabled = flightEnabled, fade = HERO_FADE_FRACTION)
             .graphicsLayer {
-                alpha = progress
-                val s = 1.08f - 0.08f * progress
-                scaleX = s
-                scaleY = s
-                transformOrigin = TransformOrigin(0.5f, 0f)
+                val p = progress().coerceIn(0f, 1f)
+                val card = cardRect()
+                if (morph && card.width > 0f) {
+                    val s = (card.width + (size.width - card.width) * p) / size.width
+                    transformOrigin = TransformOrigin(0f, 0f)
+                    scaleX = s
+                    scaleY = s
+                    translationX = card.left * (1f - p)
+                    translationY = card.top * (1f - p)
+                    shape = RoundedCornerShape(cardCorner * (1f - p) / s.coerceAtLeast(0.01f))
+                    clip = true
+                    shadowElevation = shadow * (1f - p)
+                    alpha = 1f
+                    if (p <= 0.001f) alpha = 0f
+                } else {
+                    alpha = p
+                }
                 compositingStrategy = CompositingStrategy.Offscreen
             }
             .drawWithContent {
                 drawContent()
-                drawRect(
-                    Brush.verticalGradient(
-                        0f to Color.Black,
-                        (1f - HERO_FADE_FRACTION) to Color.Black,
-                        1f to Color.Transparent,
-                    ),
-                    blendMode = BlendMode.DstIn,
-                )
+                val fade = HERO_FADE_FRACTION * (if (morph) progress().coerceIn(0f, 1f) else 1f)
+                if (fade > 0.001f) {
+                    drawRect(
+                        Brush.verticalGradient(0f to Color.Black, (1f - fade) to Color.Black, 1f to Color.Transparent),
+                        blendMode = BlendMode.DstIn,
+                    )
+                }
             },
     ) {
         AsyncImage(model = sharp, contentDescription = title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
@@ -554,11 +612,15 @@ private fun HeroArtwork(thumbnail: String?, title: String?, progress: Float) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(120.dp)
-                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.38f), Color.Transparent))),
+                .fillMaxHeight(HERO_SCRIM_FRACTION)
+                .graphicsLayer { alpha = if (morph) progress().coerceIn(0f, 1f) else 1f }
+                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = HERO_SCRIM_ALPHA), Color.Transparent))),
         )
     }
 }
+
+/** GlassShapes.Medium's corner, which the card is clipped to. */
+private val GlassCardCorner = 14.dp
 
 /**
  * Two-finger pinch on the artwork: out past 1.2x calls [onPinchOut], in below 0.83x calls [onPinchIn], once
@@ -593,7 +655,9 @@ private fun SwipeArtwork(
     flightEnabled: Boolean,
     wide: Boolean = false,
     videoId: String? = null,
-    heroProgress: Float = 0f,
+    hidden: Boolean = false,
+    flightToCard: Boolean = true,
+    onBounds: (androidx.compose.ui.layout.LayoutCoordinates) -> Unit = {},
 ) {
     val scale by animateFloatAsState(
         targetValue = if (isPlaying) 1f else 0.82f,
@@ -625,14 +689,15 @@ private fun SwipeArtwork(
             }
             .graphicsLayer {
                 // Grows towards the full-bleed sleeve while it fades, so the two read as one picture.
-                val grow = 1f + 0.18f * heroProgress
-                scaleX = scale * grow
-                scaleY = scale * grow
-                alpha = 1f - heroProgress
+                scaleX = scale
+                scaleY = scale
+                // The full-bleed sleeve draws this picture while it is up or morphing.
+                alpha = if (hidden) 0f else 1f
                 translationX = shownX * 0.6f
                 rotationZ = shownX / size.width * 4f
             }
-            .fullFlightTarget(sheet, corner = 14.dp, enabled = flightEnabled)
+            .onGloballyPositioned(onBounds)
+            .fullFlightTarget(sheet, corner = 14.dp, enabled = flightEnabled && flightToCard)
             .shadow(elevation, GlassShapes.Medium, clip = false, ambientColor = Color.Black, spotColor = Color.Black),
     ) {
         Artwork(

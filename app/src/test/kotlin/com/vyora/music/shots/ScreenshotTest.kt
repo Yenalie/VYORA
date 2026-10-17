@@ -189,6 +189,7 @@ class ScreenshotTest {
         if (System.getProperty("shots.only") == "v19") return v19Features()
         if (System.getProperty("shots.only") == "v110") return v110Features()
         if (System.getProperty("shots.only") == "v193") return v193Features()
+        if (System.getProperty("shots.only") == "morph") return morphFrames()
         val found = runBlocking { YouTubeClient.search("Tulus", SearchFilter.SONGS).getOrThrow().items.take(8) }
         val lead = found.firstOrNull { song ->
             val lyr = runBlocking { com.vyora.music.data.lyrics.LyricsRepository.lyricsFor(song.id, song.title, song.artist, song.duration) }
@@ -432,6 +433,41 @@ class ScreenshotTest {
             SettingsRepository.update { it.copy(fullBleedArtwork = false) }
             flow("_audioFormat").value = com.vyora.music.data.local.AudioFormatInfo("audio/mp4a-latm", 44_100, 0, 128_000, 2)
             shot("62_card_aac", minMs = 2000)
+        }
+    }
+
+    private fun frame(name: String, advanceMs: Long) {
+        fakePlayback()
+        compose.mainClock.advanceTimeBy(advanceMs)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val bmp = capture()
+        File(File("/tmp/shots").apply { mkdirs() }, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    /** `-Dshots.only=morph`: frames of the card ↔ full-bleed morph and of the mini → full flight. */
+    private fun morphFrames() {
+        val found = runBlocking { YouTubeClient.search("Tulus", SearchFilter.SONGS).getOrThrow().items.take(6) }
+        waitReal(4000)
+        step("morph") {
+            SettingsRepository.update { it.copy(skipUnavailable = false, fullBleedArtwork = false) }
+            compose.runOnUiThread { PlayerManager.setQueue(found, 0) }
+            fakeTrack = found[0]
+            compose.mainClock.autoAdvance = false
+            waitReal(2500)
+            flow("_audioFormat").value = com.vyora.music.data.local.AudioFormatInfo("audio/opus", 48_000, 0, 160_000, 2)
+            clickLastText(found[0].title); shot("70_card", minMs = 2500)
+            compose.runOnUiThread { SettingsRepository.update { it.copy(fullBleedArtwork = true) } }
+            frame("71_morph_a", 64); frame("72_morph_b", 80); frame("73_morph_c", 120)
+            shot("74_hero", minMs = 1500)
+            val h = compose.activity.window.decorView.height.toFloat()
+            compose.onRoot().performTouchInput { down(androidx.compose.ui.geometry.Offset(centerX, h * 0.75f)) }
+            for (k in 1..6) compose.onRoot().performTouchInput { moveBy(androidx.compose.ui.geometry.Offset(0f, h * 0.07f)) }
+            frame("75_drag_hero", 16)
+            compose.onRoot().performTouchInput { up() }
+            shot("76_mini", minMs = 2000)
+            compose.runOnUiThread { SettingsRepository.update { it.copy(fullBleedArtwork = false) } }
+            clickLastText(found[0].title); frame("77_open_card_a", 90); frame("78_open_card_b", 90)
+            shot("79_card_again", minMs = 1500)
         }
     }
 }
