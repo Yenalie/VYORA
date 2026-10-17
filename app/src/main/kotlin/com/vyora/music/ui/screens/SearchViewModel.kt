@@ -41,6 +41,8 @@ data class SearchUiState(
     val artistFocus: String? = null,
     val typedQuery: String? = null,
     val exact: Boolean = false,
+    /** Search-as-you-type suggestions for [query] while it has not been submitted yet. */
+    val suggestions: List<String> = emptyList(),
 ) {
     fun tabState(tab: SearchTab): TabState = tabs[tab] ?: TabState()
 }
@@ -53,12 +55,20 @@ class SearchViewModel : ViewModel() {
     private var generation = 0
     private val jobs = mutableMapOf<SearchTab, Job>()
 
+    private var suggestJob: Job? = null
+
     fun onQueryChange(query: String) {
+        suggestJob?.cancel()
         if (query.isBlank()) {
             reset()
             return
         }
         _state.update { it.copy(query = query) }
+        suggestJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(SUGGEST_DEBOUNCE_MS)
+            val list = YouTubeClient.suggestions(query)
+            _state.update { if (it.query == query) it.copy(suggestions = list) else it }
+        }
     }
 
     fun submit(
@@ -70,6 +80,7 @@ class SearchViewModel : ViewModel() {
     ) {
         val q = (override ?: _state.value.query).trim().replace(Regex("\\s+"), " ")
         if (q.isBlank()) return
+        suggestJob?.cancel()
         generation++
         cancelJobs()
         _state.value = SearchUiState(
@@ -179,6 +190,57 @@ class SearchViewModel : ViewModel() {
     }
 
     companion object {
+        const val SUGGEST_DEBOUNCE_MS = 220L
+
+        /** How many of each kind the Top Results list mixes in. */
+        val TOP_LIMITS = mapOf(
+            SearchTab.SONGS to 6,
+            SearchTab.ARTISTS to 3,
+            SearchTab.ALBUMS to 4,
+            SearchTab.PLAYLISTS to 3,
+            SearchTab.VIDEOS to 3,
+        )
+
+        /** The order kinds take turns in Top Results — songs lead, as in Apple Music. */
+        private val TOP_PATTERN = listOf(
+            SearchTab.SONGS, SearchTab.SONGS, SearchTab.ALBUMS, SearchTab.ARTISTS, SearchTab.SONGS,
+            SearchTab.PLAYLISTS, SearchTab.VIDEOS, SearchTab.SONGS, SearchTab.ALBUMS, SearchTab.ARTISTS,
+        )
+
+        /**
+         * One ranked list across every kind ("Top Results"): an artist whose name is exactly what was
+         * searched comes first, then the kinds take turns by [TOP_PATTERN] until each hits its limit.
+         */
+        fun topResults(tabs: Map<SearchTab, List<SimpleItem>>, wanted: String): List<SimpleItem> {
+            val queues = SEARCH_TABS.associateWith { tab ->
+                ArrayDeque(tabs[tab].orEmpty().take(TOP_LIMITS.getValue(tab)))
+            }
+            val out = mutableListOf<SimpleItem>()
+            val seen = HashSet<String>()
+            fun take(tab: SearchTab) {
+                val q = queues.getValue(tab)
+                while (q.isNotEmpty()) {
+                    val item = q.removeFirst()
+                    if (seen.add(item.id)) {
+                        out += item
+                        return
+                    }
+                }
+            }
+            val exactArtist = tabs[SearchTab.ARTISTS].orEmpty().firstOrNull {
+                wanted.isNotEmpty() && normalize(it.title) == wanted
+            }
+            if (exactArtist != null) {
+                seen += exactArtist.id
+                out += exactArtist
+                queues.getValue(SearchTab.ARTISTS).removeAll { it.id == exactArtist.id }
+            }
+            while (queues.values.any { it.isNotEmpty() }) {
+                TOP_PATTERN.forEach(::take)
+            }
+            return out
+        }
+
         val SEARCH_TABS = listOf(SearchTab.SONGS, SearchTab.ARTISTS, SearchTab.ALBUMS, SearchTab.PLAYLISTS, SearchTab.VIDEOS)
 
         fun normalize(s: String) = s.lowercase().filter { it.isLetterOrDigit() }

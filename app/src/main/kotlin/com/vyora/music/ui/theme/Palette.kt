@@ -46,4 +46,8 @@ object MoodColors {
     val Acoustic = listOf(Color(0xFFC88A4A), Color(0xFFE9C46A))
     val Party = listOf(Color(0xFFFF4D8D), Color(0xFF9B5CFF))
     val Sleep = listOf(Color(0xFF2C3E72), Color(0xFF5A6FB8))
+    val HipHop = listOf(Color(0xFFF2A93B), Color(0xFFE5484D))
+    val RnB = listOf(Color(0xFF9B2C6F), Color(0xFFE56BA8))
+    val Rock = listOf(Color(0xFF3A3F47), Color(0xFF8A94A6))
+    val KPop = listOf(Color(0xFF00B3A4), Color(0xFF6E8BFF))
 }

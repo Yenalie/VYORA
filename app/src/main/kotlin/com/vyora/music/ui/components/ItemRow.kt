@@ -77,6 +77,8 @@ fun ItemRow(
     secondaryColor: Color = VyoraTextMuted,
     playlistId: String? = null,
     badge: (@Composable () -> Unit)? = null,
+    /** Prefix songs with "Song · " / "Music Video · ", as mixed result lists do. */
+    showKind: Boolean = false,
 ) {
     val current by PlayerManager.currentItem.collectAsState()
     val isSong = item.isSong
@@ -168,7 +170,10 @@ fun ItemRow(
                     ItemType.ARTIST -> stringResource(R.string.kind_artist)
                     ItemType.ALBUM -> listOf(kindAlbum, item.artist).filter { it.isNotBlank() }.joinToString(" · ")
                     ItemType.PLAYLIST -> listOf(kindPlaylist, item.artist).filter { it.isNotBlank() }.joinToString(" · ")
-                    else -> item.artist.takeIf { it.isNotBlank() }
+                    else -> if (showKind) {
+                        listOf(stringResource(if (item.isVideo) R.string.kind_video else R.string.kind_song), item.artist)
+                            .filter { it.isNotBlank() }.joinToString(" · ")
+                    } else item.artist.takeIf { it.isNotBlank() }
                 }
                 val downloads by com.vyora.music.data.download.Downloads.entries.collectAsState()
                 val offline = isSong && downloads[item.id]?.status == com.vyora.music.data.download.DownloadStatus.COMPLETED

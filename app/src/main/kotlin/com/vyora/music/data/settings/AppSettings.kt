@@ -27,7 +27,40 @@ enum class AccentChoice(val argb: Long) {
 
 enum class GlassLook { LIQUID, FROSTED, TINTED }
 
-enum class AudioQuality { HIGH, NORMAL, LOW }
+/**
+ * Streaming quality ladder, ported from BitChord's four rungs (Low / Medium / High / Lossless).
+ * Stored by [name], so the original HIGH / NORMAL / LOW names are kept and NORMAL is the "Medium" rung.
+ *
+ * - YouTube: [maxKbps] caps the Opus/AAC ladder; MEDIUM and above take the best rendition on offer.
+ * - Music server: [serverKbps] asks the server to transcode; `null` streams the original file bit for bit.
+ *   Only [LOSSLESS] lets a lossless file through untouched.
+ * - Device files are always played as they are.
+ */
+enum class AudioQuality(val maxKbps: Int, val serverKbps: Int?, val hourlyMb: Int) {
+    LOW(64, 128, 29),
+    NORMAL(140, 192, 77),
+    HIGH(Int.MAX_VALUE, 320, 144),
+    LOSSLESS(Int.MAX_VALUE, null, 300);
+
+    val keepsLossless: Boolean get() = serverKbps == null
+}
+
+/**
+ * What a download keeps (BitChord's DownloadQuality). Priced per track rather than per hour, because a
+ * download is paid for once. [LOSSLESS] is the only rung that keeps a server's original file.
+ */
+enum class DownloadQuality(val stream: AudioQuality, val perTrackMb: Int) {
+    STANDARD(AudioQuality.NORMAL, 4),
+    HIGH(AudioQuality.HIGH, 8),
+    LOSSLESS(AudioQuality.LOSSLESS, 35),
+}
+
+/**
+ * PCM format requested at the AudioTrack boundary (BitChord's OutputPcmMode). [FLOAT_32] hands hi-res
+ * (24/32-bit) sources to Android as 32-bit float instead of truncating them to 16 bits; it is only used on
+ * an external route that advertises PCM float, never on the phone's own speaker.
+ */
+enum class OutputPcmMode { PCM_16, FLOAT_32 }
 
 enum class CacheSize(val megabytes: Long) {
     MB_128(128),
@@ -89,10 +122,26 @@ data class AppSettings(
     val animatedPlayerBackground: Boolean = true,
     val haptics: Boolean = true,
     val glass: GlassSettings = GlassSettings(),
-    val audioQuality: AudioQuality = AudioQuality.HIGH,
+    val audioQuality: AudioQuality = AudioQuality.LOSSLESS,
     /** Quality on metered networks (mobile data, hotspot); [audioQuality] applies on Wi-Fi. */
     val mobileQuality: AudioQuality = AudioQuality.NORMAL,
-    val separateMobileQuality: Boolean = false,
+    val separateMobileQuality: Boolean = true,
+    val downloadQuality: DownloadQuality = DownloadQuality.HIGH,
+    /** Copy finished downloads into Music/VYORA where other music apps can see them. */
+    val exportDownloads: Boolean = false,
+    val outputPcmMode: OutputPcmMode = OutputPcmMode.PCM_16,
+    /** Route playback to an attached USB DAC even when Android would pick another output. */
+    val preferUsbDac: Boolean = false,
+    /** Sound Check: level every YouTube track to the same loudness using YouTube's own figure. */
+    val loudnessNormalization: Boolean = true,
+    /** Leave loudness alone while playing through the phone's own speaker. */
+    val loudnessOffOnSpeaker: Boolean = true,
+    /** Stereo widening + cross-feed inside the player (BitChord's spatial audio). */
+    val spatialAudio: Boolean = false,
+    /** Once a song was suggested by Autoplay this session, never suggest it again. */
+    val dontRepeatSuggestions: Boolean = true,
+    /** Autoplay and mixes prefer the catalogue song over its music-video upload. */
+    val preferSongsOverVideos: Boolean = true,
     val playbackSpeed: Float = 1f,
     val playbackPitch: Float = 1f,
     val scrobbleLastFm: Boolean = false,
@@ -205,7 +254,24 @@ object SettingsRepository {
     private inline fun <reified T : Enum<T>> SharedPreferences.enum(key: String, default: T): T =
         getString(key, null)?.let { name -> enumValues<T>().firstOrNull { it.name == name } } ?: default
 
-    private fun read(p: SharedPreferences): AppSettings {
+    /** Bumped when the quality ladder gained LOSSLESS (1.10.0). */
+    private const val QUALITY_LADDER = 2
+
+    private fun read(p: SharedPreferences): AppSettings = migrate(p, readStored(p))
+
+    /**
+     * Before the ladder had a Lossless rung, HIGH streamed the server's original file. Keep that for
+     * people updating, and give anyone who never split Wi-Fi from mobile the same choice on both.
+     */
+    internal fun migrate(p: SharedPreferences, s: AppSettings): AppSettings {
+        if (p.getInt("quality_ladder", 0) >= QUALITY_LADDER || !p.contains("audio_quality")) return s
+        val wifi = if (s.audioQuality == AudioQuality.HIGH) AudioQuality.LOSSLESS else s.audioQuality
+        val split = p.getBoolean("audio_quality_split", false)
+        val mobile = if (split) s.mobileQuality.let { if (it == AudioQuality.HIGH) AudioQuality.LOSSLESS else it } else wifi
+        return s.copy(audioQuality = wifi, mobileQuality = mobile)
+    }
+
+    private fun readStored(p: SharedPreferences): AppSettings {
         val d = AppSettings()
         val g = d.glass
         val e = d.equalizer
@@ -233,7 +299,16 @@ object SettingsRepository {
             ),
             audioQuality = p.enum("audio_quality", d.audioQuality),
             mobileQuality = p.enum("audio_quality_mobile", d.mobileQuality),
-            separateMobileQuality = p.getBoolean("audio_quality_split", d.separateMobileQuality),
+            separateMobileQuality = true,
+            downloadQuality = p.enum("download_quality", d.downloadQuality),
+            exportDownloads = p.getBoolean("download_export", d.exportDownloads),
+            outputPcmMode = p.enum("output_pcm", d.outputPcmMode),
+            preferUsbDac = p.getBoolean("prefer_usb_dac", d.preferUsbDac),
+            loudnessNormalization = p.getBoolean("loudness_norm", d.loudnessNormalization),
+            loudnessOffOnSpeaker = p.getBoolean("loudness_speaker_off", d.loudnessOffOnSpeaker),
+            spatialAudio = p.getBoolean("spatial_audio", d.spatialAudio),
+            dontRepeatSuggestions = p.getBoolean("autoplay_no_repeat", d.dontRepeatSuggestions),
+            preferSongsOverVideos = p.getBoolean("autoplay_songs_only", d.preferSongsOverVideos),
             playbackSpeed = p.getFloat("playback_speed", d.playbackSpeed).coerceIn(0.5f, 2f),
             playbackPitch = p.getFloat("playback_pitch", d.playbackPitch).coerceIn(0.5f, 2f),
             scrobbleLastFm = p.getBoolean("scrobble_lastfm", d.scrobbleLastFm),
@@ -290,7 +365,17 @@ object SettingsRepository {
         }
         putString("audio_quality", s.audioQuality.name)
         putString("audio_quality_mobile", s.mobileQuality.name)
-        putBoolean("audio_quality_split", s.separateMobileQuality)
+        putBoolean("audio_quality_split", true)
+        putInt("quality_ladder", QUALITY_LADDER)
+        putString("download_quality", s.downloadQuality.name)
+        putBoolean("download_export", s.exportDownloads)
+        putString("output_pcm", s.outputPcmMode.name)
+        putBoolean("prefer_usb_dac", s.preferUsbDac)
+        putBoolean("loudness_norm", s.loudnessNormalization)
+        putBoolean("loudness_speaker_off", s.loudnessOffOnSpeaker)
+        putBoolean("spatial_audio", s.spatialAudio)
+        putBoolean("autoplay_no_repeat", s.dontRepeatSuggestions)
+        putBoolean("autoplay_songs_only", s.preferSongsOverVideos)
         putFloat("playback_speed", s.playbackSpeed)
         putFloat("playback_pitch", s.playbackPitch)
         putBoolean("scrobble_lastfm", s.scrobbleLastFm)

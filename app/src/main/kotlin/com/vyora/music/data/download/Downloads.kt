@@ -72,6 +72,12 @@ object Downloads {
                 .distinctUntilChanged()
                 .collect { wifiOnly -> m.requirements = requirementsFor(wifiOnly) }
         }
+        scope.launch {
+            SettingsRepository.settings
+                .map { it.exportDownloads }
+                .distinctUntilChanged()
+                .collect { export -> if (export) exportCompleted() }
+        }
     }
 
     fun manager(context: Context): DownloadManager {
@@ -110,13 +116,13 @@ object Downloads {
 
     fun downloadAll(context: Context, items: List<SimpleItem>) {
         val app = context.applicationContext
-        val songs = items.filter { it.isSong && it.id.isNotBlank() && it.isYouTube }
+        val songs = items.filter { it.isSong && it.id.isNotBlank() && (it.isYouTube || it.isServer) }
             .filter { _entries.value[it.id]?.status.let { s -> s == null || s == DownloadStatus.FAILED } }
             .distinctBy { it.id }
         if (songs.isEmpty()) return
         manager(app)
         for (item in songs) {
-            val request = DownloadRequest.Builder(item.id, Uri.parse(SimpleItem.watchUrl(item.id)))
+            val request = DownloadRequest.Builder(item.id, Uri.parse(SimpleItem.playbackUrl(item.id)))
                 .setCustomCacheKey(OfflineCache.keyFor(item.id))
                 .setData(encode(item).toByteArray(Charsets.UTF_8))
                 .build()
@@ -193,6 +199,7 @@ object Downloads {
                 entries.forEach { map[it.item.id] = it }
                 _entries.value = map
                 publishCompleted()
+                if (SettingsRepository.current.exportDownloads) exportCompleted()
                 if (list.any { it.state == Download.STATE_DOWNLOADING }) watchProgress(m)
             }
         }
@@ -204,8 +211,30 @@ object Downloads {
             remove(download.request.id)
             return
         }
+        val was = _entries.value[entry.item.id]?.status
         _entries.value = _entries.value + (entry.item.id to entry)
         publishCompleted()
+        if (entry.status == DownloadStatus.COMPLETED && was != DownloadStatus.COMPLETED && SettingsRepository.current.exportDownloads) {
+            exportCompleted()
+        }
+    }
+
+    @Volatile private var exporting: Job? = null
+
+    /** Copies every finished, not-yet-exported download into Music/VYORA, one at a time. */
+    private fun exportCompleted() {
+        val app = appContext ?: return
+        if (exporting?.isActive == true) {
+            exporting?.invokeOnCompletion { scope.launch { exportCompleted() } }
+            return
+        }
+        val done = _entries.value.values.filter { it.status == DownloadStatus.COMPLETED }.map { it.item }
+        exporting = io.launch {
+            for (item in done) {
+                if (!SettingsRepository.current.exportDownloads) break
+                if (!DownloadExport.isExported(app, item.id)) DownloadExport.export(app, item)
+            }
+        }
     }
 
     private fun remove(id: String) {
@@ -287,7 +316,7 @@ object Downloads {
             title = json?.optString("title").orEmpty().ifBlank { id },
             artist = json?.optString("artist").orEmpty(),
             thumbnail = json?.optString("thumbnail")?.takeIf { it.isNotBlank() },
-            url = SimpleItem.watchUrl(id),
+            url = SimpleItem.playbackUrl(id),
             duration = json?.optLong("duration") ?: 0L,
             type = ItemType.SONG,
             artistId = json?.optString("artistId")?.takeIf { it.isNotBlank() },

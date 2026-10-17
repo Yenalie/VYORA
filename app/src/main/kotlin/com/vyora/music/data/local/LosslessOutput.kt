@@ -43,6 +43,10 @@ object LosslessOutput {
         val bluetoothCodecUnknown: Boolean = false,
         /** Product name of the active output, for display ("USB-C DAC", "WH-1000XM5"…). */
         val deviceName: String? = null,
+        /** The active route lists PCM float among its encodings (or lists none, meaning any). */
+        val advertisesFloat: Boolean = false,
+        /** A USB audio output is attached, whether or not it is the active route. */
+        val usbConnected: Boolean = false,
     )
 
     private val _state = MutableStateFlow(State())
@@ -78,10 +82,19 @@ object LosslessOutput {
             }
         }
         val name = active?.productName?.toString()?.takeIf { it.isNotBlank() && it != android.os.Build.MODEL }
-        _state.value = decided.copy(deviceName = name)
+        val route = active ?: devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+        _state.value = decided.copy(
+            deviceName = name,
+            advertisesFloat = route?.encodings?.let { it.isEmpty() || android.media.AudioFormat.ENCODING_PCM_FLOAT in it } == true,
+            usbConnected = devices.any { it.type in USB },
+        )
     }
 
     /** The decision from the connected output types and a Bluetooth codec name (null if unknown). Pure, for tests. */
+    /** The attached USB output, for "Prefer USB DAC". */
+    fun usbDevice(): AudioDeviceInfo? =
+        audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS).orEmpty().firstOrNull { it.isSink && it.type in USB }
+
     internal fun decide(outputTypes: Set<Int>, bluetoothCodec: String?, bluetoothSampleRateHz: Int? = null): State {
         val cabled = when {
             outputTypes.any { it in WIRED } -> Kind.WIRED

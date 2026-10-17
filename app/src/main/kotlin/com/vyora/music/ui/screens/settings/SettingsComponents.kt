@@ -169,6 +169,7 @@ fun SettingsRow(
     enabled: Boolean = true,
     divider: Boolean = true,
     onClick: (() -> Unit)? = null,
+    badge: String? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val source = remember { MutableInteractionSource() }
@@ -196,7 +197,16 @@ fun SettingsRow(
                 Spacer(Modifier.width(14.dp))
             }
             Column(Modifier.weight(1f)) {
-                Text(title, color = titleColor, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        title, color = titleColor, style = MaterialTheme.typography.bodyLarge, maxLines = 2,
+                        overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (badge != null) {
+                        Spacer(Modifier.width(8.dp))
+                        SettingsBadge(badge)
+                    }
+                }
                 if (subtitle != null) {
                     Text(subtitle, color = VyoraTextMuted, style = MaterialTheme.typography.bodySmall)
                 }
@@ -212,6 +222,21 @@ fun SettingsRow(
     }
 }
 
+/** Small capsule next to a row title ("In use", "Connected"), like iOS's status tags. */
+@Composable
+fun SettingsBadge(text: String, color: Color = VyoraAccent) {
+    Text(
+        text.uppercase(),
+        color = color,
+        style = MaterialTheme.typography.labelSmall,
+        maxLines = 1,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(color.copy(alpha = 0.14f))
+            .padding(horizontal = 7.dp, vertical = 2.dp),
+    )
+}
+
 @Composable
 fun SettingsNavRow(
     title: String,
@@ -221,9 +246,10 @@ fun SettingsNavRow(
     value: String? = null,
     subtitle: String? = null,
     divider: Boolean = true,
+    badge: String? = null,
 ) {
     SettingsRow(
-        title = title, icon = icon, iconTint = iconTint, subtitle = subtitle, divider = divider, onClick = onClick,
+        title = title, icon = icon, iconTint = iconTint, subtitle = subtitle, divider = divider, onClick = onClick, badge = badge,
         trailing = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (value != null) {
@@ -246,9 +272,11 @@ fun SettingsSwitchRow(
     subtitle: String? = null,
     enabled: Boolean = true,
     divider: Boolean = true,
+    badge: String? = null,
 ) {
     SettingsRow(
         title = title, icon = icon, iconTint = iconTint, subtitle = subtitle, enabled = enabled, divider = divider,
+        badge = badge,
         onClick = { onCheckedChange(!checked) },
         trailing = { IosSwitch(checked = checked, onCheckedChange = if (enabled) onCheckedChange else null) },
     )

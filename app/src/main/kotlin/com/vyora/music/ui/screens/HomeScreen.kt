@@ -114,6 +114,8 @@ fun HomeScreen(
     val topPicks = content?.topPicks.orEmpty()
     val topSongs = content?.topSongs.orEmpty()
     val artistShelves = content?.artistShelves.orEmpty()
+    val mixes = content?.mixes.orEmpty()
+    val rediscover = content?.rediscover.orEmpty()
 
     val listState = rememberLazyListState()
     OnTabReselect("home") { listState.scrollToTopSmooth() }
@@ -202,6 +204,17 @@ fun HomeScreen(
             }
         }
 
+        mixes.forEach { mix ->
+            item(key = "mix_" + mix.seed.id) {
+                Shelf(
+                    title = stringResource(R.string.home_because_you_listened, mix.seed.title),
+                    items = mix.songs,
+                    onTitle = { onPlayList(listOf(mix.seed) + mix.songs, 0) },
+                    onPlay = { i -> onPlayList(mix.songs, i) },
+                )
+            }
+        }
+
         artistShelves.forEach { shelf ->
             item(key = "more_" + shelf.artist) {
                 Shelf(
@@ -220,6 +233,17 @@ fun HomeScreen(
                     items = liked.take(15),
                     onTitle = { onOpenCollection(Collections.LIKED) },
                     onPlay = { i -> onPlayList(liked.take(15), i) },
+                )
+            }
+        }
+
+        if (rediscover.size >= 4) {
+            item(key = "rediscover") {
+                Shelf(
+                    title = stringResource(R.string.home_rediscover),
+                    items = rediscover,
+                    onTitle = { onOpenCollection(Collections.LIKED) },
+                    onPlay = { i -> onPlayList(rediscover, i) },
                 )
             }
         }

@@ -8,6 +8,8 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
@@ -185,6 +187,7 @@ class ScreenshotTest {
         org.junit.Assume.assumeTrue(System.getProperty("shots.only").orEmpty().isNotBlank())
         if (System.getProperty("shots.only") == "new") return newFeatures()
         if (System.getProperty("shots.only") == "v19") return v19Features()
+        if (System.getProperty("shots.only") == "v110") return v110Features()
         val found = runBlocking { YouTubeClient.search("Tulus", SearchFilter.SONGS).getOrThrow().items.take(8) }
         val lead = found.firstOrNull { song ->
             val lyr = runBlocking { com.vyora.music.data.lyrics.LyricsRepository.lyricsFor(song.id, song.title, song.artist, song.duration) }
@@ -256,6 +259,51 @@ class ScreenshotTest {
         }
     }
 
+    /** `-Dshots.only=v110`: Apple-style search, suggestions and Top Results, and the new audio pages. */
+    private fun v110Features() {
+        waitReal(5000)
+        step("search") {
+            clickText("Search"); shot("50_search", minMs = 1500)
+            swipeUp(); shot("51_search_2", minMs = 1000)
+            val field = compose.onAllNodes(androidx.compose.ui.test.hasSetTextAction())[0]
+            field.performClick()
+            field.performTextInput("tulus")
+            shot("52_suggestions", minMs = 2500)
+            field.performImeAction()
+            shot("53_top_results", minMs = 6000)
+            swipeUp(); shot("54_top_results_2", minMs = 1500)
+            clickLastText("Songs", lowest = false); shot("55_songs", minMs = 4000)
+            compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(800)
+        }
+        step("settings") {
+            runCatching { clickText("Cancel") }; waitReal(1000)
+            clickText("Home"); waitReal(1500)
+            clickDesc("Settings"); waitReal(1500)
+            shot("55b_settings_top", minMs = 1000)
+            fun reach(text: String) {
+                repeat(4) {
+                    if (runCatching { clickLastText(text) }.isSuccess) return
+                    compose.onRoot().performTouchInput { swipeUp(startY = bottom * 0.7f, endY = bottom * 0.45f, durationMillis = 400) }
+                    waitReal(700)
+                }
+                error("not found: $text")
+            }
+            reach("Audio Quality"); shot("56_audio_quality", minMs = 1200)
+            clickLastText("Wi-Fi"); shot("57_quality_wifi", minMs = 1200)
+            compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(800)
+            clickLastText("Download Quality"); shot("58_download_quality", minMs = 1200)
+            compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(800)
+            compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
+            shot("59_settings_audio", minMs = 1000)
+            reach("Audio Output"); shot("60_output", minMs = 1200)
+            swipeUp(); shot("61_output_2", minMs = 1000)
+            compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
+            swipeUp(); waitReal(600)
+            shot("62_settings_playback", minMs = 1000)
+            reach("Downloads"); shot("63_downloads", minMs = 1200)
+        }
+    }
+
     /** `-Dshots.only=v19`: Discord and Spotify sign-in pages, Library and the Now Playing speed control. */
     private fun v19Features() {
         val found = runBlocking { YouTubeClient.search("Tulus", SearchFilter.SONGS).getOrThrow().items.take(6) }
@@ -271,7 +319,7 @@ class ScreenshotTest {
             repeat(3) { compose.onRoot().performTouchInput { swipeDown(startY = bottom * 0.25f, endY = bottom * 0.85f, durationMillis = 300) }; waitReal(400) }
             clickLastText("Appearance"); shot("45_appearance", minMs = 1200)
             compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
-            clickLastText("Streaming quality"); shot("46_quality", minMs = 1200)
+            clickLastText("Audio Quality"); shot("46_quality", minMs = 1200)
             compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)
             clickLastText("Song Transitions"); shot("47_transitions", minMs = 1200)
             compose.activity.onBackPressedDispatcher.onBackPressed(); waitReal(1000)

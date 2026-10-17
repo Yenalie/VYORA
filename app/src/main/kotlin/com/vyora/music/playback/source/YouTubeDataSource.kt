@@ -29,7 +29,18 @@ object YouTubeDataSource {
     private const val KEY_AUDIO = "yt-audio"
     private const val KEY_VIDEO = "yt-video"
     private const val NO_OFFLINE = "yt-none/"
-    val OFFLINE_QUALITY = AudioQuality.HIGH
+    private const val KEY_SERVER = "srv-audio"
+
+    /** What a download keeps right now: the user's Download Quality rung. */
+    val offlineQuality: AudioQuality get() = SettingsRepository.current.downloadQuality.stream
+
+    private fun streamingQuality(): AudioQuality =
+        SettingsRepository.current.effectiveQuality(com.vyora.music.core.NetworkState.isMetered)
+
+    /** Offline key of a playable URI: a YouTube watch page or one of our server stream URLs. */
+    fun offlineIdOf(uri: Uri?): String? = videoIdOf(uri)
+        ?: com.vyora.music.data.server.MusicServer.streamSongIdOf(uri?.toString())
+            ?.let { com.vyora.music.data.server.MusicServer.SONG_PREFIX + it }
 
     /**
      * Audio for the player, Crossfader and Cast proxy. `https` (YouTube) goes through the stream cache;
@@ -51,7 +62,7 @@ object YouTubeDataSource {
     private enum class Kind { AUDIO, VIDEO }
 
     fun downloadUpstreamFactory(context: Context): DataSource.Factory =
-        ResolvingDataSource.Factory(http(), Resolver(OfflineCache.get(context), Kind.AUDIO, OFFLINE_QUALITY))
+        ResolvingDataSource.Factory(http(), Resolver(OfflineCache.get(context), Kind.AUDIO) { offlineQuality })
 
     private fun http(): DataSource.Factory = DefaultHttpDataSource.Factory()
         .setAllowCrossProtocolRedirects(true)
@@ -75,25 +86,38 @@ object YouTubeDataSource {
     }
 
     private fun offlineKey(spec: DataSpec): String {
-        val id = videoIdOf(spec.uri) ?: return NO_OFFLINE + (spec.key ?: spec.uri.toString())
+        val id = offlineIdOf(spec.uri) ?: return NO_OFFLINE + (spec.key ?: spec.uri.toString())
         return if (OfflineCache.isComplete(id)) OfflineCache.keyFor(id) else NO_OFFLINE + id
     }
 
     private fun cacheKey(spec: DataSpec, kind: Kind): String {
+        if (kind == Kind.AUDIO) {
+            com.vyora.music.data.server.MusicServer.streamSongIdOf(spec.uri.toString())?.let { song ->
+                return "$KEY_SERVER/$song/${serverRung(streamingQuality())}"
+            }
+        }
         val id = videoIdOf(spec.uri) ?: return spec.key ?: spec.uri.toString()
         return when (kind) {
-            Kind.AUDIO -> "$KEY_AUDIO/$id/${SettingsRepository.current.effectiveQuality(com.vyora.music.core.NetworkState.isMetered).name}"
+            Kind.AUDIO -> "$KEY_AUDIO/$id/${streamingQuality().name}"
             Kind.VIDEO -> "$KEY_VIDEO/$id"
         }
     }
 
+    /** Cache rung of a server stream: rungs that ask for the same file share one cached copy. */
+    private fun serverRung(q: AudioQuality): String = q.serverKbps?.toString() ?: "raw"
+
     private class Resolver(
         private val cache: Cache,
         private val kind: Kind,
-        private val fixedQuality: AudioQuality? = null,
+        private val fixedQuality: (() -> AudioQuality)? = null,
     ) : ResolvingDataSource.Resolver {
         @Throws(IOException::class)
         override fun resolveDataSpec(dataSpec: DataSpec): DataSpec {
+            if (kind == Kind.AUDIO && com.vyora.music.data.server.MusicServer.streamSongIdOf(dataSpec.uri.toString()) != null) {
+                val q = fixedQuality?.invoke() ?: qualityOfServerKey(dataSpec.key) ?: streamingQuality()
+                val url = com.vyora.music.data.server.MusicServer.withQuality(dataSpec.uri.toString(), q.serverKbps)
+                return dataSpec.buildUpon().setUri(Uri.parse(url)).build()
+            }
             val videoId = videoIdOf(dataSpec.uri) ?: return dataSpec
             val key = dataSpec.key
             val cachedItag = key?.let { cache.getContentMetadata(it).get(META_ITAG, -1L).toInt() }?.takeIf { it > 0 }
@@ -118,7 +142,14 @@ object YouTubeDataSource {
                 .build()
         }
 
-        private fun qualityOf(key: String?): AudioQuality = fixedQuality ?:
+        /** The rung a server cache key was written for, so a cached copy is completed at the same rung. */
+        private fun qualityOfServerKey(key: String?): AudioQuality? {
+            if (key == null || !key.startsWith("$KEY_SERVER/")) return null
+            val rung = key.substringAfterLast('/')
+            return AudioQuality.entries.firstOrNull { serverRung(it) == rung }
+        }
+
+        private fun qualityOf(key: String?): AudioQuality = fixedQuality?.invoke() ?:
             key?.substringAfterLast('/')?.let { name -> AudioQuality.entries.firstOrNull { it.name == name } }
                 ?: SettingsRepository.current.effectiveQuality(com.vyora.music.core.NetworkState.isMetered)
     }

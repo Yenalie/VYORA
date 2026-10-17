@@ -49,6 +49,19 @@ object YouTubeClient {
         }
     }
 
+    /** Search-as-you-type suggestions, as YouTube offers them; empty on any failure. */
+    suspend fun suggestions(query: String): List<String> = withContext(Dispatchers.IO) {
+        val q = query.trim()
+        if (q.isEmpty()) return@withContext emptyList()
+        runCatching {
+            org.schabi.newpipe.extractor.ServiceList.YouTube.suggestionExtractor.suggestionList(q)
+                .map { it.trim() }.filter { it.isNotEmpty() }.distinctBy { it.lowercase() }.take(8)
+        }.getOrElse {
+            Log.w(TAG, "Suggestions failed", it)
+            emptyList()
+        }
+    }
+
     suspend fun search(query: String, filter: SearchFilter, page: Page? = null): Result<ResultPage> =
         withContext(Dispatchers.IO) {
             try {

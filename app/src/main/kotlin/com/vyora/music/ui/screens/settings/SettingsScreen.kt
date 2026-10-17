@@ -18,6 +18,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AllInclusive
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.SettingsInputComponent
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Equalizer
@@ -142,12 +145,18 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
             }
         }
         item(key = "audio") {
-            SettingsGroup(header = stringResource(R.string.settings_audio)) {
+            SettingsGroup(header = stringResource(R.string.settings_audio), footer = stringResource(R.string.sound_check_footer)) {
                 SettingsNavRow(
                     title = stringResource(R.string.audio_quality),
                     icon = Icons.Default.HighQuality, iconTint = SystemColors.Red,
                     value = qualityLabel(settings.audioQuality),
                     onClick = { onOpen("audio_quality") },
+                )
+                SettingsNavRow(
+                    title = stringResource(R.string.settings_output),
+                    icon = Icons.Default.SettingsInputComponent, iconTint = SystemColors.Teal,
+                    value = outputModeLabel(settings.outputPcmMode),
+                    onClick = { onOpen("output") },
                 )
                 SettingsNavRow(
                     title = stringResource(R.string.settings_equalizer),
@@ -163,10 +172,10 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                     onClick = { onOpen("transitions") },
                 )
                 SettingsSwitchRow(
-                    title = stringResource(R.string.skip_silence),
-                    icon = Icons.Default.GraphicEq, iconTint = SystemColors.Purple,
-                    checked = settings.skipSilence,
-                    onCheckedChange = { v -> SettingsRepository.update { it.copy(skipSilence = v) } },
+                    title = stringResource(R.string.sound_check),
+                    icon = Icons.AutoMirrored.Filled.VolumeUp, iconTint = SystemColors.Purple,
+                    checked = settings.loudnessNormalization,
+                    onCheckedChange = { v -> SettingsRepository.update { it.copy(loudnessNormalization = v) } },
                     divider = false,
                 )
             }
@@ -182,6 +191,20 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                     checked = settings.autoplay,
                     onCheckedChange = { v -> SettingsRepository.update { it.copy(autoplay = v) } },
                 )
+                if (settings.autoplay) {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.dont_repeat_suggestions),
+                        icon = Icons.Default.Repeat, iconTint = SystemColors.Indigo,
+                        checked = settings.dontRepeatSuggestions,
+                        onCheckedChange = { v -> SettingsRepository.update { it.copy(dontRepeatSuggestions = v) } },
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.prefer_songs),
+                        icon = Icons.Default.MusicNote, iconTint = SystemColors.Red,
+                        checked = settings.preferSongsOverVideos,
+                        onCheckedChange = { v -> SettingsRepository.update { it.copy(preferSongsOverVideos = v) } },
+                    )
+                }
                 SettingsSwitchRow(
                     title = stringResource(R.string.pause_on_disconnect),
                     icon = Icons.Default.Headphones, iconTint = SystemColors.Blue,
@@ -352,52 +375,6 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
 }
 
 /** Audio Quality, like Apple Music's: one checklist for Wi-Fi and, optionally, one for mobile data. */
-@Composable
-fun AudioQualityScreen(onBack: () -> Unit) {
-    val settings by SettingsRepository.settings.collectAsState()
-    SettingsPage(title = stringResource(R.string.audio_quality), onBack = onBack) {
-        item(key = "wifi") {
-            SettingsGroup(
-                header = if (settings.separateMobileQuality) stringResource(R.string.audio_quality_wifi) else null,
-                footer = stringResource(R.string.audio_quality_footer),
-            ) {
-                AudioQuality.entries.forEachIndexed { i, q ->
-                    SettingsChoiceRow(
-                        title = qualityLabel(q),
-                        selected = settings.audioQuality == q,
-                        onClick = { SettingsRepository.update { it.copy(audioQuality = q) } },
-                        divider = i < AudioQuality.entries.lastIndex,
-                    )
-                }
-            }
-        }
-        item(key = "split") {
-            SettingsGroup {
-                SettingsSwitchRow(
-                    title = stringResource(R.string.audio_quality_split),
-                    checked = settings.separateMobileQuality,
-                    onCheckedChange = { v -> SettingsRepository.update { it.copy(separateMobileQuality = v) } },
-                    divider = false,
-                )
-            }
-        }
-        if (settings.separateMobileQuality) {
-            item(key = "mobile") {
-                SettingsGroup(header = stringResource(R.string.audio_quality_mobile)) {
-                    AudioQuality.entries.forEachIndexed { i, q ->
-                        SettingsChoiceRow(
-                            title = qualityLabel(q),
-                            selected = settings.mobileQuality == q,
-                            onClick = { SettingsRepository.update { it.copy(mobileQuality = q) } },
-                            divider = i < AudioQuality.entries.lastIndex,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
 /** Song Transitions: crossfade on/off and its length. */
 @Composable
 fun TransitionsScreen(onBack: () -> Unit) {
@@ -427,10 +404,11 @@ fun TransitionsScreen(onBack: () -> Unit) {
     }
 }
 
-/** Downloads: Wi-Fi only and removing everything. */
+/** Downloads: quality, Wi-Fi only, exporting to the Music folder and removing everything. */
 @Composable
-fun DownloadsSettingsScreen(onBack: () -> Unit) {
+fun DownloadsSettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
     val settings by SettingsRepository.settings.collectAsState()
+    val metered by com.vyora.music.core.NetworkState.metered.collectAsState()
     val context = LocalContext.current
     val downloads by com.vyora.music.data.download.Downloads.entries.collectAsState()
     var offlineBytes by remember { mutableStateOf(0L) }
@@ -440,12 +418,30 @@ fun DownloadsSettingsScreen(onBack: () -> Unit) {
         offlineBytes = withContext(Dispatchers.IO) { com.vyora.music.data.download.Downloads.usedBytes(context) }
     }
     SettingsPage(title = stringResource(R.string.downloads), onBack = onBack) {
-        item(key = "wifi") {
-            SettingsGroup {
+        item(key = "quality") {
+            SettingsGroup(footer = stringResource(R.string.download_quality_footer)) {
+                SettingsNavRow(
+                    title = stringResource(R.string.download_quality),
+                    value = downloadQualityLabel(settings.downloadQuality),
+                    subtitle = stringResource(R.string.download_per_track, settings.downloadQuality.perTrackMb),
+                    onClick = { onOpen("quality/download") },
+                )
                 SettingsSwitchRow(
                     title = stringResource(R.string.download_wifi_only),
                     checked = settings.downloadWifiOnly,
                     onCheckedChange = { v -> SettingsRepository.update { it.copy(downloadWifiOnly = v) } },
+                    badge = stringResource(R.string.waiting_for_wifi).takeIf { settings.downloadWifiOnly && metered },
+                    divider = false,
+                )
+            }
+        }
+        item(key = "export") {
+            SettingsGroup(footer = stringResource(R.string.export_downloads_footer)) {
+                SettingsSwitchRow(
+                    title = stringResource(R.string.export_downloads),
+                    subtitle = com.vyora.music.data.download.DownloadExport.FOLDER.takeIf { settings.exportDownloads },
+                    checked = settings.exportDownloads,
+                    onCheckedChange = { v -> SettingsRepository.update { it.copy(exportDownloads = v) } },
                     divider = false,
                 )
             }
@@ -673,6 +669,7 @@ fun themeLabel(mode: ThemeMode) = stringResource(
 @Composable
 fun qualityLabel(q: AudioQuality) = stringResource(
     when (q) {
+        AudioQuality.LOSSLESS -> R.string.quality_lossless
         AudioQuality.HIGH -> R.string.quality_high
         AudioQuality.NORMAL -> R.string.quality_normal
         AudioQuality.LOW -> R.string.quality_low

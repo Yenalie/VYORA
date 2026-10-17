@@ -110,14 +110,6 @@ import com.vyora.music.ui.theme.VyoraText
 import com.vyora.music.ui.theme.VyoraTextFaint
 import com.vyora.music.ui.theme.VyoraTextMuted
 
-private val ALL_TAB_LIMITS = mapOf(
-    SearchTab.SONGS to 5,
-    SearchTab.ARTISTS to 3,
-    SearchTab.ALBUMS to 4,
-    SearchTab.PLAYLISTS to 4,
-    SearchTab.VIDEOS to 4
-)
-
 @Composable
 fun SearchScreen(
     onPlay: (List<SimpleItem>, Int) -> Unit,
@@ -186,8 +178,15 @@ fun SearchScreen(
         }
 
         Box(Modifier.fillMaxSize().padding(horizontal = Spacing.ScreenH)) {
+            val typing = fieldFocused && state.query.isNotBlank() && state.query.trim() != state.submittedQuery
             if (fieldFocused && state.query.isBlank() && recentSearches.isNotEmpty()) {
                 RecentSearches(recentSearches, onPick = { viewModel.onQueryChange(it); submit(it) })
+            } else if (typing) {
+                Suggestions(
+                    query = state.query,
+                    suggestions = state.suggestions,
+                    onPick = { viewModel.onQueryChange(it); submit(it) },
+                )
             } else if (!searching) {
                 Discovery(onMood = { submit(it) }, onFocusSearch = { runCatching { fieldFocus.requestFocus() } })
             } else {
@@ -229,9 +228,9 @@ private fun GlassSearchField(
         Row(
             Modifier
                 .weight(1f)
-                .height(46.dp)
-                .liquidFill(shape = GlassShapes.Pill, fill = if (focused) GlassFillStrong else GlassFill)
-                .padding(start = 14.dp, end = 10.dp),
+                .height(40.dp)
+                .liquidFill(shape = SearchFieldShape, fill = if (focused) GlassFillStrong else GlassFill)
+                .padding(start = 10.dp, end = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(Icons.Default.Search, null, tint = VyoraTextMuted, modifier = Modifier.size(20.dp))
@@ -327,11 +326,15 @@ private fun AllTab(
     val bottomInset = LocalBottomBarInset.current
     val sections = SearchViewModel.SEARCH_TABS.map { it to state.tabState(it) }
     val wanted = SearchViewModel.normalize(state.corrected.takeIf { it }?.let { state.suggestion } ?: state.submittedQuery)
-    val topArtist = state.tabState(SearchTab.ARTISTS).items.firstOrNull()
-        ?.takeIf { wanted.isNotEmpty() && SearchViewModel.normalize(it.title) == wanted }
     val allSettled = sections.all { (_, s) -> s.status == LoadStatus.LOADED || s.status == LoadStatus.ERROR }
     val nothingFound = allSettled && sections.all { (_, s) -> s.items.isEmpty() }
     val everythingFailed = allSettled && sections.all { (_, s) -> s.status == LoadStatus.ERROR }
+    val songsReady = state.tabState(SearchTab.SONGS).status.let { it == LoadStatus.LOADED || it == LoadStatus.ERROR }
+    val results = remember(state.tabs, wanted) {
+        SearchViewModel.topResults(sections.associate { (tab, s) -> tab to s.items }, wanted)
+    }
+    val playable = remember(results) { results.filter { it.isSong } }
+    val loadingKinds = sections.any { (_, s) -> s.status == LoadStatus.IDLE || s.status == LoadStatus.LOADING }
 
     val allListState = rememberLazyListState()
     OnTabReselect("search") { allListState.scrollToTopSmooth() }
@@ -339,46 +342,94 @@ private fun AllTab(
     when {
         everythingFailed -> ErrorBlock(onRetry = { onRetry(SearchTab.ALL) })
         nothingFound -> EmptyBlock()
+        results.isEmpty() || !songsReady -> Box(Modifier.fillMaxWidth().padding(top = 24.dp), contentAlignment = Alignment.Center) { InlineLoading() }
         else -> LazyColumn(
             state = allListState,
-                        contentPadding = PaddingValues(bottom = 24.dp + bottomInset)
+            contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp + bottomInset)
         ) {
-            if (topArtist != null) {
-                item(key = "top_header") {
-                    SectionHeader(title = stringResource(R.string.search_top_result), icon = Icons.Default.Mic, onSeeAll = null)
-                }
-                item(key = "top_${topArtist.id}") {
-                    ItemRow(topArtist, onClick = { onItem(topArtist, listOf(topArtist), 0) })
+            itemsIndexed(results, key = { _, item -> "top_${item.type}_${item.id}" }) { index, item ->
+                ItemRow(
+                    item = item,
+                    showKind = true,
+                    showSeparator = index < results.lastIndex,
+                    onClick = {
+                        if (item.isSong) onItem(item, playable, playable.indexOf(item).coerceAtLeast(0))
+                        else onItem(item, listOf(item), 0)
+                    },
+                )
+            }
+            if (loadingKinds) item(key = "top_loading") { InlineLoading() }
+            sections.filter { (tab, s) -> s.status == LoadStatus.ERROR }.forEach { (tab, _) ->
+                item(key = "error_${tab.name}") {
+                    TextButton(onClick = { onRetry(tab) }) {
+                        Text(stringResource(R.string.search_retry_kind, tabTitle(tab)), color = VyoraAccent)
+                    }
                 }
             }
-            sections.forEach { (tab, section) ->
-                val limit = ALL_TAB_LIMITS.getValue(tab)
-                if (section.status == LoadStatus.LOADED && section.items.isEmpty()) return@forEach
-                if (tab == SearchTab.ARTISTS && topArtist != null && section.items.size <= 1 && section.nextPage == null) return@forEach
-
-                item(key = "header_${tab.name}") {
-                    SectionHeader(
-                        title = tabTitle(tab),
-                        icon = tabIcon(tab),
-                        onSeeAll = if (section.items.size > limit || section.nextPage != null) {
-                            { onSeeAll(tab) }
-                        } else null
-                    )
-                }
-                when (section.status) {
-                    LoadStatus.IDLE, LoadStatus.LOADING -> item(key = "loading_${tab.name}") { InlineLoading() }
-                    LoadStatus.ERROR -> item(key = "error_${tab.name}") {
-                        TextButton(onClick = { onRetry(tab) }) { Text(stringResource(R.string.try_again), color = VyoraAccent) }
-                    }
-                    else -> {
-                        val rows = if (tab == SearchTab.ARTISTS && topArtist != null) section.items.drop(1) else section.items
-                        itemRows(tab, rows.take(limit), fullQueue = rows, onItem)
+            item(key = "see_more") {
+                Column(Modifier.padding(top = 18.dp)) {
+                    SectionTitle(title = stringResource(R.string.search_more_results))
+                    Spacer(Modifier.height(10.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(SearchViewModel.SEARCH_TABS, key = { "more_" + it.name }) { tab ->
+                            GlassChip(label = tabTitle(tab), selected = false, onClick = { onSeeAll(tab) }, icon = tabIcon(tab))
+                        }
                     }
                 }
             }
         }
     }
 }
+
+@Composable
+private fun Suggestions(query: String, suggestions: List<String>, onPick: (String) -> Unit) {
+    val bottomInset = LocalBottomBarInset.current
+    val rows = remember(query, suggestions) {
+        (listOf(query.trim()) + suggestions).distinctBy { it.lowercase() }.filter { it.isNotBlank() }
+    }
+    LazyColumn(contentPadding = PaddingValues(top = 2.dp, bottom = 24.dp + bottomInset)) {
+        itemsIndexed(rows, key = { _, q -> "suggest_$q" }) { i, q ->
+            Column {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .glassClickable(pressedScale = 0.985f) { onPick(q) }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Default.Search, null, tint = VyoraTextMuted, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        highlightTyped(q, query),
+                        color = VyoraText,
+                        style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                if (i < rows.lastIndex) Hairline(startIndent = 32.dp)
+            }
+        }
+    }
+}
+
+/** Apple Music style: what was typed in regular weight, the completion in bold. */
+private fun highlightTyped(suggestion: String, typed: String): androidx.compose.ui.text.AnnotatedString {
+    val t = typed.trim()
+    return androidx.compose.ui.text.buildAnnotatedString {
+        if (t.isNotEmpty() && suggestion.startsWith(t, ignoreCase = true)) {
+            append(suggestion.substring(0, t.length))
+            pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold))
+            append(suggestion.substring(t.length))
+            pop()
+        } else {
+            append(suggestion)
+        }
+    }
+}
+
+private val SearchFieldShape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
 
 @Composable
 private fun SingleTab(
@@ -484,18 +535,6 @@ private fun SpellingHint(state: SearchUiState, onPick: (String, Boolean) -> Unit
 }
 
 @Composable
-private fun SectionHeader(title: String, icon: ImageVector, onSeeAll: (() -> Unit)?) {
-    Row(Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        SectionTitle(
-            title = title,
-            action = if (onSeeAll != null) stringResource(R.string.see_all) else null,
-            onAction = onSeeAll,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@Composable
 private fun InlineLoading() {
     Row(
         Modifier.fillMaxWidth().padding(vertical = 14.dp),
@@ -541,6 +580,10 @@ private val Moods = listOf(
     Mood(R.string.mood_acoustic, R.string.mood_q_acoustic, Icons.Default.MusicNote, MoodColors.Acoustic),
     Mood(R.string.mood_party, R.string.mood_q_party, Icons.Default.Celebration, MoodColors.Party),
     Mood(R.string.mood_sleep, R.string.mood_q_sleep, Icons.Default.Bedtime, MoodColors.Sleep),
+    Mood(R.string.mood_hiphop, R.string.mood_q_hiphop, Icons.Default.Mic, MoodColors.HipHop),
+    Mood(R.string.mood_rnb, R.string.mood_q_rnb, Icons.Default.Favorite, MoodColors.RnB),
+    Mood(R.string.mood_rock, R.string.mood_q_rock, Icons.Default.Album, MoodColors.Rock),
+    Mood(R.string.mood_kpop, R.string.mood_q_kpop, Icons.Default.Star, MoodColors.KPop),
 )
 
 @Composable
@@ -575,9 +618,9 @@ private fun Discovery(onMood: (String) -> Unit, onFocusSearch: () -> Unit) {
 private fun MoodTile(label: String, icon: ImageVector, colors: List<Color>, modifier: Modifier, onClick: () -> Unit) {
     Box(
         modifier
-            .aspectRatio(1.45f)
+            .aspectRatio(1.6f)
             .glassClickable(onClick = onClick)
-            .clip(GlassShapes.Medium)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
             .background(Brush.linearGradient(colors))
             .padding(12.dp),
     ) {
@@ -585,14 +628,19 @@ private fun MoodTile(label: String, icon: ImageVector, colors: List<Color>, modi
             icon, null, tint = Color.White.copy(alpha = 0.55f),
             modifier = Modifier.align(Alignment.TopEnd).size(46.dp).graphicsLayer { rotationZ = 18f; translationX = 18f; translationY = -6f },
         )
-        Text(label, color = Color.White, style = MaterialTheme.typography.titleMedium, modifier = Modifier.align(Alignment.BottomStart))
+        Text(
+            label, color = Color.White, style = MaterialTheme.typography.titleMedium,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            maxLines = 2, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.align(Alignment.BottomStart).padding(end = 28.dp),
+        )
     }
 }
 
 @Composable
 private fun tabTitle(tab: SearchTab): String = stringResource(
     when (tab) {
-        SearchTab.ALL -> R.string.tab_all
+        SearchTab.ALL -> R.string.search_top_results
         SearchTab.SONGS -> R.string.tab_songs
         SearchTab.ARTISTS -> R.string.tab_artists
         SearchTab.ALBUMS -> R.string.tab_albums

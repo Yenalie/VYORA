@@ -30,6 +30,7 @@ class VyoraApp : Application(), ImageLoaderFactory {
         com.vyora.music.data.lyrics.LyricsRepository.init(this)
         com.vyora.music.data.scrobble.Scrobbler.init(this)
         com.vyora.music.data.local.LosslessOutput.init(this)
+        com.vyora.music.data.youtube.LoudnessStore.init(this)
     }
 
     override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)

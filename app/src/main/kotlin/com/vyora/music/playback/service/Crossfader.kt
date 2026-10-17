@@ -18,7 +18,10 @@ class Crossfader(
     private val context: Context,
     private val main: ExoPlayer,
     private val sourceFactory: MediaSource.Factory,
+    /** Builds the tail's audio pipeline; it is handed a reader for the id of the track the tail plays. */
+    private val renderers: ((() -> String?) -> androidx.media3.exoplayer.RenderersFactory)? = null,
 ) {
+    @Volatile private var tailMediaId: String? = null
     private enum class Phase { IDLE, PREPARING, FADING }
 
     private var tail: ExoPlayer? = null
@@ -83,6 +86,7 @@ class Crossfader(
 
         val item: MediaItem = main.currentMediaItem ?: return
         val t = tail ?: buildTail().also { tail = it }
+        tailMediaId = item.mediaId
         t.setMediaSource(sourceFactory.createMediaSource(item), handoff)
         t.volume = 0f
         t.playWhenReady = false
@@ -138,7 +142,8 @@ class Crossfader(
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
-        return ExoPlayer.Builder(context)
+        val builder = renderers?.let { ExoPlayer.Builder(context, it { tailMediaId }) } ?: ExoPlayer.Builder(context)
+        return builder
             .setMediaSourceFactory(sourceFactory)
             .setAudioAttributes(attrs, false)
             .build()

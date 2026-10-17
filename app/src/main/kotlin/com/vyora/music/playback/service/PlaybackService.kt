@@ -37,6 +37,9 @@ import com.vyora.music.data.youtube.YouTubeClient
 import com.vyora.music.playback.MediaItems
 import com.vyora.music.playback.SleepTimer
 import com.vyora.music.playback.audio.AudioEffects
+import com.vyora.music.playback.audio.OutputStatus
+import com.vyora.music.playback.audio.VyoraRenderersFactory
+import com.vyora.music.data.youtube.Loudness
 import com.vyora.music.playback.source.MediaCache
 import com.vyora.music.playback.source.YouTubeDataSource
 import kotlinx.coroutines.Job
@@ -69,6 +72,9 @@ class PlaybackService : MediaLibraryService() {
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
     private val active: Player get() = mediaSession?.player ?: player
+    @Volatile private var mainMediaId: String? = null
+    private var mainRenderers: VyoraRenderersFactory? = null
+    private var tailRenderers: VyoraRenderersFactory? = null
 
     private class QueueSnapshot(
         val items: List<MediaItem>,
@@ -125,7 +131,11 @@ class PlaybackService : MediaLibraryService() {
             .build()
 
         val sourceFactory = DefaultMediaSourceFactory(this).setDataSourceFactory(YouTubeDataSource.audioFactory(this))
-        player = ExoPlayer.Builder(this)
+        val renderers = VyoraRenderersFactory(this)
+        renderers.loudness.targetGain = { loudnessGainFor(mainMediaId) }
+        renderers.spatial.enabled = SettingsRepository.current.spatialAudio
+        mainRenderers = renderers
+        player = ExoPlayer.Builder(this, renderers)
             .setMediaSourceFactory(sourceFactory)
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(SettingsRepository.current.pauseOnDisconnect)
@@ -142,6 +152,9 @@ class PlaybackService : MediaLibraryService() {
 
             override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
                 retriedIds.clear()
+                mainMediaId = mediaItem?.mediaId
+                mainRenderers?.loudness?.onTrackChanged()
+                publishLoudness()
                 if (!crossfader.onTransition(player.currentMediaItemIndex)) player.volume = sleepFactor()
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) keepCurrentFirstInShuffle()
                 saveQueue()
@@ -188,7 +201,15 @@ class PlaybackService : MediaLibraryService() {
             }
         })
         player.addListener(presenceListener)
-        crossfader = Crossfader(this, player, sourceFactory)
+        player.addAnalyticsListener(outputListener)
+        mainMediaId = player.currentMediaItem?.mediaId
+        crossfader = Crossfader(this, player, sourceFactory) { tailId ->
+            VyoraRenderersFactory(this).also { r ->
+                r.loudness.targetGain = { loudnessGainFor(tailId()) }
+                r.spatial.enabled = SettingsRepository.current.spatialAudio
+                tailRenderers = r
+            }
+        }
         listening.attach(player)
 
         player.setShuffleOrder(PlayNextShuffleOrder(IntArray(0)))
@@ -205,6 +226,10 @@ class PlaybackService : MediaLibraryService() {
                     discordWas = s.discordPresence
                 }
                 player.skipSilenceEnabled = s.skipSilence
+                mainRenderers?.spatial?.enabled = s.spatialAudio
+                tailRenderers?.spatial?.enabled = s.spatialAudio
+                applyPreferredDevice(s.preferUsbDac)
+                publishLoudness()
                 val params = PlaybackParameters(s.playbackSpeed, s.playbackPitch)
                 if (player.playbackParameters != params) player.playbackParameters = params
                 MediaCache.setMaxBytes(s.mediaCache.bytes)
@@ -214,6 +239,12 @@ class PlaybackService : MediaLibraryService() {
                     if (s.autoplay) maybeAutoplay() else removeUpcomingAutoplay()
                 }
                 autoplayWas = s.autoplay
+            }
+        }
+        scope.launch {
+            com.vyora.music.data.local.LosslessOutput.state.collect {
+                applyPreferredDevice(SettingsRepository.current.preferUsbDac)
+                publishLoudness()
             }
         }
         scope.launch {
@@ -374,6 +405,53 @@ class PlaybackService : MediaLibraryService() {
         )
     }
 
+    /**
+     * Sound Check's gain for [mediaId]: YouTube's loudness figure turned into a bounded linear gain, or
+     * exactly 1 when it is off, the phone speaker is playing and the user asked to leave it alone there,
+     * or nothing is known about the track. Runs on the audio thread — only reads volatile state.
+     */
+    private fun loudnessGainFor(mediaId: String?): Float {
+        val db = loudnessDbFor(mediaId) ?: return 1f
+        return Loudness.gainFor(db)
+    }
+
+    private fun loudnessDbFor(mediaId: String?): Double? {
+        val s = SettingsRepository.current
+        if (!s.loudnessNormalization) return null
+        if (s.loudnessOffOnSpeaker &&
+            com.vyora.music.data.local.LosslessOutput.state.value.via == com.vyora.music.data.local.LosslessOutput.Kind.SPEAKER
+        ) return null
+        val id = mediaId?.takeIf { SimpleItem.isYouTubeId(it) } ?: return null
+        return StreamResolver.loudnessDbFor(id)
+    }
+
+    private fun publishLoudness() {
+        val db = loudnessDbFor(mainMediaId)
+        OutputStatus.publishLoudness(db?.let { (-it).coerceIn(-15.0, 3.0).toFloat() })
+    }
+
+    private var preferredUsb: android.media.AudioDeviceInfo? = null
+
+    /** Prefer USB DAC: pin the player to an attached USB output; let Android choose again once it is gone. */
+    private fun applyPreferredDevice(prefer: Boolean) {
+        val usb = if (prefer) com.vyora.music.data.local.LosslessOutput.usbDevice() else null
+        if (usb?.id == preferredUsb?.id) return
+        preferredUsb = usb
+        runCatching { player.setPreferredAudioDevice(usb) }.onFailure { Log.w(TAG, "Preferred device not applied", it) }
+    }
+
+    private val outputListener = object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+        override fun onAudioTrackInitialized(
+            eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+            audioTrackConfig: androidx.media3.exoplayer.audio.AudioSink.AudioTrackConfig,
+        ) = OutputStatus.publishSink(audioTrackConfig.encoding, audioTrackConfig.sampleRate, audioTrackConfig.offload)
+
+        override fun onAudioTrackReleased(
+            eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+            audioTrackConfig: androidx.media3.exoplayer.audio.AudioSink.AudioTrackConfig,
+        ) = OutputStatus.clearSink()
+    }
+
     private fun handleError(error: PlaybackException) {
         val item = player.currentMediaItem
         val id = item?.mediaId.orEmpty()
@@ -464,28 +542,49 @@ class PlaybackService : MediaLibraryService() {
         if (left > AUTOPLAY_WHEN_LEFT) return
         val lastIndex = timeline.getLastWindowIndex(shuffle).takeIf { it != C.INDEX_UNSET } ?: return
         // Radio needs a YouTube seed; for a queue of device files use the last streamed song, if any.
-        val seed = (lastIndex downTo 0).asSequence()
-            .map { player.getMediaItemAt(it).mediaId }
-            .firstOrNull { it.isNotBlank() && SimpleItem.isYouTubeId(it) } ?: return
-        if (seed == autoplayFailedSeed) return
+        val queueSeed = (lastIndex downTo 0).asSequence()
+            .map { player.getMediaItemAt(it) }
+            .firstOrNull { it.mediaId.isNotBlank() && SimpleItem.isYouTubeId(it.mediaId) } ?: return
+        val tail = (lastIndex downTo maxOf(0, lastIndex - 6)).mapNotNull { MediaItems.toSimpleItem(player.getMediaItemAt(it)) }
+            .asReversed().let { listOfNotNull(MediaItems.toSimpleItem(queueSeed)) + it }
+        val seeds = com.vyora.music.data.library.Recommend.seeds(
+            queueTail = tail,
+            recent = LibraryManager.recentSongs.value,
+            liked = LibraryManager.likedSongs.value,
+        ).filter { it.id != autoplayFailedSeed }
+        val seed = seeds.firstOrNull() ?: return
 
         autoplayJob = scope.launch {
-            val songs = YouTubeClient.radio(seed).getOrNull()
-            if (songs.isNullOrEmpty()) {
-                autoplayFailedSeed = seed
+            val s = SettingsRepository.current
+            val existing = (0 until player.mediaItemCount).mapNotNull { MediaItems.toSimpleItem(player.getMediaItemAt(it)) }
+            val inQueue = existing.mapTo(HashSet()) { it.id }
+            val exclude = if (s.dontRepeatSuggestions) inQueue + autoplayed else inQueue
+            var picks = emptyList<SimpleItem>()
+            // An exhausted or failing station falls through to the next seed instead of ending playback.
+            for (candidate in seeds) {
+                val songs = YouTubeClient.radio(candidate.id).getOrNull().orEmpty()
+                if (songs.isEmpty()) continue
+                val orderedExisting = existing.filter { it.id != candidate.id } + candidate
+                picks = com.vyora.music.data.library.Recommend.extend(
+                    existing = orderedExisting,
+                    candidates = songs,
+                    limit = AUTOPLAY_BATCH,
+                    songsOnly = s.preferSongsOverVideos,
+                    exclude = exclude,
+                )
+                if (picks.isEmpty() && !s.dontRepeatSuggestions) {
+                    picks = songs.filter { it.id !in inQueue }.take(AUTOPLAY_BATCH)
+                }
+                if (picks.isNotEmpty()) break
+            }
+            if (picks.isEmpty()) {
+                autoplayFailedSeed = seed.id
                 return@launch
             }
             autoplayFailedSeed = null
             if (!SettingsRepository.current.autoplay || player.mediaItemCount == 0) return@launch
-            val inQueue = HashSet<String>().apply { for (i in 0 until player.mediaItemCount) add(player.getMediaItemAt(i).mediaId) }
-            val picks = songs.filter { it.id !in inQueue && it.id !in autoplayed }.take(AUTOPLAY_BATCH)
-                .ifEmpty { songs.filter { it.id !in inQueue }.take(AUTOPLAY_BATCH) }
-            if (picks.isEmpty()) {
-                autoplayFailedSeed = seed
-                return@launch
-            }
             picks.forEach { autoplayed += it.id }
-            while (autoplayed.size > 300) autoplayed.remove(autoplayed.first())
+            while (autoplayed.size > 500) autoplayed.remove(autoplayed.first())
             val ended = player.playbackState == Player.STATE_ENDED
             val firstNew = player.mediaItemCount
             player.addMediaItems(picks.map { MediaItems.from(it, autoplay = true) })

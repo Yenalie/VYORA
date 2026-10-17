@@ -538,9 +538,23 @@ fun VyoraAppRoot(settings: AppSettings) {
                 )
             }
             screen("settings/appearance") { com.vyora.music.ui.screens.settings.AppearanceSettingsScreen(onBack = { navController.popBackStack() }) }
-            screen("settings/audio_quality") { com.vyora.music.ui.screens.settings.AudioQualityScreen(onBack = { navController.popBackStack() }) }
+            screen("settings/audio_quality") {
+                com.vyora.music.ui.screens.settings.AudioQualityScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpen = { page -> navController.navigate("settings/$page") },
+                )
+            }
+            screen("settings/quality/wifi") { com.vyora.music.ui.screens.settings.QualityPickerScreen("wifi", onBack = { navController.popBackStack() }) }
+            screen("settings/quality/mobile") { com.vyora.music.ui.screens.settings.QualityPickerScreen("mobile", onBack = { navController.popBackStack() }) }
+            screen("settings/quality/download") { com.vyora.music.ui.screens.settings.QualityPickerScreen("download", onBack = { navController.popBackStack() }) }
+            screen("settings/output") { com.vyora.music.ui.screens.settings.AudioOutputScreen(onBack = { navController.popBackStack() }) }
             screen("settings/transitions") { com.vyora.music.ui.screens.settings.TransitionsScreen(onBack = { navController.popBackStack() }) }
-            screen("settings/downloads") { com.vyora.music.ui.screens.settings.DownloadsSettingsScreen(onBack = { navController.popBackStack() }) }
+            screen("settings/downloads") {
+                com.vyora.music.ui.screens.settings.DownloadsSettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpen = { page -> navController.navigate("settings/$page") },
+                )
+            }
             screen("settings/storage") { com.vyora.music.ui.screens.settings.StorageSettingsScreen(onBack = { navController.popBackStack() }) }
             screen("settings/backup") { com.vyora.music.ui.screens.settings.BackupSettingsScreen(onBack = { navController.popBackStack() }) }
             screen("settings/updates") { com.vyora.music.ui.screens.settings.UpdatesSettingsScreen(onBack = { navController.popBackStack() }) }

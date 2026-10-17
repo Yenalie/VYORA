@@ -130,6 +130,27 @@ object MusicServer {
             .addQueryParameter("estimateContentLength", "true").build().toString()
     }
 
+    /** The server song id inside one of our own stream URLs, or `null` for anything else. */
+    fun streamSongIdOf(url: String?): String? {
+        val u = url?.toHttpUrlOrNull() ?: return null
+        val last = u.pathSegments.lastOrNull() ?: return null
+        if (last != "stream" && last != "stream.view") return null
+        if (u.pathSegments.getOrNull(u.pathSegments.size - 2) != "rest") return null
+        return u.queryParameter("id")?.takeIf { it.isNotBlank() }
+    }
+
+    /**
+     * [url] (one of our stream URLs) asking for [kbps]: `null` keeps the original file (`format=raw`),
+     * anything else asks the server to transcode to MP3 at that ceiling — the rung's data budget.
+     */
+    fun withQuality(url: String, kbps: Int?): String {
+        val u = url.toHttpUrlOrNull() ?: return url
+        val b = u.newBuilder().removeAllQueryParameters("format").removeAllQueryParameters("maxBitRate")
+        if (kbps == null) b.addQueryParameter("format", "raw")
+        else b.addQueryParameter("format", "mp3").addQueryParameter("maxBitRate", kbps.toString())
+        return b.build().toString()
+    }
+
     fun coverUrl(coverId: String?, size: Int = 600): String? {
         val cfg = _config.value ?: return null
         if (coverId.isNullOrBlank()) return null

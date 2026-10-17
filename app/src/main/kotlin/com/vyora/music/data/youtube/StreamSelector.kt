@@ -46,7 +46,7 @@ object StreamSelector {
 
         val ranked = pool.sortedWith(compareBy<AudioCandidate> { it.bitrate }.thenBy { if (it.isOpus) 1 else 0 })
         return when (quality) {
-            AudioQuality.HIGH -> ranked.last()
+            AudioQuality.HIGH, AudioQuality.LOSSLESS -> ranked.last()
             AudioQuality.NORMAL -> ranked.lastOrNull { it.bitrate <= NORMAL_MAX_BITRATE } ?: ranked.first()
             AudioQuality.LOW -> ranked.firstOrNull { it.bitrate >= LOW_MIN_BITRATE } ?: ranked.last()
         }

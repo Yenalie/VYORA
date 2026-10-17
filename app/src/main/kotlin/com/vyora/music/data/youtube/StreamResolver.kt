@@ -6,6 +6,7 @@ import com.vyora.music.data.settings.AudioQuality
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import org.schabi.newpipe.extractor.NewPipe
+import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper
 import org.schabi.newpipe.extractor.stream.AudioStream
 import org.schabi.newpipe.extractor.stream.AudioTrackType
@@ -34,6 +35,12 @@ object StreamResolver {
         val video: List<VideoCandidate>,
         val expiresAt: Long,
     )
+
+    /**
+     * YouTube's normalization figure for [videoId], once its stream has been resolved; `null` until then.
+     * Safe to call from the audio thread.
+     */
+    fun loudnessDbFor(videoId: String): Double? = LoudnessStore.get(videoId)
 
     private val entries = object : LinkedHashMap<String, Entry>(MAX_ENTRIES, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Entry>) = size > MAX_ENTRIES
@@ -95,7 +102,9 @@ object StreamResolver {
     }
 
     private fun extract(videoId: String): Entry {
-        val info = StreamInfo.getInfo(SimpleItem.watchUrl(videoId))
+        val extractor = ServiceList.YouTube.getStreamExtractor(SimpleItem.watchUrl(videoId))
+        val info = StreamInfo.getInfo(extractor)
+        Loudness.read(extractor)?.let { db -> LoudnessStore.put(videoId, db) }
         val audio = info.audioStreams.map { it.toCandidate() }
         val video = info.videoOnlyStreams.map { it.toCandidate() }
         val urls = audio.map { it.url } + video.map { it.url }

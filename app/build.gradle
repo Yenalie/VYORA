@@ -12,8 +12,8 @@ android {
         applicationId = 'com.vyora.music'
         minSdk = 29
         targetSdk = 35
-        versionCode = 12
-        versionName = '1.9.1'
+        versionCode = 13
+        versionName = '1.10.0'
 
         testInstrumentationRunner = 'androidx.test.runner.AndroidJUnitRunner'
 
@@ -125,6 +125,8 @@ dependencies {
     implementation libs.androidx.media3.cast
 
     implementation libs.newpipe.extractor
+    // NewPipe's JSON types, for reading YouTube's loudness data (Sound Check).
+    implementation 'com.github.TeamNewPipe:nanojson:e9d656ddb49a412a5a0a5d5ef20ca7ef09549996'
     implementation libs.okhttp
     implementation libs.coil.compose
 

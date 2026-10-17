@@ -191,7 +191,7 @@ fun BoxScope.SongMenu(
             MenuAction(goToArtist, Icons.Default.Person) { app.openArtist(name, null, item.artistId) }
         },
         if (item.isYouTube) MenuAction(createStation, Icons.Default.Radio) { PlayerManager.startRadio(item) } else null,
-        if (item.isSong && item.isYouTube) {
+        if (item.isSong && (item.isYouTube || item.isServer)) {
             MenuAction(downloadLabel, downloadIcon, accent = downloadStatus == DownloadStatus.COMPLETED) {
                 when (downloadStatus) {
                     null, DownloadStatus.FAILED -> {
