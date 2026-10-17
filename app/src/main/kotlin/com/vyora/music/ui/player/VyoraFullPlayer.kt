@@ -31,6 +31,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -116,6 +117,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
@@ -819,17 +821,15 @@ private fun CurrentLyricsPeek(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 12.dp)
-            .clip(RoundedCornerShape(22.dp))
-            .liquidFill(
-                shape = RoundedCornerShape(22.dp),
-                fill = Color.White.copy(alpha = 0.12f),
-                rimAlpha = 0.78f,
-            )
-            .glassClickable(pressedScale = 0.985f, onClick = onOpen)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.Black.copy(alpha = 0.16f))
+            .border(1.dp, Color.White.copy(alpha = 0.52f), RoundedCornerShape(20.dp))
+            .glassClickable(pressedScale = 0.99f, onClick = onOpen)
+            .animateContentSize(tween(220))
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.Top,
     ) {
-        Icon(Icons.Default.Lyrics, contentDescription = null, tint = Color.White.copy(alpha = 0.78f), modifier = Modifier.size(19.dp))
+        Icon(Icons.Default.Lyrics, contentDescription = null, tint = Color.White.copy(alpha = 0.82f), modifier = Modifier.padding(top = 2.dp).size(19.dp))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Crossfade(targetState = currentLine, animationSpec = tween(180), label = "currentLyricLine") { line ->
@@ -837,18 +837,16 @@ private fun CurrentLyricsPeek(
                     text = line,
                     color = Color.White,
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    softWrap = true,
                 )
             }
             if (!nextLine.isNullOrBlank()) {
                 Crossfade(targetState = nextLine, animationSpec = tween(220), label = "nextLyricLine") { line ->
                     Text(
                         text = line,
-                        color = Color.White.copy(alpha = 0.48f),
+                        color = Color.White.copy(alpha = 0.66f),
                         style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        softWrap = true,
                     )
                 }
             }
