@@ -1,9 +1,10 @@
 # Changelog
 
 ## 1.9.5
-- **Lirik langsung di full player:** baris yang sedang diputar dan baris berikutnya tampil tepat di bawah judul lagu dan artis; ketuk panel untuk membuka lirik penuh
-- **Kartu lirik Liquid Glass:** pratinjau dan kartu berbagi mendapat lapisan kaca buram, highlight tepi, dan kedalaman yang mengikuti artwork
-- Transisi player, perpindahan mode Artwork/Lirik/Antrean, dan pergantian metadata lagu terasa lebih halus
+- **Lyric strip ala BitChord:** satu baris lirik aktif tampil sederhana di bawah judul dan artis; ketuk untuk membuka panel lirik penuh
+- Lirik panjang di strip membungkus ke beberapa baris, sementara pergantian lirik memakai transisi fade dan slide yang ringan
+- Kartu lirik berbagi mendapat tampilan Liquid Glass baru
+- Transisi player dan perpindahan mode Artwork/Lirik/Antrean terasa lebih halus
 
 ## 1.9.0
 - **Login Discord baru (port dari YumaPlayer):** tidak ada lagi login WebView atau token akun. Tombol "Masuk dengan Discord" membuka halaman persetujuan resmi Discord (OAuth2 + PKCE) di Chrome / aplikasi Discord, lalu otomatis kembali ke VYORA. Token disimpan terenkripsi dan diperbarui otomatis

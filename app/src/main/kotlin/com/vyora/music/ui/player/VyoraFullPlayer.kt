@@ -18,8 +18,11 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -30,7 +33,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -117,7 +119,6 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.layout.requiredSize
-import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
@@ -812,45 +813,38 @@ private fun CurrentLyricsPeek(
         synced.indexOfLast { it.timeMs <= positionMs + 250 }.coerceAtLeast(0)
     }
     val currentLine = if (synced.isNotEmpty()) synced.getOrNull(activeIndex)?.text else plain.firstOrNull()
-    val nextLine = if (synced.isNotEmpty()) {
-        synced.drop(activeIndex + 1).firstOrNull { it.text.isNotBlank() }?.text
-    } else plain.getOrNull(1)
     if (currentLine.isNullOrBlank()) return
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 12.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color.Black.copy(alpha = 0.16f))
-            .border(1.dp, Color.White.copy(alpha = 0.52f), RoundedCornerShape(20.dp))
+            .padding(top = 10.dp, bottom = 2.dp)
+            .clip(RoundedCornerShape(8.dp))
             .glassClickable(pressedScale = 0.99f, onClick = onOpen)
-            .animateContentSize(tween(220))
-            .padding(horizontal = 14.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.Top,
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Default.Lyrics, contentDescription = null, tint = Color.White.copy(alpha = 0.82f), modifier = Modifier.padding(top = 2.dp).size(19.dp))
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Crossfade(targetState = currentLine, animationSpec = tween(180), label = "currentLyricLine") { line ->
-                Text(
-                    text = line,
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                    softWrap = true,
-                )
-            }
-            if (!nextLine.isNullOrBlank()) {
-                Crossfade(targetState = nextLine, animationSpec = tween(220), label = "nextLyricLine") { line ->
-                    Text(
-                        text = line,
-                        color = Color.White.copy(alpha = 0.66f),
-                        style = MaterialTheme.typography.bodyMedium,
-                        softWrap = true,
-                    )
-                }
-            }
+        Icon(Icons.Default.Lyrics, contentDescription = null, tint = Color.White.copy(alpha = 0.82f), modifier = Modifier.size(19.dp))
+        Spacer(Modifier.width(10.dp))
+        AnimatedContent(
+            targetState = currentLine,
+            transitionSpec = {
+                (fadeIn(tween(260)) + slideInVertically(tween(260)) { height -> height / 3 }) togetherWith
+                    (fadeOut(tween(180)) + slideOutVertically(tween(180)) { height -> -height / 3 }) using
+                    SizeTransform(clip = false)
+            },
+            modifier = Modifier.weight(1f),
+            label = "currentLyricStrip",
+        ) { line ->
+            Text(
+                text = line,
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                softWrap = true,
+            )
         }
+        Spacer(Modifier.width(6.dp))
+        Text("›", color = Color.White.copy(alpha = 0.55f), style = MaterialTheme.typography.titleLarge)
     }
 }
 
