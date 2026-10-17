@@ -594,4 +594,7 @@
     <string name="mood_q_rnb">lagu r&amp;b hits</string>
     <string name="mood_q_rock">lagu rock hits</string>
     <string name="mood_q_kpop">lagu k-pop hits</string>
+    <string name="full_bleed_artwork">Artwork Layar Penuh</string>
+    <string name="full_bleed_artwork_desc">Cubit-perbesar artwork di Sedang Diputar untuk memenuhi layar, cubit-perkecil untuk kembali.</string>
+    <string name="player_high_quality">Kualitas Tinggi</string>
 </resources>

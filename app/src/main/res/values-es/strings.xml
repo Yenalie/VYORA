@@ -602,4 +602,7 @@
     <string name="mood_q_rnb">éxitos r&amp;b</string>
     <string name="mood_q_rock">éxitos rock</string>
     <string name="mood_q_kpop">éxitos k-pop</string>
+    <string name="full_bleed_artwork">Portada a pantalla completa</string>
+    <string name="full_bleed_artwork_desc">Pellizca hacia fuera sobre la portada en Reproduciendo para llenar la pantalla, y hacia dentro para volver.</string>
+    <string name="player_high_quality">Alta calidad</string>
 </resources>

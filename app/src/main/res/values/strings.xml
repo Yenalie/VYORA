@@ -599,4 +599,7 @@
     <string name="mood_q_rnb">r&amp;b hits</string>
     <string name="mood_q_rock">rock hits</string>
     <string name="mood_q_kpop">k-pop hits</string>
+    <string name="full_bleed_artwork">Full-Screen Artwork</string>
+    <string name="full_bleed_artwork_desc">Pinch out on the artwork in Now Playing to fill the screen, pinch in to go back.</string>
+    <string name="player_high_quality">High Quality</string>
 </resources>

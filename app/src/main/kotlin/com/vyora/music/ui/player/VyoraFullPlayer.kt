@@ -16,6 +16,7 @@ import android.widget.Toast
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -27,6 +28,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -264,6 +271,22 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
 
     val playerBackdrop = rememberLayerBackdrop()
 
+    // BitChord's full-bleed artwork: the sleeve edge to edge at the top, its lower part dissolving into the
+    // background. Pinch out on the artwork to switch it on, pinch in to go back; the choice is remembered.
+    val heroWanted = appSettings.fullBleedArtwork && mode == MODE_ART && videoItem == null
+    val hero by animateFloatAsState(
+        targetValue = if (heroWanted) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
+        label = "heroArtwork",
+    )
+    val heroHaptics = LocalHapticFeedback.current
+    val setHero: (Boolean) -> Unit = { on ->
+        if (com.vyora.music.data.settings.SettingsRepository.current.fullBleedArtwork != on) {
+            heroHaptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            com.vyora.music.data.settings.SettingsRepository.update { it.copy(fullBleedArtwork = on) }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().layerBackdrop(playerBackdrop)) {
             LivingBackground(
@@ -272,6 +295,7 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
                 tint = animatedTint,
                 animate = sheet.isVisible && isPlaying && animatedBackground,
             )
+            if (hero > 0.001f) HeroArtwork(thumbnail, title, hero)
         }
 
         CompositionLocalProvider(LocalAppBackdrop provides playerBackdrop, LocalMenuBackdrop provides playerBackdrop) {
@@ -339,6 +363,7 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
+                                .pinchToggle(onPinchOut = { setHero(true) }, onPinchIn = { setHero(false) })
                                 .padding(vertical = 14.dp),
                             contentAlignment = Alignment.Center,
                         ) {
@@ -348,6 +373,7 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
                                 flightEnabled = mode == MODE_ART,
                                 wide = videoItem != null,
                                 videoId = videoId,
+                                heroProgress = hero,
                             )
                         }
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -493,6 +519,70 @@ private fun BackgroundCopy(
     }
 }
 
+private const val HERO_FADE_FRACTION = 0.42f
+
+/** The full-bleed sleeve: square, edge to edge from the top of the screen, fading out over its lower part. */
+@Composable
+private fun HeroArtwork(thumbnail: String?, title: String?, progress: Float) {
+    val sharp = remember(thumbnail) { com.vyora.music.data.youtube.YouTubeClient.artUrl(thumbnail, 1080) ?: thumbnail }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .graphicsLayer {
+                alpha = progress
+                val s = 1.08f - 0.08f * progress
+                scaleX = s
+                scaleY = s
+                transformOrigin = TransformOrigin(0.5f, 0f)
+                compositingStrategy = CompositingStrategy.Offscreen
+            }
+            .drawWithContent {
+                drawContent()
+                drawRect(
+                    Brush.verticalGradient(
+                        0f to Color.Black,
+                        (1f - HERO_FADE_FRACTION) to Color.Black,
+                        1f to Color.Transparent,
+                    ),
+                    blendMode = BlendMode.DstIn,
+                )
+            },
+    ) {
+        AsyncImage(model = sharp, contentDescription = title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        // Keeps the status bar and the grabber legible over a bright sleeve.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.38f), Color.Transparent))),
+        )
+    }
+}
+
+/**
+ * Two-finger pinch on the artwork: out past 1.2x calls [onPinchOut], in below 0.83x calls [onPinchIn], once
+ * per gesture. Only multi-touch events are consumed, so a one-finger swipe still skips tracks.
+ */
+private fun Modifier.pinchToggle(onPinchOut: () -> Unit, onPinchIn: () -> Unit): Modifier = pointerInput(Unit) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false)
+        var zoom = 1f
+        var fired = false
+        while (true) {
+            val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+            if (event.changes.none { it.pressed }) break
+            if (event.changes.count { it.pressed } >= 2) {
+                if (!fired) {
+                    zoom *= event.calculateZoom()
+                    if (zoom > 1.2f) { fired = true; onPinchOut() } else if (zoom < 0.83f) { fired = true; onPinchIn() }
+                }
+                event.changes.forEach { it.consume() }
+            }
+        }
+    }
+}
+
 @Composable
 private fun SwipeArtwork(
     thumbnail: String?,
@@ -503,6 +593,7 @@ private fun SwipeArtwork(
     flightEnabled: Boolean,
     wide: Boolean = false,
     videoId: String? = null,
+    heroProgress: Float = 0f,
 ) {
     val scale by animateFloatAsState(
         targetValue = if (isPlaying) 1f else 0.82f,
@@ -533,8 +624,11 @@ private fun SwipeArtwork(
                 )
             }
             .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
+                // Grows towards the full-bleed sleeve while it fades, so the two read as one picture.
+                val grow = 1f + 0.18f * heroProgress
+                scaleX = scale * grow
+                scaleY = scale * grow
+                alpha = 1f - heroProgress
                 translationX = shownX * 0.6f
                 rotationZ = shownX / size.width * 4f
             }
@@ -1259,23 +1353,83 @@ private fun SeekSection() {
     }
 }
 
-/** Apple-style quality mark between the elapsed and remaining time; tap for codec details. */
+/**
+ * BitChord's quality label between the timestamps: a shimmering "Lossless" / "Hi-Res Lossless" with the wave
+ * glyph, "High Quality" with headphones for the top lossy rung, otherwise the codec and bitrate actually
+ * playing. Tap for the full format details.
+ */
 @Composable
 private fun NowPlayingQuality() {
     val format by PlayerManager.audioFormat.collectAsState()
     val current by PlayerManager.currentItem.collectAsState()
     var details by remember { mutableStateOf(false) }
     val f = format ?: return
-    com.vyora.music.ui.components.QualityBadge(
-        tier = f.tier,
-        color = Color.White.copy(alpha = 0.6f),
-        lossyLabel = f.codec.uppercase(),
-        onClick = { details = true },
-        modifier = Modifier.padding(horizontal = 6.dp),
-    )
+    val kbps = (f.bitrate + 500) / 1000
+    val muted = Color.White.copy(alpha = 0.45f)
+    val style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium, fontSize = 12.sp)
+    Row(
+        Modifier.padding(horizontal = 6.dp).glassClickable(pressedScale = 0.94f) { details = true },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        when {
+            f.tier != com.vyora.music.data.local.AudioTier.LOSSY -> {
+                Icon(Icons.Default.GraphicEq, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                ShimmerText(com.vyora.music.ui.components.tierLabel(f.tier), style)
+            }
+            kbps >= HIGH_QUALITY_KBPS -> {
+                Icon(Icons.Default.Headphones, null, tint = muted, modifier = Modifier.size(13.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(stringResource(R.string.player_high_quality), color = muted, style = style, maxLines = 1)
+            }
+            else -> Text(
+                if (kbps > 0) "${f.codec} · $kbps kbps" else f.codec,
+                color = muted, style = style, maxLines = 1,
+            )
+        }
+    }
     if (details) {
         com.vyora.music.ui.components.AudioFormatDialog(f, current?.isLocal == true, onDismiss = { details = false }, isServer = current?.isServer == true)
     }
+}
+
+/** Lossy at or above this is YouTube's best Opus / a 256-320 kbps tier, shown as "High Quality". */
+private const val HIGH_QUALITY_KBPS = 150
+
+/** "Lossless" with a highlight band sweeping across it every three seconds (BitChord's ShimmerText). */
+@Composable
+private fun ShimmerText(text: String, style: androidx.compose.ui.text.TextStyle) {
+    val progress = androidx.compose.animation.core.rememberInfiniteTransition(label = "lossless-shimmer").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = tween(durationMillis = 3_000, easing = LinearEasing),
+        ),
+        label = "lossless-shimmer-progress",
+    )
+    val tint = Color.White
+    val base = tint.copy(alpha = 0.55f)
+    Text(
+        text = text,
+        style = style,
+        color = tint,
+        maxLines = 1,
+        modifier = Modifier
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                val band = size.width * 0.6f
+                val center = -band + progress.value * (size.width + 2 * band)
+                drawRect(
+                    brush = Brush.linearGradient(
+                        colorStops = arrayOf(0f to base, 0.5f to tint, 1f to base),
+                        start = androidx.compose.ui.geometry.Offset(center - band, 0f),
+                        end = androidx.compose.ui.geometry.Offset(center + band, 0f),
+                    ),
+                    blendMode = BlendMode.SrcIn,
+                )
+            },
+    )
 }
 
 @Composable

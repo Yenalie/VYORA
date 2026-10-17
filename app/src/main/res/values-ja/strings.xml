@@ -594,4 +594,7 @@
     <string name="mood_q_rnb">r&amp;b ヒット</string>
     <string name="mood_q_rock">ロック ヒット</string>
     <string name="mood_q_kpop">k-pop ヒット</string>
+    <string name="full_bleed_artwork">全画面アートワーク</string>
+    <string name="full_bleed_artwork_desc">再生中画面のアートワークをピンチアウトで全画面に、ピンチインで元に戻します。</string>
+    <string name="player_high_quality">高音質</string>
 </resources>

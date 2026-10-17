@@ -45,6 +45,20 @@ class AudioEngineTest {
         assertEquals(250, StreamSelector.pickAudio(list, AudioQuality.LOW)!!.itag)
     }
 
+    @Test fun rungsDifferWithRealYouTubeLadder() {
+        // The ladder YouTube actually serves, in bps after StreamResolver's kbps normalisation.
+        val list = listOf(
+            audio(139, 48_000, "mp4a.40.5"), audio(249, 50_000), audio(250, 70_000),
+            audio(140, 128_000, "mp4a.40.2"), audio(251, 160_000),
+        )
+        val picks = AudioQuality.entries.associateWith { StreamSelector.pickAudio(list, it)!!.itag }
+        assertEquals(251, picks[AudioQuality.LOSSLESS])
+        assertEquals(251, picks[AudioQuality.HIGH])
+        assertEquals(140, picks[AudioQuality.NORMAL])
+        assertEquals(250, picks[AudioQuality.LOW])
+        assertEquals(160, list.last().kbps)
+    }
+
     @Test fun ignoresNonProgressive() {
         assertNull(StreamSelector.pickAudio(listOf(audio(251, 160_000, progressive = false)), AudioQuality.HIGH))
     }

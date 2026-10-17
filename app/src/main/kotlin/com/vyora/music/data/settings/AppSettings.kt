@@ -120,11 +120,13 @@ data class AppSettings(
     val language: AppLanguage = AppLanguage.SYSTEM,
     val ambientBackground: Boolean = true,
     val animatedPlayerBackground: Boolean = true,
+    /** Now Playing artwork edge to edge at the top of the screen (BitChord's full-bleed artwork). Pinch to toggle. */
+    val fullBleedArtwork: Boolean = false,
     val haptics: Boolean = true,
     val glass: GlassSettings = GlassSettings(),
     val audioQuality: AudioQuality = AudioQuality.LOSSLESS,
     /** Quality on metered networks (mobile data, hotspot); [audioQuality] applies on Wi-Fi. */
-    val mobileQuality: AudioQuality = AudioQuality.NORMAL,
+    val mobileQuality: AudioQuality = AudioQuality.HIGH,
     val separateMobileQuality: Boolean = true,
     val downloadQuality: DownloadQuality = DownloadQuality.HIGH,
     /** Copy finished downloads into Music/VYORA where other music apps can see them. */
@@ -255,7 +257,7 @@ object SettingsRepository {
         getString(key, null)?.let { name -> enumValues<T>().firstOrNull { it.name == name } } ?: default
 
     /** Bumped when the quality ladder gained LOSSLESS (1.9.2). */
-    private const val QUALITY_LADDER = 2
+    private const val QUALITY_LADDER = 3
 
     private fun read(p: SharedPreferences): AppSettings = migrate(p, readStored(p))
 
@@ -264,7 +266,11 @@ object SettingsRepository {
      * people updating, and give anyone who never split Wi-Fi from mobile the same choice on both.
      */
     internal fun migrate(p: SharedPreferences, s: AppSettings): AppSettings {
-        if (p.getInt("quality_ladder", 0) >= QUALITY_LADDER || !p.contains("audio_quality")) return s
+        val ladder = p.getInt("quality_ladder", 0)
+        if (ladder >= QUALITY_LADDER || !p.contains("audio_quality")) return s
+        // Ladder 2 → 3: mobile data used to default to Medium, which made Lossless look like it did nothing
+        // away from Wi-Fi. Lift a Medium that was only ever the default to High once.
+        if (ladder == 2) return if (s.mobileQuality == AudioQuality.NORMAL) s.copy(mobileQuality = AudioQuality.HIGH) else s
         val wifi = if (s.audioQuality == AudioQuality.HIGH) AudioQuality.LOSSLESS else s.audioQuality
         val split = p.getBoolean("audio_quality_split", false)
         val mobile = if (split) s.mobileQuality.let { if (it == AudioQuality.HIGH) AudioQuality.LOSSLESS else it } else wifi
@@ -281,6 +287,7 @@ object SettingsRepository {
             language = p.enum("language", d.language),
             ambientBackground = p.getBoolean("ambient", d.ambientBackground),
             animatedPlayerBackground = p.getBoolean("player_bg", d.animatedPlayerBackground),
+            fullBleedArtwork = p.getBoolean("player_full_bleed", d.fullBleedArtwork),
             haptics = p.getBoolean("haptics", d.haptics),
             glass = GlassSettings(
                 enabled = p.getBoolean("glass_enabled", g.enabled),
@@ -347,6 +354,7 @@ object SettingsRepository {
         putString("language", s.language.name)
         putBoolean("ambient", s.ambientBackground)
         putBoolean("player_bg", s.animatedPlayerBackground)
+        putBoolean("player_full_bleed", s.fullBleedArtwork)
         putBoolean("haptics", s.haptics)
         with(s.glass) {
             putBoolean("glass_enabled", enabled)

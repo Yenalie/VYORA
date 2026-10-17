@@ -118,7 +118,10 @@ object StreamResolver {
     private fun AudioStream.toCandidate() = AudioCandidate(
         itag = itag,
         url = content.orEmpty(),
-        bitrate = averageBitrate.takeIf { it > 0 } ?: bitrate,
+        // NewPipe's averageBitrate is the itag's nominal rate in *kbps* (160 for itag 251) while bitrate is
+        // in bps. Comparing the kbps figure against bps thresholds put every rendition under the Medium and
+        // Low caps, so all four quality rungs played the same stream. Normalise to bps here.
+        bitrate = averageBitrate.takeIf { it > 0 }?.let { if (it < 10_000) it * 1000 else it } ?: bitrate,
         codec = codec.orEmpty(),
         mimeType = format?.mimeType.orEmpty(),
         isDrc = itagItem?.isDrc() == true || isDrcUrl(content),

@@ -26,7 +26,9 @@ object YouTubeDataSource {
     private const val CONNECT_TIMEOUT_MS = 15_000
     private const val READ_TIMEOUT_MS = 20_000
     private const val META_ITAG = "vyora-itag"
-    private const val KEY_AUDIO = "yt-audio"
+    // "yt-audio2": entries cached before the bitrate fix were written at the wrong rung (every rung held
+    // the top stream) and pinned it through their stored itag; a new prefix lets them age out.
+    private const val KEY_AUDIO = "yt-audio2"
     private const val KEY_VIDEO = "yt-video"
     private const val NO_OFFLINE = "yt-none/"
     private const val KEY_SERVER = "srv-audio"

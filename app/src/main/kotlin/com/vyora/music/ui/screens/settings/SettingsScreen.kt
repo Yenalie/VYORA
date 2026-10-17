@@ -355,6 +355,12 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     title = stringResource(R.string.settings_player_bg),
                     checked = settings.animatedPlayerBackground,
                     onCheckedChange = { v -> SettingsRepository.update { it.copy(animatedPlayerBackground = v) } },
+                )
+                SettingsSwitchRow(
+                    title = stringResource(R.string.full_bleed_artwork),
+                    subtitle = stringResource(R.string.full_bleed_artwork_desc),
+                    checked = settings.fullBleedArtwork,
+                    onCheckedChange = { v -> SettingsRepository.update { it.copy(fullBleedArtwork = v) } },
                     divider = false,
                 )
             }

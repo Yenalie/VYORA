@@ -188,6 +188,7 @@ class ScreenshotTest {
         if (System.getProperty("shots.only") == "new") return newFeatures()
         if (System.getProperty("shots.only") == "v19") return v19Features()
         if (System.getProperty("shots.only") == "v110") return v110Features()
+        if (System.getProperty("shots.only") == "v193") return v193Features()
         val found = runBlocking { YouTubeClient.search("Tulus", SearchFilter.SONGS).getOrThrow().items.take(8) }
         val lead = found.firstOrNull { song ->
             val lyr = runBlocking { com.vyora.music.data.lyrics.LyricsRepository.lyricsFor(song.id, song.title, song.artist, song.duration) }
@@ -411,6 +412,26 @@ class ScreenshotTest {
                 drawBitmap(top, ((bmp.width - top.width) / 2).toFloat(), ((bmp.height - top.height) / 2).toFloat(), null)
             }
             File("/tmp/shots/26_format_dialog.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        }
+    }
+
+    /** `-Dshots.only=v193`: full-bleed artwork and the BitChord quality label. */
+    private fun v193Features() {
+        val found = runBlocking { YouTubeClient.search("Tulus", SearchFilter.SONGS).getOrThrow().items.take(6) }
+        waitReal(4000)
+        step("player") {
+            SettingsRepository.update { it.copy(skipUnavailable = false, fullBleedArtwork = true) }
+            compose.runOnUiThread { PlayerManager.setQueue(found, 0) }
+            fakeTrack = found[0]
+            compose.mainClock.autoAdvance = false
+            waitReal(2500)
+            flow("_audioFormat").value = com.vyora.music.data.local.AudioFormatInfo("audio/opus", 48_000, 0, 160_000, 2)
+            clickLastText(found[0].title); shot("60_hero_high", minMs = 3000)
+            flow("_audioFormat").value = com.vyora.music.data.local.AudioFormatInfo("audio/flac", 96_000, 24, 0, 2)
+            shot("61_hero_hires", minMs = 1500)
+            SettingsRepository.update { it.copy(fullBleedArtwork = false) }
+            flow("_audioFormat").value = com.vyora.music.data.local.AudioFormatInfo("audio/mp4a-latm", 44_100, 0, 128_000, 2)
+            shot("62_card_aac", minMs = 2000)
         }
     }
 }

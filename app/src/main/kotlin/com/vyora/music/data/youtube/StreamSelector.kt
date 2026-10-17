@@ -12,7 +12,9 @@ data class AudioCandidate(
     val trackKind: TrackKind,
     val progressive: Boolean,
     val contentLength: Long,
-)
+) {
+    val kbps: Int get() = (bitrate + 500) / 1000
+}
 
 data class VideoCandidate(
     val itag: Int,
@@ -44,11 +46,13 @@ object StreamSelector {
 
         preferredItag?.let { itag -> pool.firstOrNull { it.itag == itag }?.let { return it } }
 
+        // Bitrates are in bits per second (see StreamResolver: NewPipe's itag average is in kbps and is
+        // scaled up there). Opus wins a tie, being the better codec at the same rate.
         val ranked = pool.sortedWith(compareBy<AudioCandidate> { it.bitrate }.thenBy { if (it.isOpus) 1 else 0 })
         return when (quality) {
             AudioQuality.HIGH, AudioQuality.LOSSLESS -> ranked.last()
             AudioQuality.NORMAL -> ranked.lastOrNull { it.bitrate <= NORMAL_MAX_BITRATE } ?: ranked.first()
-            AudioQuality.LOW -> ranked.firstOrNull { it.bitrate >= LOW_MIN_BITRATE } ?: ranked.last()
+            AudioQuality.LOW -> ranked.firstOrNull { it.bitrate >= LOW_MIN_BITRATE } ?: ranked.first()
         }
     }
 
