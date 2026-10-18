@@ -15,6 +15,7 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -23,6 +24,8 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -456,13 +459,20 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
                             Spacer(Modifier.width(12.dp))
                             actions()
                         }
-                        CurrentLyricsPeek(
-                            itemId = currentItem?.id,
-                            title = title.orEmpty(),
-                            artist = artist.orEmpty(),
-                            durationMs = durationMs,
-                            onOpen = { mode = MODE_LYRICS },
-                        )
+                        AnimatedVisibility(
+                            visible = appSettings.showPlayerLyricsStrip,
+                            enter = fadeIn(tween(180)) + expandVertically(animationSpec = tween(220)),
+                            exit = fadeOut(tween(120)) + shrinkVertically(animationSpec = tween(180)),
+                        ) {
+                            CurrentLyricsPeek(
+                                itemId = currentItem?.id,
+                                title = title.orEmpty(),
+                                artist = artist.orEmpty(),
+                                durationMs = durationMs,
+                                providerPreference = appSettings.lyricsProvider,
+                                onOpen = { mode = MODE_LYRICS },
+                            )
+                        }
                     }
                 } else {
                     Column(Modifier.fillMaxSize()) {
@@ -799,6 +809,7 @@ private fun CurrentLyricsPeek(
     title: String,
     artist: String,
     durationMs: Long,
+    providerPreference: com.vyora.music.data.settings.LyricsProviderPreference,
     onOpen: () -> Unit,
 ) {
     if (itemId.isNullOrBlank()) return
@@ -806,7 +817,7 @@ private fun CurrentLyricsPeek(
     val playhead = PlayerManager.lyricPlaybackPosition.collectAsState()
     val isPlaying by PlayerManager.isPlaying.collectAsState()
     var lyrics by remember(itemId) { mutableStateOf<Lyrics?>(null) }
-    LaunchedEffect(itemId, title, artist, durationMs) {
+    LaunchedEffect(itemId, title, artist, durationMs, providerPreference) {
         val seconds = (durationMs / 1000).coerceAtLeast(0)
         lyrics = LyricsRepository.lyricsFor(itemId, title, artist, seconds)
     }
@@ -886,6 +897,7 @@ private fun CurrentLyricsPeek(
 private fun LyricsPanel() {
     val item by PlayerManager.currentItem.collectAsState()
     val durationMs by PlayerManager.durationMs.collectAsState()
+    val providerPreference = com.vyora.music.data.settings.SettingsRepository.settings.collectAsState().value.lyricsProvider
     val current = item
     if (current == null) return
 
@@ -893,7 +905,7 @@ private fun LyricsPanel() {
     var lyrics by remember(current.id) { mutableStateOf<Lyrics?>(null) }
     var selection by remember(current.id) { mutableStateOf<Set<Int>?>(null) }
     var cardLines by remember(current.id) { mutableStateOf<List<String>?>(null) }
-    LaunchedEffect(current.id) {
+    LaunchedEffect(current.id, providerPreference) {
         loading = true
         val seconds = if (current.duration > 0) current.duration else durationMs / 1000
         lyrics = LyricsRepository.lyricsFor(current.id, current.title, current.artist, seconds)

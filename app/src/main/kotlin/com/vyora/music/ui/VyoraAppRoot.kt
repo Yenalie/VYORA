@@ -538,6 +538,7 @@ fun VyoraAppRoot(settings: AppSettings) {
                 )
             }
             screen("settings/appearance") { com.vyora.music.ui.screens.settings.AppearanceSettingsScreen(onBack = { navController.popBackStack() }) }
+            screen("settings/lyrics") { com.vyora.music.ui.screens.settings.LyricsSettingsScreen(onBack = { navController.popBackStack() }) }
             screen("settings/audio_quality") {
                 com.vyora.music.ui.screens.settings.AudioQualityScreen(
                     onBack = { navController.popBackStack() },

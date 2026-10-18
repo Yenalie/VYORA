@@ -1,4 +1,9 @@
 # Changelog
+## 1.9.12
+- Tambah halaman Pengaturan > Lirik untuk memilih sumber prioritas; provider lain tetap menjadi fallback otomatis, dan hasil tersinkron kata dapat mengungguli hasil per baris
+- Tambah sakelar pratinjau lirik di bawah judul/artis full player, dengan transisi expand/fade yang ringan dan tetap mempertahankan akses ke layar lirik penuh
+- Pilihan provider dipisahkan pada cache agar mengganti sumber tidak menampilkan hasil lama dari preferensi lain
+
 ## 1.9.11
 - Rantai sumber lirik mengikuti prioritas BitChord: lrc.red langsung berbasis ISRC, BiniLyrics, BetterLyrics/Portato, LyricsPlus, Unison, KuGou, lalu LRCLIB
 - Provider dijalankan paralel namun hasil dipilih menurut prioritas; timing kata/suku kata dipertahankan dan jawaban line-sync menjadi fallback

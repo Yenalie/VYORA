@@ -55,6 +55,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -216,6 +217,18 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
                     icon = Icons.Default.SkipNext, iconTint = SystemColors.Indigo,
                     checked = settings.skipUnavailable,
                     onCheckedChange = { v -> SettingsRepository.update { it.copy(skipUnavailable = v) } },
+                    divider = false,
+                )
+            }
+        }
+        item(key = "lyrics") {
+            SettingsGroup {
+                SettingsNavRow(
+                    title = stringResource(R.string.lyrics),
+                    subtitle = stringResource(R.string.lyrics_settings_summary),
+                    icon = Icons.Default.Lyrics, iconTint = SystemColors.Purple,
+                    value = stringResource(lyricsProviderTitleRes(settings.lyricsProvider)),
+                    onClick = { onOpen("lyrics") },
                     divider = false,
                 )
             }

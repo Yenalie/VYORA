@@ -6,6 +6,8 @@ import com.vyora.music.core.Http
 import com.vyora.music.data.db.CacheDao
 import com.vyora.music.data.db.LyricsCacheEntity
 import com.vyora.music.data.db.VyoraDatabase
+import com.vyora.music.data.settings.LyricsProviderPreference
+import com.vyora.music.data.settings.SettingsRepository
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -38,6 +40,11 @@ object LyricsRepository {
 
     private const val CACHE_MAX = 200
     private data class CachedLyrics(val value: Lyrics?, val fetchedAt: Long)
+    private data class ProviderAttempt(
+        val preference: LyricsProviderPreference,
+        val source: String,
+        val lookup: suspend () -> Lyrics?,
+    )
     private val cache = object : LinkedHashMap<String, CachedLyrics>(64, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedLyrics>?) = size > CACHE_MAX
     }
@@ -54,28 +61,30 @@ object LyricsRepository {
     }
 
     suspend fun lyricsFor(id: String, rawTitle: String, rawArtist: String, durationSec: Long): Lyrics? {
+        val providerPreference = SettingsRepository.current.lyricsProvider
+        val cacheId = "$id|lyrics:${providerPreference.name}"
         val now = System.currentTimeMillis()
         synchronized(cache) {
-            val cached = cache[id]
+            val cached = cache[cacheId]
             if (cached != null) {
                 if (isFresh(cached.value, cached.fetchedAt)) return cached.value
-                cache.remove(id)
+                cache.remove(cacheId)
             }
         }
         val disk = dao
-        val stored = disk?.let { d -> runCatching { withContext(Dispatchers.IO) { d.lyrics(id) } }.getOrNull() }
+        val stored = disk?.let { d -> runCatching { withContext(Dispatchers.IO) { d.lyrics(cacheId) } }.getOrNull() }
         if (stored != null) {
             val decoded = stored.payload?.let(LyricsJson::decode)
             val age = (now - stored.fetchedAt).coerceAtLeast(0L)
             val currentPayload = stored.payload == null || LyricsJson.version(stored.payload) >= LyricsJson.CACHE_VERSION
             if (currentPayload && isFresh(decoded, stored.fetchedAt, age)) {
-                synchronized(cache) { cache[id] = CachedLyrics(decoded, stored.fetchedAt) }
+                synchronized(cache) { cache[cacheId] = CachedLyrics(decoded, stored.fetchedAt) }
                 return decoded
             }
         }
         val result = try {
             val (title, artist) = clean(rawTitle, rawArtist)
-            fetch(title, artist, durationSec, rawTitle)
+            fetch(title, artist, durationSec, rawTitle, providerPreference)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
@@ -83,10 +92,10 @@ object LyricsRepository {
             null
         }
         val fetchedAt = System.currentTimeMillis()
-        synchronized(cache) { cache[id] = CachedLyrics(result, fetchedAt) }
+        synchronized(cache) { cache[cacheId] = CachedLyrics(result, fetchedAt) }
         if (disk != null) withContext(Dispatchers.IO) {
             runCatching {
-                disk.putLyrics(LyricsCacheEntity(id, result?.let(LyricsJson::encode), fetchedAt))
+                disk.putLyrics(LyricsCacheEntity(cacheId, result?.let(LyricsJson::encode), fetchedAt))
                 disk.trimLyrics(DISK_KEEP)
             }
         }
@@ -107,7 +116,13 @@ object LyricsRepository {
      * accepted in the same deterministic source priority; a word-timed result
      * beats a line-only fallback.
      */
-    private suspend fun fetch(title: String, artist: String, durationSec: Long, originalTitle: String): Lyrics? = coroutineScope {
+    private suspend fun fetch(
+        title: String,
+        artist: String,
+        durationSec: Long,
+        originalTitle: String,
+        preferred: LyricsProviderPreference,
+    ): Lyrics? = coroutineScope {
         val biniIdentity = async(Dispatchers.IO) {
             runCatching { BitChordLyricsProviders.identifyBini(title, artist, durationSec, versionTitle = originalTitle) }
                 .onFailure { Log.d(TAG, "BiniLyrics identify: ${it.message}") }
@@ -115,40 +130,45 @@ object LyricsRepository {
         }
         val identified = withTimeoutOrNull(IDENTIFY_TIMEOUT_MS) { biniIdentity.await() }
 
-        val attempts = listOf(
-            "lrc.red" to async(Dispatchers.IO) {
+        val providers = listOf(
+            ProviderAttempt(LyricsProviderPreference.LRC_RED, "lrc.red") {
                 runCatching { BitChordLyricsProviders.lrcRed(title, artist, durationSec, identified?.isrc, originalTitle) }
                     .onFailure { Log.d(TAG, "lrc.red: ${it.message}") }.getOrNull()
             },
-            "BiniLyrics" to async(Dispatchers.IO) {
+            ProviderAttempt(LyricsProviderPreference.LRC_RED, "BiniLyrics") {
                 runCatching { BitChordLyricsProviders.bini(identified ?: biniIdentity.await()) }
                     .onFailure { Log.d(TAG, "BiniLyrics: ${it.message}") }.getOrNull()
             },
-            "BetterLyrics" to async(Dispatchers.IO) {
+            ProviderAttempt(LyricsProviderPreference.BETTER_LYRICS, "BetterLyrics") {
                 runCatching { betterLyrics(title, artist, durationSec) }
                     .onFailure { Log.d(TAG, "BetterLyrics: ${it.message}") }.getOrNull()
             },
-            "BetterLyrics Portato" to async(Dispatchers.IO) {
+            ProviderAttempt(LyricsProviderPreference.BETTER_LYRICS_PORTATO, "BetterLyrics Portato") {
                 runCatching { betterLyrics(title, artist, durationSec, BETTER_LYRICS_PORTATO, SOURCE_BETTER_LYRICS_PORTATO) }
                     .onFailure { Log.d(TAG, "BetterLyrics Portato: ${it.message}") }.getOrNull()
             },
-            "LyricsPlus" to async(Dispatchers.IO) {
+            ProviderAttempt(LyricsProviderPreference.LYRICS_PLUS, "LyricsPlus") {
                 runCatching { LyricsPlusProvider.lyrics(title, artist, durationSec) }
                     .onFailure { Log.d(TAG, "LyricsPlus: ${it.message}") }.getOrNull()
             },
-            "Unison" to async(Dispatchers.IO) {
+            ProviderAttempt(LyricsProviderPreference.UNISON, "Unison") {
                 runCatching { UnisonProvider.lyrics(title, artist, durationSec) }
                     .onFailure { Log.d(TAG, "Unison: ${it.message}") }.getOrNull()
             },
-            "KuGou" to async(Dispatchers.IO) {
+            ProviderAttempt(LyricsProviderPreference.KUGOU, "KuGou") {
                 runCatching { KuGouProvider.lyrics(title, artist, durationSec) }
                     .onFailure { Log.d(TAG, "KuGou: ${it.message}") }.getOrNull()
             },
-            "LRCLIB" to async(Dispatchers.IO) {
+            ProviderAttempt(LyricsProviderPreference.LRCLIB, "LRCLIB") {
                 runCatching { exact(title, artist, durationSec) ?: search(title, artist) }
                     .onFailure { Log.d(TAG, "LRCLIB: ${it.message}") }.getOrNull()
             },
         )
+        val orderedProviders = if (preferred == LyricsProviderPreference.AUTO) providers else
+            providers.filter { it.preference == preferred } + providers.filterNot { it.preference == preferred }
+        val attempts = orderedProviders.map { provider ->
+            provider.source to async(Dispatchers.IO) { provider.lookup() }
+        }
 
         var lineSynced: Lyrics? = null
         var plainFallback: Lyrics? = null

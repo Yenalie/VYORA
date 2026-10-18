@@ -74,6 +74,11 @@ enum class CacheSize(val megabytes: Long) {
 
 enum class VideoArtwork { ALWAYS, WIFI_ONLY, OFF }
 
+/** First lyric source to try; other sources remain available as automatic fallbacks. */
+enum class LyricsProviderPreference {
+    AUTO, LRC_RED, BETTER_LYRICS, BETTER_LYRICS_PORTATO, LYRICS_PLUS, UNISON, KUGOU, LRCLIB,
+}
+
 /** Online status Discord shows while VYORA's activity is set. */
 enum class DiscordOnlineStatus(val wire: String) { ONLINE("online"), IDLE("idle"), DND("dnd") }
 
@@ -156,6 +161,8 @@ data class AppSettings(
     val crossfadeSeconds: Float = 6f,
     val equalizer: EqualizerSettings = EqualizerSettings(),
     val videoArtwork: VideoArtwork = VideoArtwork.ALWAYS,
+    val lyricsProvider: LyricsProviderPreference = LyricsProviderPreference.AUTO,
+    val showPlayerLyricsStrip: Boolean = true,
     val mediaCache: CacheSize = CacheSize.MB_512,
     val autoUpdateCheck: Boolean = true,
     val downloadWifiOnly: Boolean = false,
@@ -337,6 +344,8 @@ object SettingsRepository {
                 loudness = p.getFloat("eq_loud", e.loudness),
             ),
             videoArtwork = p.enum("video_artwork", d.videoArtwork),
+            lyricsProvider = p.enum("lyrics_provider", d.lyricsProvider),
+            showPlayerLyricsStrip = p.getBoolean("player_lyrics_strip", d.showPlayerLyricsStrip),
             mediaCache = p.enum("media_cache", d.mediaCache),
             autoUpdateCheck = p.getBoolean("update_auto", d.autoUpdateCheck),
             downloadWifiOnly = p.getBoolean("download_wifi_only", d.downloadWifiOnly),
@@ -404,6 +413,8 @@ object SettingsRepository {
         }
         putInt("eq_version", EQ_VERSION)
         putString("video_artwork", s.videoArtwork.name)
+        putString("lyrics_provider", s.lyricsProvider.name)
+        putBoolean("player_lyrics_strip", s.showPlayerLyricsStrip)
         putString("media_cache", s.mediaCache.name)
         putBoolean("update_auto", s.autoUpdateCheck)
         putBoolean("download_wifi_only", s.downloadWifiOnly)
