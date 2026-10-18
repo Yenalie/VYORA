@@ -7,8 +7,10 @@ import com.vyora.music.data.importer.SpotifyImport
 import com.vyora.music.data.local.LosslessOutput
 import com.vyora.music.data.lyrics.LyricLine
 import com.vyora.music.data.lyrics.LyricWord
+import com.vyora.music.data.lyrics.BitChordLyricsProviders
 import com.vyora.music.data.lyrics.Lyrics
 import com.vyora.music.data.lyrics.LyricsJson
+import com.vyora.music.data.lyrics.LyricsPlusProvider
 import com.vyora.music.data.lyrics.LyricsRepository
 import com.vyora.music.data.lyrics.PortatoLyrics
 import com.vyora.music.data.lyrics.Ttml
@@ -61,6 +63,34 @@ class NewFeaturesTest {
         assertEquals("Hello", line.words[0].text)
         assertEquals(2, line.words[0].syllables.size)
         assertEquals(1000L, line.words[0].startMs)
+    }
+
+    @Test fun lrcRedUsesValidatedIsrcAndRejectsWrongRecording() {
+        assertEquals("https://lrc.red/s/USRC17607839.ttml", BitChordLyricsProviders.documentUrl("usrc17607839"))
+        assertNull(BitChordLyricsProviders.documentUrl("../../bad"))
+        val hits = org.json.JSONArray("""[
+            {"isrc":"USRC17607839","title":"Nan Ko Paham","artist":"Maman Fvndy & Guest","duration":240.0},
+            {"isrc":"USRC17607840","title":"Nan Ko Paham (Live)","artist":"Maman Fvndy","duration":240.0}
+        ]""")
+        val selected = BitChordLyricsProviders.bestLrcRedHit(hits, "Nan Ko Paham", "Maman Fvndy", 240)
+        assertEquals("USRC17607839", selected?.optString("isrc"))
+        val live = BitChordLyricsProviders.bestLrcRedHit(hits, "Nan Ko Paham", "Maman Fvndy", 240, "Nan Ko Paham (Live)")
+        assertEquals("USRC17607840", live?.optString("isrc"))
+        val wrongVersionOnly = org.json.JSONArray("""[
+            {"isrc":"USRC17607840","title":"Nan Ko Paham (Live)","artist":"Maman Fvndy","duration":240.0}
+        ]""")
+        assertNull(BitChordLyricsProviders.bestLrcRedHit(wrongVersionOnly, "Nan Ko Paham", "Maman Fvndy", 240))
+    }
+
+    @Test fun lyricsPlusKeepsSyllableTimingWhileGroupingWords() {
+        val response = org.json.JSONObject("""{"lyrics":[{"time":1000,"duration":2200,"text":"Hello world","syllabus":[{"time":1000,"duration":300,"text":"Hel"},{"time":1300,"duration":400,"text":"lo "},{"time":1700,"duration":500,"text":"world"}]}]}""")
+        val line = LyricsPlusProvider.parse(response).single()
+        assertEquals("Hello world", line.text)
+        assertEquals(2, line.words.size)
+        assertEquals("Hello", line.words[0].text)
+        assertEquals(2, line.words[0].syllables.size)
+        assertEquals(1000L, line.words[0].startMs)
+        assertEquals(3200L, line.endMs)
     }
 
     @Test fun enhancedLrcWords() {

@@ -112,9 +112,9 @@ data class Lyrics(
     val isWordSynced: Boolean get() = synced.any { it.hasWords }
 }
 
-/** Compact JSON for the on-disk lyrics cache. Version 2 adds per-syllable timing. */
+/** Compact JSON for the on-disk lyrics cache. Version 3 refreshes entries after provider-chain changes. */
 object LyricsJson {
-    const val CACHE_VERSION = 2
+    const val CACHE_VERSION = 3
 
     fun version(raw: String): Int = runCatching { JSONObject(raw).optInt("v", 0) }.getOrDefault(0)
 

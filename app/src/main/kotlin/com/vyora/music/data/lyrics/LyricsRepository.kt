@@ -6,12 +6,20 @@ import com.vyora.music.core.Http
 import com.vyora.music.data.db.CacheDao
 import com.vyora.music.data.db.LyricsCacheEntity
 import com.vyora.music.data.db.VyoraDatabase
+import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.Callback
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.IOException
 
 object LyricsRepository {
     private const val TAG = "VYORA-Lyrics"
@@ -24,6 +32,7 @@ object LyricsRepository {
     private const val PLAIN_TTL_MS = 6L * 60 * 60 * 1000
     private const val SYNCED_TTL_MS = 7L * 24 * 60 * 60 * 1000
     private const val DISK_KEEP = 3000
+    private const val IDENTIFY_TIMEOUT_MS = 2_500L
 
     private val client by lazy { Http.with(8, 12) }
 
@@ -58,22 +67,21 @@ object LyricsRepository {
         if (stored != null) {
             val decoded = stored.payload?.let(LyricsJson::decode)
             val age = (now - stored.fetchedAt).coerceAtLeast(0L)
-            // Pre-v2 payloads may be the permanently cached plain-text result that caused the static strip.
             val currentPayload = stored.payload == null || LyricsJson.version(stored.payload) >= LyricsJson.CACHE_VERSION
-            val fresh = currentPayload && isFresh(decoded, stored.fetchedAt, age)
-            if (fresh) {
+            if (currentPayload && isFresh(decoded, stored.fetchedAt, age)) {
                 synchronized(cache) { cache[id] = CachedLyrics(decoded, stored.fetchedAt) }
                 return decoded
             }
         }
-        val outcome = withContext(Dispatchers.IO) {
-            runCatching {
-                val (title, artist) = clean(rawTitle, rawArtist)
-                fetch(title, artist, durationSec)
-            }
+        val result = try {
+            val (title, artist) = clean(rawTitle, rawArtist)
+            fetch(title, artist, durationSec, rawTitle)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Log.w(TAG, "Lyrics lookup failed", error)
+            null
         }
-        outcome.exceptionOrNull()?.let { Log.w(TAG, "Lyrics lookup failed", it); return null }
-        val result = outcome.getOrNull()
         val fetchedAt = System.currentTimeMillis()
         synchronized(cache) { cache[id] = CachedLyrics(result, fetchedAt) }
         if (disk != null) withContext(Dispatchers.IO) {
@@ -93,27 +101,82 @@ object LyricsRepository {
         }
 
     /**
-     * Port of BitChord's BetterLyrics source order: Apple TTML, QQ/Portato word timing, then LRCLIB line sync.
-     * A line-synced result is preferred over static text; static text remains a last-resort lyrics-page fallback.
+     * BitChord's keyless default chain, adapted to VYORA's Android lyric model:
+     * lrc.red/BiniLyrics, Apple TTML, QQ karaoke, LyricsPlus mirrors, Unison,
+     * KuGou, then LRCLIB. Network requests race concurrently, but results are
+     * accepted in the same deterministic source priority; a word-timed result
+     * beats a line-only fallback.
      */
-    private fun fetch(title: String, artist: String, durationSec: Long): Lyrics? {
-        val better = runCatching { betterLyrics(title, artist, durationSec) }
-            .onFailure { Log.d(TAG, "BetterLyrics: ${it.message}") }.getOrNull()
-        if (better?.isWordSynced == true) return better
-        val portato = runCatching { betterLyrics(title, artist, durationSec, BETTER_LYRICS_PORTATO, SOURCE_BETTER_LYRICS_PORTATO) }
-            .onFailure { Log.d(TAG, "BetterLyrics Portato: ${it.message}") }.getOrNull()
-        if (portato?.isWordSynced == true) return portato
-        val lrclib = runCatching { exact(title, artist, durationSec) ?: search(title, artist) }
-            .onFailure { Log.d(TAG, "LRCLIB: ${it.message}") }.getOrNull()
-        return when {
-            better?.isSynced == true -> better
-            portato?.isSynced == true -> portato
-            lrclib?.isSynced == true -> lrclib
-            else -> better ?: portato ?: lrclib
+    private suspend fun fetch(title: String, artist: String, durationSec: Long, originalTitle: String): Lyrics? = coroutineScope {
+        val biniIdentity = async(Dispatchers.IO) {
+            runCatching { BitChordLyricsProviders.identifyBini(title, artist, durationSec, versionTitle = originalTitle) }
+                .onFailure { Log.d(TAG, "BiniLyrics identify: ${it.message}") }
+                .getOrNull()
+        }
+        val identified = withTimeoutOrNull(IDENTIFY_TIMEOUT_MS) { biniIdentity.await() }
+
+        val attempts = listOf(
+            "lrc.red" to async(Dispatchers.IO) {
+                runCatching { BitChordLyricsProviders.lrcRed(title, artist, durationSec, identified?.isrc, originalTitle) }
+                    .onFailure { Log.d(TAG, "lrc.red: ${it.message}") }.getOrNull()
+            },
+            "BiniLyrics" to async(Dispatchers.IO) {
+                runCatching { BitChordLyricsProviders.bini(identified ?: biniIdentity.await()) }
+                    .onFailure { Log.d(TAG, "BiniLyrics: ${it.message}") }.getOrNull()
+            },
+            "BetterLyrics" to async(Dispatchers.IO) {
+                runCatching { betterLyrics(title, artist, durationSec) }
+                    .onFailure { Log.d(TAG, "BetterLyrics: ${it.message}") }.getOrNull()
+            },
+            "BetterLyrics Portato" to async(Dispatchers.IO) {
+                runCatching { betterLyrics(title, artist, durationSec, BETTER_LYRICS_PORTATO, SOURCE_BETTER_LYRICS_PORTATO) }
+                    .onFailure { Log.d(TAG, "BetterLyrics Portato: ${it.message}") }.getOrNull()
+            },
+            "LyricsPlus" to async(Dispatchers.IO) {
+                runCatching { LyricsPlusProvider.lyrics(title, artist, durationSec) }
+                    .onFailure { Log.d(TAG, "LyricsPlus: ${it.message}") }.getOrNull()
+            },
+            "Unison" to async(Dispatchers.IO) {
+                runCatching { UnisonProvider.lyrics(title, artist, durationSec) }
+                    .onFailure { Log.d(TAG, "Unison: ${it.message}") }.getOrNull()
+            },
+            "KuGou" to async(Dispatchers.IO) {
+                runCatching { KuGouProvider.lyrics(title, artist, durationSec) }
+                    .onFailure { Log.d(TAG, "KuGou: ${it.message}") }.getOrNull()
+            },
+            "LRCLIB" to async(Dispatchers.IO) {
+                runCatching { exact(title, artist, durationSec) ?: search(title, artist) }
+                    .onFailure { Log.d(TAG, "LRCLIB: ${it.message}") }.getOrNull()
+            },
+        )
+
+        var lineSynced: Lyrics? = null
+        var plainFallback: Lyrics? = null
+        try {
+            for ((source, job) in attempts) {
+                val found = try {
+                    job.await()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    Log.d(TAG, "$source lookup failed: ${error.message}")
+                    null
+                } ?: continue
+                if (found.isWordSynced) return@coroutineScope found
+                if (found.synced.any { it.timeMs > 0L }) {
+                    if (lineSynced == null) lineSynced = found
+                } else if (plainFallback == null && !found.plain.isNullOrBlank()) {
+                    plainFallback = found
+                }
+            }
+            lineSynced ?: plainFallback
+        } finally {
+            attempts.forEach { it.second.cancel() }
+            biniIdentity.cancel()
         }
     }
 
-    private fun betterLyrics(
+    private suspend fun betterLyrics(
         title: String,
         artist: String,
         durationSec: Long,
@@ -126,10 +189,9 @@ object LyricsRepository {
             .addQueryParameter("a", artist)
             .apply { if (durationSec > 0) addQueryParameter("d", durationSec.toString()) }
             .build()
-        val body = get(url.toString()) ?: return null
+        val body = getLyricsText(url.toString()) ?: return null
         val lines = PortatoLyrics.parse(body)
         if (lines.isEmpty()) return null
-        // A match whose length is far from the song's is the wrong recording.
         if (durationSec > 0) {
             val last = lines.maxOf { maxOf(it.timeMs, it.endMs) } / 1000
             if (last > durationSec + 20) return null
@@ -137,22 +199,22 @@ object LyricsRepository {
         return Lyrics(lines, null, source)
     }
 
-    private fun exact(title: String, artist: String, durationSec: Long): Lyrics? {
+    private suspend fun exact(title: String, artist: String, durationSec: Long): Lyrics? {
         if (artist.isBlank()) return null
         val url = "$LRCLIB/get".toHttpUrl().newBuilder()
             .addQueryParameter("track_name", title)
             .addQueryParameter("artist_name", artist)
             .apply { if (durationSec > 0) addQueryParameter("duration", durationSec.toString()) }
             .build()
-        val body = get(url.toString()) ?: return null
+        val body = getLyricsText(url.toString()) ?: return null
         return parse(JSONObject(body))
     }
 
-    private fun search(title: String, artist: String): Lyrics? {
+    private suspend fun search(title: String, artist: String): Lyrics? {
         val url = "$LRCLIB/search".toHttpUrl().newBuilder()
             .addQueryParameter("q", "$title $artist".trim())
             .build()
-        val body = get(url.toString()) ?: return null
+        val body = getLyricsText(url.toString()) ?: return null
         val array = JSONArray(body)
         var plainFallback: Lyrics? = null
         for (i in 0 until minOf(array.length(), 8)) {
@@ -163,16 +225,39 @@ object LyricsRepository {
         return plainFallback
     }
 
-    private fun get(url: String): String? {
-        val request = Request.Builder().url(url).header("User-Agent", Http.USER_AGENT).build()
-        client.newCall(request).execute().use { response ->
-            if (response.code == 404) return null
-            if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}")
-            return response.body?.string()
+    internal suspend fun getLyricsText(url: String): String? = suspendCancellableCoroutine { continuation ->
+        val request = runCatching {
+            Request.Builder().url(url)
+                .header("User-Agent", Http.USER_AGENT)
+                .header("Accept", "application/json, text/plain, application/ttml+xml, */*")
+                .build()
+        }.getOrElse { error ->
+            continuation.resumeWith(Result.failure(error))
+            return@suspendCancellableCoroutine
         }
+        val call = client.newCall(request)
+        continuation.invokeOnCancellation { call.cancel() }
+        call.enqueue(object : Callback {
+            override fun onFailure(call: okhttp3.Call, error: IOException) {
+                continuation.resumeWith(Result.failure(error))
+            }
+
+            override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
+                response.use {
+                    if (it.code == 404) {
+                        continuation.resumeWith(Result.success(null))
+                    } else if (!it.isSuccessful) {
+                        continuation.resumeWith(Result.failure(IOException("HTTP ${it.code}")))
+                    } else {
+                        val body = runCatching { it.body?.string() }.getOrNull()
+                        continuation.resumeWith(Result.success(body))
+                    }
+                }
+            }
+        })
     }
 
-    private fun parse(o: JSONObject): Lyrics? {
+    private suspend fun parse(o: JSONObject): Lyrics? {
         if (o.optBoolean("instrumental", false)) return null
         val synced = o.optString("syncedLyrics").takeIf { it.isNotBlank() && it != "null" }?.let(::parseLrc).orEmpty()
         val plain = o.optString("plainLyrics").takeIf { it.isNotBlank() && it != "null" }
@@ -234,7 +319,7 @@ object LyricsRepository {
 
     private val noise = Regex(
         """[(\[](?:[^)\]]*?(official|video|audio|lyric|lirik|mv|m/v|visualizer|hd|4k|live|remaster|version|performance)[^)\]]*?)[)\]]""",
-        RegexOption.IGNORE_CASE
+        RegexOption.IGNORE_CASE,
     )
 
     fun clean(rawTitle: String, rawArtist: String): Pair<String, String> {
@@ -254,4 +339,5 @@ object LyricsRepository {
         title = title.replace(Regex("""(?i)\s*(ft\.?|feat\.?)\s+.*$"""), "")
         return title.replace(Regex("""\s+"""), " ").trim() to artist.replace(Regex("""\s+"""), " ").trim()
     }
+
 }

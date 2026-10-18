@@ -1,4 +1,9 @@
 # Changelog
+## 1.9.11
+- Rantai sumber lirik mengikuti prioritas BitChord: lrc.red langsung berbasis ISRC, BiniLyrics, BetterLyrics/Portato, LyricsPlus, Unison, KuGou, lalu LRCLIB
+- Provider dijalankan paralel namun hasil dipilih menurut prioritas; timing kata/suku kata dipertahankan dan jawaban line-sync menjadi fallback
+- Cache lirik dinaikkan versinya agar hasil lama yang disimpan tidak menghalangi provider baru
+
 ## 1.9.10
 - Port lyric clock dan renderer draw-phase BitChord: sampel playback bertimestamp, koreksi drift, seek-aware, serta sweep kata/suku kata yang stabil
 - Parser TTML/QRC/YRC kini mempertahankan timing suku kata dan menggabungkannya menjadi kata; BetterLyrics Portato ditambahkan sebagai fallback karaoke
