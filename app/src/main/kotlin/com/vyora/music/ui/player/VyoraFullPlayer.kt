@@ -1527,6 +1527,13 @@ private fun SeekSection() {
     }
 }
 
+private val PlayerInfoCardShape = RoundedCornerShape(6.dp)
+
+private fun Modifier.playerInfoCard(): Modifier = this
+    .clip(PlayerInfoCardShape)
+    .background(Color.Black.copy(alpha = 0.16f), PlayerInfoCardShape)
+    .border(1.dp, Color.White.copy(alpha = 0.22f), PlayerInfoCardShape)
+
 /**
  * BitChord's quality label between the timestamps: a shimmering "Lossless" / "Hi-Res Lossless" with the wave
  * glyph, "High Quality" with headphones for the top lossy rung, otherwise the codec and bitrate actually
@@ -1540,15 +1547,10 @@ private fun NowPlayingQuality(modifier: Modifier = Modifier) {
     val f = format ?: return
     val kbps = (f.bitrate + 500) / 1000
     val style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 10.sp, letterSpacing = 0.35.sp)
-    val cardShape = RoundedCornerShape(6.dp)
     Row(
         modifier
             .height(26.dp)
-            .liquidFill(
-                shape = cardShape,
-                fill = Color.White.copy(alpha = 0.045f),
-                rimAlpha = 0.36f,
-            )
+            .playerInfoCard()
             .glassClickable(pressedScale = 0.97f) { details = true }
             .padding(horizontal = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1654,11 +1656,7 @@ private fun SleepBadge(modifier: Modifier = Modifier) {
     Row(
         modifier
             .height(26.dp)
-            .liquidFill(
-                shape = RoundedCornerShape(6.dp),
-                fill = Color.White.copy(alpha = 0.045f),
-                rimAlpha = 0.32f,
-            )
+            .playerInfoCard()
             .padding(horizontal = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

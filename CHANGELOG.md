@@ -1,4 +1,7 @@
 # Changelog
+## 1.9.20
+- Permukaan kartu kualitas audio dan sleep timer diganti menjadi kartu datar sederhana dengan fill gelap transparan dan outline tipis, tanpa efek Liquid Glass
+
 ## 1.9.19
 - Timestamp lagu dikembalikan ke teks biasa di kiri/kanan seperti Apple Music; mini-card kotak kecil hanya untuk kualitas audio dan sleep timer saat aktif, dengan lebar otomatis mengikuti panjang teks
 
