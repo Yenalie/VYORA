@@ -1,4 +1,7 @@
 # Changelog
+## 1.9.14
+- Strip lirik full player dirapikan dengan permukaan rounded yang halus, ikon/teks sejajar, dan padding konsisten; chevron teks yang janggal dihapus
+
 ## 1.9.13
 - Strip lirik full player kini membungkus teks panjang ke beberapa baris tanpa ellipsis; sapuan karaoke tetap mengikuti baris visual
 - Pengaturan Lirik diringkas menjadi pilihan provider yang mudah dipindai dan satu keterangan fallback singkat

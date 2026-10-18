@@ -259,6 +259,7 @@ fun VyoraPlayerSheet(
 private const val MODE_ART = 0
 private const val MODE_LYRICS = 1
 private const val MODE_QUEUE = 2
+private val CurrentLyricsPeekShape = RoundedCornerShape(16.dp)
 
 @Composable
 private fun FullPlayerContent(sheet: PlayerSheetState) {
@@ -843,14 +844,22 @@ private fun CurrentLyricsPeek(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 10.dp, bottom = 2.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .glassClickable(pressedScale = 0.99f, onClick = onOpen)
-            .padding(vertical = 4.dp),
+            .padding(top = 8.dp)
+            .clip(CurrentLyricsPeekShape)
+            .background(Color.White.copy(alpha = 0.065f))
+            .border(1.dp, Color.White.copy(alpha = 0.12f), CurrentLyricsPeekShape)
+            .glassClickable(pressedScale = 0.985f, onClick = onOpen)
+            .heightIn(min = 52.dp)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Default.Lyrics, contentDescription = null, tint = Color.White.copy(alpha = 0.82f), modifier = Modifier.size(19.dp))
-        Spacer(Modifier.width(10.dp))
+        Icon(
+            Icons.Default.Lyrics,
+            contentDescription = stringResource(R.string.lyrics),
+            tint = Color.White.copy(alpha = 0.76f),
+            modifier = Modifier.size(20.dp),
+        )
+        Spacer(Modifier.width(12.dp))
         AnimatedContent(
             targetState = Triple(activeIndex, activeLyric, currentLine),
             transitionSpec = {
@@ -885,8 +894,6 @@ private fun CurrentLyricsPeek(
                 )
             }
         }
-        Spacer(Modifier.width(6.dp))
-        Text("›", color = Color.White.copy(alpha = 0.55f), style = MaterialTheme.typography.titleLarge)
     }
 }
 
