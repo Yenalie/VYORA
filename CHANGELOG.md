@@ -1,4 +1,6 @@
 # Changelog
+## 1.9.8
+- Menghaluskan clock dan tepi sapuan karaoke supaya highlight vokal tidak bergetar atau berkedip
 
 ## 1.9.7
 - Sapuan highlight karaoke kini bergerak lebih halus karakter demi karakter mengikuti waktu vokal, sementara teks yang belum dinyanyikan tetap redup

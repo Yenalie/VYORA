@@ -1027,18 +1027,39 @@ private fun SyncedLyrics(
  */
 @Composable
 private fun rememberSmoothPositionMs(): androidx.compose.runtime.State<Long> {
-    val coarse by PlayerManager.positionMs.collectAsState()
+    val coarseState = PlayerManager.positionMs.collectAsState()
     val playing by PlayerManager.isPlaying.collectAsState()
     val speed = SettingsRepository.settings.collectAsState().value.playbackSpeed
-    val out = remember { androidx.compose.runtime.mutableLongStateOf(coarse) }
-    LaunchedEffect(coarse, playing, speed) {
-        out.longValue = coarse
-        if (!playing) return@LaunchedEffect
-        var first = -1L
+    val out = remember { androidx.compose.runtime.mutableLongStateOf(coarseState.value) }
+    LaunchedEffect(playing, speed) {
+        var position = coarseState.value.toDouble()
+        var lastOutput = position
+        var previousFrame = 0L
         while (true) {
-            androidx.compose.runtime.withFrameNanos { now ->
-                if (first < 0) first = now
-                out.longValue = coarse + ((now - first) / 1_000_000 * speed).toLong()
+            androidx.compose.runtime.withFrameNanos { frameNanos ->
+                val reported = coarseState.value.toDouble()
+                if (!playing) {
+                    position = reported
+                    lastOutput = position
+                    out.longValue = position.toLong()
+                } else {
+                    if (previousFrame != 0L) {
+                        position += (frameNanos - previousFrame).coerceAtLeast(0L) / 1_000_000.0 * speed
+                    }
+                    val error = reported - position
+                    if (kotlin.math.abs(error) > 1_000.0) {
+                        // A deliberate seek or track jump: follow it immediately.
+                        position = reported
+                    } else {
+                        // Gently steer toward the player's 2 Hz samples instead of
+                        // snapping back to them, which made the karaoke edge shimmer.
+                        position += error * 0.16
+                        if (position < lastOutput) position = lastOutput
+                    }
+                    lastOutput = position
+                    out.longValue = position.toLong()
+                }
+                previousFrame = frameNanos
             }
         }
     }
@@ -1063,10 +1084,12 @@ private fun KaraokeLine(line: LyricLine, style: androidx.compose.ui.text.TextSty
             val codePoints = w.text.codePoints().toArray()
             val count = codePoints.size.coerceAtLeast(1)
             codePoints.forEachIndexed { index, codePoint ->
-                // Give the leading character a short in-flight fade, then carry
-                // the bright edge across the rest of the word on every frame.
-                val characterProgress = (progress * count - index).coerceIn(0f, 1f)
-                val eased = characterProgress * characterProgress * (3f - 2f * characterProgress)
+                // A two-character feather keeps the leading edge from looking
+                // like it is stepping or flickering at glyph boundaries.
+                val feather = 2f
+                val characterProgress = (progress * (count + feather) - index) / feather
+                val clampedProgress = characterProgress.coerceIn(0f, 1f)
+                val eased = clampedProgress * clampedProgress * (3f - 2f * clampedProgress)
                 val alpha = 0.34f + 0.66f * eased
                 val character = String(Character.toChars(codePoint))
                 withStyle(androidx.compose.ui.text.SpanStyle(color = Color.White.copy(alpha = alpha))) {
