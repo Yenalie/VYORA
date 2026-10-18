@@ -1,4 +1,7 @@
 # Changelog
+## 1.9.21
+- Mini-card kualitas audio dan sleep timer kini transparan dengan outline tipis saja, tanpa warna fill gelap atau efek Liquid Glass; komentar penjelas terkait kartu dihapus
+
 ## 1.9.20
 - Permukaan kartu kualitas audio dan sleep timer diganti menjadi kartu datar sederhana dengan fill gelap transparan dan outline tipis, tanpa efek Liquid Glass
 

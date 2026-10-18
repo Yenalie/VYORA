@@ -1531,14 +1531,8 @@ private val PlayerInfoCardShape = RoundedCornerShape(6.dp)
 
 private fun Modifier.playerInfoCard(): Modifier = this
     .clip(PlayerInfoCardShape)
-    .background(Color.Black.copy(alpha = 0.16f), PlayerInfoCardShape)
-    .border(1.dp, Color.White.copy(alpha = 0.22f), PlayerInfoCardShape)
+    .border(1.dp, Color.White.copy(alpha = 0.42f), PlayerInfoCardShape)
 
-/**
- * BitChord's quality label between the timestamps: a shimmering "Lossless" / "Hi-Res Lossless" with the wave
- * glyph, "High Quality" with headphones for the top lossy rung, otherwise the codec and bitrate actually
- * playing. Tap for the full format details.
- */
 @Composable
 private fun NowPlayingQuality(modifier: Modifier = Modifier) {
     val format by PlayerManager.audioFormat.collectAsState()
@@ -1578,10 +1572,8 @@ private fun NowPlayingQuality(modifier: Modifier = Modifier) {
     }
 }
 
-/** Lossy at or above this is YouTube's best Opus / a 256-320 kbps tier, shown as "High Quality". */
 private const val HIGH_QUALITY_KBPS = 150
 
-/** "Lossless" with a highlight band sweeping across it every three seconds (BitChord's ShimmerText). */
 @Composable
 private fun ShimmerText(text: String, style: androidx.compose.ui.text.TextStyle) {
     val progress = androidx.compose.animation.core.rememberInfiniteTransition(label = "lossless-shimmer").animateFloat(
