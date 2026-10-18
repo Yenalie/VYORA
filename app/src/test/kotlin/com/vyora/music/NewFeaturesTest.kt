@@ -10,6 +10,7 @@ import com.vyora.music.data.lyrics.LyricWord
 import com.vyora.music.data.lyrics.Lyrics
 import com.vyora.music.data.lyrics.LyricsJson
 import com.vyora.music.data.lyrics.LyricsRepository
+import com.vyora.music.data.lyrics.PortatoLyrics
 import com.vyora.music.data.lyrics.Ttml
 import com.vyora.music.data.scrobble.Scrobbler
 import com.vyora.music.data.server.MusicServer
@@ -44,10 +45,22 @@ class NewFeaturesTest {
         assertEquals(2, lines.size)
         assertEquals(1_000L, lines[0].timeMs)
         assertEquals("Hello world", lines[0].text)
-        assertEquals(3, lines[0].words.size)
-        assertEquals("Hello ", lines[0].words[0].text)
+        assertEquals(2, lines[0].words.size)
+        assertEquals("Hello", lines[0].words[0].text)
+        assertEquals("world", lines[0].words[1].text)
+        assertEquals(2, lines[0].words[1].syllables.size)
         assertEquals("Plain & simple", lines[1].text)
         assertFalse(lines[1].hasWords)
+    }
+
+    @Test fun portatoQrcMergesSyllablesIntoTimedWords() {
+        val response = """{"data":{"lyrics":"[1000,2000](1000,300)Hel(1300,400)lo (1700,500)world "}}"""
+        val line = PortatoLyrics.parse(response).single()
+        assertEquals("Hello world", line.text)
+        assertEquals(2, line.words.size)
+        assertEquals("Hello", line.words[0].text)
+        assertEquals(2, line.words[0].syllables.size)
+        assertEquals(1000L, line.words[0].startMs)
     }
 
     @Test fun enhancedLrcWords() {

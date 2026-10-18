@@ -803,7 +803,8 @@ private fun CurrentLyricsPeek(
 ) {
     if (itemId.isNullOrBlank()) return
 
-    val positionMs by PlayerManager.positionMs.collectAsState()
+    val playhead = PlayerManager.lyricPlaybackPosition.collectAsState()
+    val isPlaying by PlayerManager.isPlaying.collectAsState()
     var lyrics by remember(itemId) { mutableStateOf<Lyrics?>(null) }
     LaunchedEffect(itemId, title, artist, durationMs) {
         val seconds = (durationMs / 1000).coerceAtLeast(0)
@@ -812,12 +813,20 @@ private fun CurrentLyricsPeek(
 
     val data = lyrics ?: return
     val synced = data.synced
-    val plain = remember(data) { data.plain.orEmpty().lineSequence().map(String::trim).filter(String::isNotBlank).toList() }
-    val activeIndex = remember(synced, positionMs) {
-        synced.indexOfLast { it.timeMs <= positionMs + 250 }.coerceAtLeast(0)
+    val unavailable = stringResource(R.string.lyrics_unavailable)
+    val hasTimeline = synced.any { it.timeMs > 0L || it.hasWords }
+    val lyricClock = rememberBitChordLyricClock(itemId, playhead, isPlaying, enabled = hasTimeline)
+    val activeIndex by remember(synced) {
+        androidx.compose.runtime.derivedStateOf {
+            if (synced.isEmpty()) -1 else synced.indexOfLast { it.timeMs <= lyricClock.longValue }
+        }
     }
     val activeLyric = synced.getOrNull(activeIndex)
-    val currentLine = if (synced.isNotEmpty()) activeLyric?.text else plain.firstOrNull()
+    val currentLine = when {
+        !hasTimeline -> unavailable
+        activeLyric == null || activeLyric.text.isBlank() -> "♪"
+        else -> activeLyric.text
+    }
     if (currentLine.isNullOrBlank()) return
 
     Row(
@@ -832,24 +841,39 @@ private fun CurrentLyricsPeek(
         Icon(Icons.Default.Lyrics, contentDescription = null, tint = Color.White.copy(alpha = 0.82f), modifier = Modifier.size(19.dp))
         Spacer(Modifier.width(10.dp))
         AnimatedContent(
-            targetState = activeLyric to currentLine,
+            targetState = Triple(activeIndex, activeLyric, currentLine),
             transitionSpec = {
-                (fadeIn(tween(260)) + slideInVertically(tween(260)) { height -> height / 3 }) togetherWith
-                    (fadeOut(tween(180)) + slideOutVertically(tween(180)) { height -> -height / 3 }) using
-                    SizeTransform(clip = false)
+                val duration = 340
+                val easing = androidx.compose.animation.core.FastOutSlowInEasing
+                (fadeIn(animationSpec = tween(duration, easing = easing)) +
+                    slideInVertically(animationSpec = tween(duration, easing = easing)) { height -> (height * 0.35f).toInt() })
+                    .togetherWith(
+                        fadeOut(animationSpec = tween(duration, easing = easing)) +
+                            slideOutVertically(animationSpec = tween(duration, easing = easing)) { height -> -(height * 0.35f).toInt() },
+                    ).using(
+                        SizeTransform(clip = false, sizeAnimationSpec = { _, _ -> tween(duration, easing = easing) }),
+                    )
             },
             modifier = Modifier.weight(1f),
             label = "currentLyricStrip",
-        ) { (line, text) ->
+        ) { (_, line, text) ->
             val lyricStyle = MaterialTheme.typography.titleMedium
             if (line?.hasWords == true) {
-                KaraokeLine(line, lyricStyle, Modifier.fillMaxWidth())
+                BitChordSweptLyricLine(
+                    line = line,
+                    clock = lyricClock,
+                    style = lyricStyle,
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                )
             } else {
                 Text(
                     text = text,
-                    color = Color.White,
+                    color = Color.White.copy(alpha = if (line == null) 0.55f else 1f),
                     style = lyricStyle,
-                    softWrap = true,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 )
             }
         }
@@ -903,7 +927,7 @@ private fun LyricsPanel() {
         when {
             loading -> CenterNote(stringResource(R.string.lyrics_loading))
             lyr == null || lines.none { it.isNotBlank() } -> CenterNote(stringResource(R.string.lyrics_unavailable))
-            lyr.isSynced -> SyncedLyrics(lyr.synced, selection, onLongPress = ::toggle, onToggle = ::toggle)
+            lyr.isSynced -> SyncedLyrics(current.id, lyr.synced, selection, onLongPress = ::toggle, onToggle = ::toggle)
             else -> PlainLyrics(lines, selection, onLongPress = ::toggle, onToggle = ::toggle)
         }
         if (!loading && lines.any { it.isNotBlank() }) {
@@ -973,15 +997,19 @@ private fun Modifier.lyricGestures(
 
 @Composable
 private fun SyncedLyrics(
+    trackKey: String,
     lines: List<LyricLine>,
     selection: Set<Int>?,
     onLongPress: (Int) -> Unit,
     onToggle: (Int) -> Unit,
 ) {
-    val positionMs by PlayerManager.positionMs.collectAsState()
-    val active = remember(lines, positionMs) {
-        val t = positionMs + 250
-        lines.indexOfLast { it.timeMs <= t }.coerceAtLeast(0)
+    val playhead = PlayerManager.lyricPlaybackPosition.collectAsState()
+    val isPlaying by PlayerManager.isPlaying.collectAsState()
+    val lyricClock = rememberBitChordLyricClock(trackKey, playhead, isPlaying, enabled = lines.any { it.timeMs > 0L || it.hasWords })
+    val active by remember(lines) {
+        androidx.compose.runtime.derivedStateOf {
+            lines.indexOfLast { it.timeMs <= lyricClock.longValue }.coerceAtLeast(0)
+        }
     }
     val selecting = selection != null
     val listState = rememberLazyListState()
@@ -1017,128 +1045,16 @@ private fun SyncedLyrics(
                     }
                     .lyricGestures(i, selecting, onTap = { PlayerManager.seekTo(line.timeMs) }, onLongPress = onLongPress, onToggle = onToggle)
             if (line.hasWords && i == active && !selecting) {
-                KaraokeLine(line, lineStyle, lineModifier)
+                BitChordSweptLyricLine(
+                    line = line,
+                    clock = lyricClock,
+                    style = lineStyle,
+                    modifier = lineModifier.padding(vertical = 10.dp),
+                )
             } else {
                 LyricText(text = line.text.ifBlank { "♪" }, chosen = chosen, style = lineStyle, modifier = lineModifier)
             }
         }
-    }
-}
-
-/**
- * Playback position between the player's coarse updates, advanced every frame while playing so word-timed lyrics
- * fill smoothly instead of jumping a few times a second.
- */
-@Composable
-private fun rememberSmoothPositionMs(): androidx.compose.runtime.State<Long> {
-    val coarseState = PlayerManager.positionMs.collectAsState()
-    val playing by PlayerManager.isPlaying.collectAsState()
-    val speed = SettingsRepository.settings.collectAsState().value.playbackSpeed
-    val out = remember { androidx.compose.runtime.mutableLongStateOf(coarseState.value) }
-    LaunchedEffect(playing, speed) {
-        var position = coarseState.value.toDouble()
-        var lastOutput = position
-        var previousFrame = 0L
-        while (true) {
-            androidx.compose.runtime.withFrameNanos { frameNanos ->
-                val reported = coarseState.value.toDouble()
-                if (!playing) {
-                    position = reported
-                    lastOutput = position
-                    out.longValue = position.toLong()
-                } else {
-                    if (previousFrame != 0L) {
-                        position += (frameNanos - previousFrame).coerceAtLeast(0L) / 1_000_000.0 * speed
-                    }
-                    val error = reported - position
-                    if (kotlin.math.abs(error) > 1_000.0) {
-                        // A deliberate seek or track jump: follow it immediately.
-                        position = reported
-                    } else {
-                        // Gently steer toward the player's 2 Hz samples instead of
-                        // snapping back to them, which made the karaoke edge shimmer.
-                        position += error * 0.16
-                        if (position < lastOutput) position = lastOutput
-                    }
-                    lastOutput = position
-                    out.longValue = position.toLong()
-                }
-                previousFrame = frameNanos
-            }
-        }
-    }
-    return out
-}
-
-/** Draw-phase karaoke mask: text layout stays static while only the reveal edge moves. */
-@Composable
-private fun KaraokeLine(line: LyricLine, style: androidx.compose.ui.text.TextStyle, modifier: Modifier) {
-    val position = rememberSmoothPositionMs()
-    var textLayout by remember(line) { mutableStateOf<TextLayoutResult?>(null) }
-    val sweepPath = remember(line) { Path() }
-    val text = line.text
-    Box(modifier.padding(vertical = 10.dp)) {
-        Text(
-            text = text,
-            color = Color.White.copy(alpha = 0.34f),
-            style = style,
-            modifier = Modifier.fillMaxWidth(),
-            onTextLayout = { textLayout = it },
-        )
-        Text(
-            text = text,
-            color = Color.White,
-            style = style,
-            modifier = Modifier
-                .fillMaxWidth()
-                .drawWithContent {
-                    val contentScope = this
-                    val layout = textLayout
-                    if (layout == null || text.isEmpty()) return@drawWithContent
-                    val now = position.value + 120L
-                    var revealOffset = 0f
-                    for (word in line.words) {
-                        val wordLength = word.text.length.toFloat()
-                        when {
-                            now >= word.endMs -> revealOffset += wordLength
-                            now <= word.startMs -> break
-                            else -> {
-                                val fraction = ((now - word.startMs).toFloat() /
-                                    (word.endMs - word.startMs).coerceAtLeast(1L)).coerceIn(0f, 1f)
-                                revealOffset += wordLength * fraction
-                                break
-                            }
-                        }
-                    }
-                    revealOffset = revealOffset.coerceIn(0f, text.length.toFloat())
-                    when {
-                        revealOffset <= 0f -> Unit
-                        revealOffset >= text.length -> drawContent()
-                        else -> {
-                            val charOffset = revealOffset.toInt().coerceIn(0, text.lastIndex)
-                            val lineIndex = layout.getLineForOffset(charOffset)
-                            val charBounds = layout.getBoundingBox(charOffset)
-                            val fraction = revealOffset - charOffset
-                            val cutX = charBounds.left + charBounds.width * fraction
-                            sweepPath.reset()
-                            for (i in 0 until lineIndex) {
-                                sweepPath.addRect(
-                                    Rect(layout.getLineLeft(i), layout.getLineTop(i), layout.getLineRight(i), layout.getLineBottom(i))
-                                )
-                            }
-                            val left = layout.getLineLeft(lineIndex)
-                            val right = cutX.coerceIn(left, layout.getLineRight(lineIndex))
-                            if (right > left) {
-                                sweepPath.addRect(
-                                    Rect(left, layout.getLineTop(lineIndex), right, layout.getLineBottom(lineIndex))
-                                )
-                            }
-                            clipPath(sweepPath) { contentScope.drawContent() }
-                        }
-                    }
-                },
-            onTextLayout = {},
-        )
     }
 }
 

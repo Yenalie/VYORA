@@ -1,4 +1,10 @@
 # Changelog
+## 1.9.10
+- Port lyric clock dan renderer draw-phase BitChord: sampel playback bertimestamp, koreksi drift, seek-aware, serta sweep kata/suku kata yang stabil
+- Parser TTML/QRC/YRC kini mempertahankan timing suku kata dan menggabungkannya menjadi kata; BetterLyrics Portato ditambahkan sebagai fallback karaoke
+- Cache lirik lawas tanpa versi diperbarui, hasil polos diberi masa simpan terbatas, dan strip player tidak lagi menampilkan teks polos seolah karaoke tersinkron
+- Atribusi dan lisensi BitChord dicatat di `THIRD_PARTY_NOTICES.md`
+
 ## 1.9.9
 - Optimasi sapuan karaoke: layout teks tetap statis, hanya mask highlight yang bergerak saat digambar agar animasi lebih stabil
 

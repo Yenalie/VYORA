@@ -31,8 +31,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+data class LyricPlaybackPosition(
+    val positionMs: Long,
+    val sampledAtNanos: Long,
+    val discontinuity: Long,
+)
+
 object PlayerManager {
     private const val TAG = "VYORA-Player"
+    private var lyricDiscontinuity = 0L
 
     private var mediaController: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
@@ -66,6 +73,8 @@ object PlayerManager {
     val durationMs: StateFlow<Long> = _durationMs.asStateFlow()
     private val _positionMs = MutableStateFlow(0L)
     val positionMs: StateFlow<Long> = _positionMs.asStateFlow()
+    private val _lyricPlaybackPosition = MutableStateFlow(LyricPlaybackPosition(0L, System.nanoTime(), 0L))
+    val lyricPlaybackPosition: StateFlow<LyricPlaybackPosition> = _lyricPlaybackPosition.asStateFlow()
     private val _shuffle = MutableStateFlow(false)
     val shuffle: StateFlow<Boolean> = _shuffle.asStateFlow()
     private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
@@ -77,6 +86,17 @@ object PlayerManager {
     val audioFormat: StateFlow<AudioFormatInfo?> = _audioFormat.asStateFlow()
     private val _playbackError = MutableStateFlow<Int?>(null)
     val playbackError: StateFlow<Int?> = _playbackError.asStateFlow()
+
+    private fun publishPosition(
+        positionMs: Long,
+        discontinuity: Boolean = false,
+        sampledAtNanos: Long = System.nanoTime(),
+    ) {
+        if (discontinuity) lyricDiscontinuity++
+        val position = positionMs.coerceAtLeast(0L)
+        _positionMs.value = position
+        _lyricPlaybackPosition.value = LyricPlaybackPosition(position, sampledAtNanos, lyricDiscontinuity)
+    }
 
     fun initialize(context: Context) {
         if (!scope.coroutineContext.isActive) scope = newScope()
@@ -128,7 +148,10 @@ object PlayerManager {
     private fun buildListener(controller: MediaController) = object : Player.Listener {
         override fun onIsPlayingChanged(playing: Boolean) {
             _isPlaying.value = playing
-            if (playing) startProgressUpdates() else stopProgressUpdates()
+            if (playing) startProgressUpdates() else {
+                publishPosition(controller.currentPosition)
+                stopProgressUpdates()
+            }
         }
 
         override fun onPlaybackStateChanged(state: Int) {
@@ -140,7 +163,7 @@ object PlayerManager {
                 }
                 Player.STATE_ENDED -> {
                     _isPlaying.value = false
-                    _positionMs.value = 0L
+                    publishPosition(0L, discontinuity = true)
                     _progress.value = 0f
                 }
             }
@@ -152,6 +175,14 @@ object PlayerManager {
             if (mediaItem != null && reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
                 mediaItem.toSimpleItem()?.let { LibraryManager.addToRecent(it) }
             }
+        }
+
+        override fun onPositionDiscontinuity(
+            oldPosition: Player.PositionInfo,
+            newPosition: Player.PositionInfo,
+            reason: Int,
+        ) {
+            publishPosition(newPosition.positionMs, discontinuity = true)
         }
 
         override fun onTracksChanged(tracks: Tracks) {
@@ -218,7 +249,7 @@ object PlayerManager {
         publishUpNext(controller)
         val d = controller.duration
         if (d != C.TIME_UNSET && d > 0L) _durationMs.value = d
-        _positionMs.value = controller.currentPosition.coerceAtLeast(0L)
+        publishPosition(controller.currentPosition)
         val known = _durationMs.value
         if (known > 0L) _progress.value = (_positionMs.value.toFloat() / known).coerceIn(0f, 1f)
         if (controller.isPlaying) startProgressUpdates()
@@ -230,7 +261,7 @@ object PlayerManager {
         _currentTitle.value = item?.title
         _currentArtist.value = item?.artist
         _currentThumbnail.value = item?.thumbnail
-        _positionMs.value = 0L
+        publishPosition(0L, discontinuity = true)
         _progress.value = 0f
         _durationMs.value = (item?.duration ?: 0L) * 1000L
     }
@@ -401,7 +432,7 @@ object PlayerManager {
         val controller = mediaController ?: return
         val target = positionMs.coerceAtLeast(0L)
         controller.seekTo(target)
-        _positionMs.value = target
+        publishPosition(target, discontinuity = true)
         val duration = _durationMs.value
         if (duration > 0L) _progress.value = (target.toFloat() / duration).coerceIn(0f, 1f)
     }
@@ -412,9 +443,10 @@ object PlayerManager {
             while (isActive) {
                 mediaController?.let { controller ->
                     val pos = controller.currentPosition.coerceAtLeast(0L)
+                    val sampledAtNanos = System.nanoTime()
                     val duration = controller.duration.takeIf { it > 0L && it != C.TIME_UNSET }
                         ?: _durationMs.value.coerceAtLeast(1L)
-                    _positionMs.value = pos
+                    publishPosition(pos, sampledAtNanos = sampledAtNanos)
                     _durationMs.value = duration
                     _progress.value = (pos.toFloat() / duration).coerceIn(0f, 1f)
                 }
