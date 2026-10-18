@@ -1506,31 +1506,31 @@ private fun SeekSection() {
         Spacer(Modifier.height(8.dp))
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PlaybackTimeCard(
                 elapsedMs = shownPositionMs,
                 remainingMs = (durationMs - shownPositionMs).coerceAtLeast(0L),
-                modifier = Modifier.weight(1f),
             )
-            NowPlayingQuality(Modifier.weight(1.12f))
-            SleepBadge()
+            Spacer(Modifier.width(8.dp))
+            NowPlayingQuality()
+            SleepBadge(Modifier.padding(start = 8.dp))
         }
     }
 }
 
 @Composable
-private fun PlaybackTimeCard(elapsedMs: Long, remainingMs: Long, modifier: Modifier = Modifier) {
+private fun PlaybackTimeCard(elapsedMs: Long, remainingMs: Long) {
     Row(
-        modifier = modifier
-            .height(40.dp)
+        modifier = Modifier
+            .height(34.dp)
             .liquidFill(
-                shape = RoundedCornerShape(12.dp),
-                fill = Color.White.copy(alpha = 0.095f),
-                rimAlpha = 0.42f,
+                shape = GlassShapes.Pill,
+                fill = Color.White.copy(alpha = 0.07f),
+                rimAlpha = 0.28f,
             )
-            .padding(horizontal = 10.dp),
+            .padding(horizontal = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
@@ -1541,14 +1541,14 @@ private fun PlaybackTimeCard(elapsedMs: Long, remainingMs: Long, modifier: Modif
             maxLines = 1,
             softWrap = false,
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(6.dp))
         Box(
             Modifier
                 .width(1.dp)
                 .height(14.dp)
                 .background(Color.White.copy(alpha = 0.24f)),
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(6.dp))
         Text(
             "−${formatTime(remainingMs)}",
             color = Color.White.copy(alpha = 0.56f),
@@ -1572,17 +1572,17 @@ private fun NowPlayingQuality(modifier: Modifier = Modifier) {
     val f = format ?: return
     val kbps = (f.bitrate + 500) / 1000
     val style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
-    val cardShape = RoundedCornerShape(12.dp)
+    val cardShape = GlassShapes.Pill
     Row(
         modifier
-            .height(40.dp)
+            .height(34.dp)
             .liquidFill(
                 shape = cardShape,
-                fill = Color.White.copy(alpha = 0.095f),
-                rimAlpha = 0.42f,
+                fill = Color.White.copy(alpha = 0.07f),
+                rimAlpha = 0.28f,
             )
             .glassClickable(pressedScale = 0.97f) { details = true }
-            .padding(horizontal = 9.dp),
+            .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         when {
@@ -1596,13 +1596,17 @@ private fun NowPlayingQuality(modifier: Modifier = Modifier) {
                 Spacer(Modifier.width(4.dp))
                 Text(stringResource(R.string.player_high_quality), color = Color.White.copy(alpha = 0.88f), style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            else -> Text(
-                if (kbps > 0) "${f.codec} · $kbps kbps" else f.codec,
-                color = Color.White.copy(alpha = 0.88f),
-                style = style,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            else -> {
+                Icon(Icons.Default.GraphicEq, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    if (kbps > 0) "${f.codec} · $kbps kbps" else f.codec,
+                    color = Color.White.copy(alpha = 0.88f),
+                    style = style,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
     if (details) {
@@ -1687,14 +1691,14 @@ private fun SleepBadge(modifier: Modifier = Modifier) {
     }
     Row(
         modifier
-            .height(40.dp)
+            .height(34.dp)
             .widthIn(max = 92.dp)
             .liquidFill(
-                shape = RoundedCornerShape(12.dp),
-                fill = Color.White.copy(alpha = 0.095f),
-                rimAlpha = 0.42f,
+                shape = GlassShapes.Pill,
+                fill = Color.White.copy(alpha = 0.07f),
+                rimAlpha = 0.28f,
             )
-            .padding(horizontal = 9.dp),
+            .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(Icons.Default.Bedtime, null, tint = Color.White.copy(alpha = 0.75f), modifier = Modifier.size(13.dp))

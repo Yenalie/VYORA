@@ -1,4 +1,7 @@
 # Changelog
+## 1.9.17
+- Kartu timer dan kualitas audio di full player kini membungkus isi dan berukuran ringkas, bukan melebar memenuhi baris; chip codec diberi ikon audio dengan Liquid Glass yang lebih halus
+
 ## 1.9.16
 - Timer berjalan/sisa dipasangkan dalam kartu Liquid Glass dengan pemisah halus; kualitas Lossless/Opus dibuat kartu yang bisa diketuk untuk detail format
 - Sleep timer aktif memakai kartu ringkas seukuran, dengan batas lebar dan ellipsis aman untuk layar kecil
