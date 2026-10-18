@@ -68,7 +68,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -1504,10 +1503,11 @@ private fun SeekSection() {
             )
         }
         Spacer(Modifier.height(8.dp))
-        Box(Modifier.fillMaxWidth().height(28.dp)) {
-            PlaybackTimeCard(
-                text = formatTime(shownPositionMs),
-                muted = false,
+        Box(Modifier.fillMaxWidth().height(26.dp)) {
+            Text(
+                formatTime(shownPositionMs),
+                color = Color.White.copy(alpha = 0.6f),
+                style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.align(Alignment.CenterStart),
             )
             Row(
@@ -1517,36 +1517,13 @@ private fun SeekSection() {
                 NowPlayingQuality()
                 SleepBadge(Modifier.padding(start = 6.dp))
             }
-            PlaybackTimeCard(
-                text = "−${formatTime((durationMs - shownPositionMs).coerceAtLeast(0L))}",
-                muted = true,
+            Text(
+                "-" + formatTime((durationMs - shownPositionMs).coerceAtLeast(0L)),
+                color = Color.White.copy(alpha = 0.6f),
+                style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.align(Alignment.CenterEnd),
             )
         }
-    }
-}
-
-@Composable
-private fun PlaybackTimeCard(text: String, muted: Boolean, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(6.dp)
-    Row(
-        modifier = modifier
-            .height(26.dp)
-            .liquidFill(
-                shape = shape,
-                fill = Color.White.copy(alpha = 0.045f),
-                rimAlpha = 0.32f,
-            )
-            .padding(horizontal = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text,
-            color = Color.White.copy(alpha = if (muted) 0.66f else 0.9f),
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-            maxLines = 1,
-            softWrap = false,
-        )
     }
 }
 
@@ -1677,7 +1654,6 @@ private fun SleepBadge(modifier: Modifier = Modifier) {
     Row(
         modifier
             .height(26.dp)
-            .widthIn(max = 92.dp)
             .liquidFill(
                 shape = RoundedCornerShape(6.dp),
                 fill = Color.White.copy(alpha = 0.045f),
@@ -1692,7 +1668,6 @@ private fun SleepBadge(modifier: Modifier = Modifier) {
             if (current is SleepTimer.Mode.At) formatTime(left) else stringResource(R.string.sleep_end_of_song),
             color = Color.White.copy(alpha = 0.75f),
             style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.weight(1f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             softWrap = false,

@@ -1,4 +1,7 @@
 # Changelog
+## 1.9.19
+- Timestamp lagu dikembalikan ke teks biasa di kiri/kanan seperti Apple Music; mini-card kotak kecil hanya untuk kualitas audio dan sleep timer saat aktif, dengan lebar otomatis mengikuti panjang teks
+
 ## 1.9.18
 - Timestamp dan badge kualitas audio di bawah seekbar disusun ulang mengikuti referensi: timer kiri/kanan dan codec di tengah, masing-masing mini-card kotak 26dp bersudut lembut, bukan capsule/panel lebar
 
