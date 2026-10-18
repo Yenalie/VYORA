@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.9.7
+- Sapuan highlight karaoke kini bergerak lebih halus karakter demi karakter mengikuti waktu vokal, sementara teks yang belum dinyanyikan tetap redup
+
 ## 1.9.6
 - **Karaoke per kata di lyric strip:** kata yang sedang dinyanyikan menyala mengikuti timing vokal dari BetterLyrics atau enhanced LRC
 - Bila sumber lirik tidak menyediakan timestamp kata, strip tetap mengikuti lirik per baris seperti biasa

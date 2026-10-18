@@ -1045,7 +1045,10 @@ private fun rememberSmoothPositionMs(): androidx.compose.runtime.State<Long> {
     return out
 }
 
-/** The current line, word by word: sung words full white, the word being sung filling in, the rest dimmed. */
+/**
+ * Karaoke sweep: each timed word reveals smoothly from its first character to its last.
+ * Previously the whole word brightened at once, which looked like a sudden color change.
+ */
 @Composable
 private fun KaraokeLine(line: LyricLine, style: androidx.compose.ui.text.TextStyle, modifier: Modifier) {
     val position by rememberSmoothPositionMs()
@@ -1057,8 +1060,19 @@ private fun KaraokeLine(line: LyricLine, style: androidx.compose.ui.text.TextSty
                 t <= w.startMs -> 0f
                 else -> ((t - w.startMs).toFloat() / (w.endMs - w.startMs).coerceAtLeast(1)).coerceIn(0f, 1f)
             }
-            val alpha = 0.38f + 0.62f * progress
-            withStyle(androidx.compose.ui.text.SpanStyle(color = Color.White.copy(alpha = alpha))) { append(w.text) }
+            val codePoints = w.text.codePoints().toArray()
+            val count = codePoints.size.coerceAtLeast(1)
+            codePoints.forEachIndexed { index, codePoint ->
+                // Give the leading character a short in-flight fade, then carry
+                // the bright edge across the rest of the word on every frame.
+                val characterProgress = (progress * count - index).coerceIn(0f, 1f)
+                val eased = characterProgress * characterProgress * (3f - 2f * characterProgress)
+                val alpha = 0.34f + 0.66f * eased
+                val character = String(Character.toChars(codePoint))
+                withStyle(androidx.compose.ui.text.SpanStyle(color = Color.White.copy(alpha = alpha))) {
+                    append(character)
+                }
+            }
         }
     }
     Text(text = text, style = style, modifier = modifier.padding(vertical = 10.dp))
