@@ -13,10 +13,9 @@ import com.vyora.music.data.settings.SettingsRepository
 private data class LyricsProviderChoice(
     val provider: LyricsProviderPreference,
     val title: Int,
-    val description: Int,
 )
 
-/** Stable, localized label used in both the settings root summary and the provider picker. */
+/** Localized label shared by the settings root summary and provider picker. */
 fun lyricsProviderTitleRes(provider: LyricsProviderPreference): Int = when (provider) {
     LyricsProviderPreference.AUTO -> R.string.lyrics_provider_auto
     LyricsProviderPreference.LRC_RED -> R.string.lyrics_provider_lrc_red
@@ -32,14 +31,14 @@ fun lyricsProviderTitleRes(provider: LyricsProviderPreference): Int = when (prov
 fun LyricsSettingsScreen(onBack: () -> Unit) {
     val settings by SettingsRepository.settings.collectAsState()
     val choices = listOf(
-        LyricsProviderChoice(LyricsProviderPreference.AUTO, R.string.lyrics_provider_auto, R.string.lyrics_provider_auto_desc),
-        LyricsProviderChoice(LyricsProviderPreference.LRC_RED, R.string.lyrics_provider_lrc_red, R.string.lyrics_provider_lrc_red_desc),
-        LyricsProviderChoice(LyricsProviderPreference.BETTER_LYRICS, R.string.lyrics_provider_better, R.string.lyrics_provider_better_desc),
-        LyricsProviderChoice(LyricsProviderPreference.BETTER_LYRICS_PORTATO, R.string.lyrics_provider_portato, R.string.lyrics_provider_portato_desc),
-        LyricsProviderChoice(LyricsProviderPreference.LYRICS_PLUS, R.string.lyrics_provider_plus, R.string.lyrics_provider_plus_desc),
-        LyricsProviderChoice(LyricsProviderPreference.UNISON, R.string.lyrics_provider_unison, R.string.lyrics_provider_unison_desc),
-        LyricsProviderChoice(LyricsProviderPreference.KUGOU, R.string.lyrics_provider_kugou, R.string.lyrics_provider_kugou_desc),
-        LyricsProviderChoice(LyricsProviderPreference.LRCLIB, R.string.lyrics_provider_lrclib, R.string.lyrics_provider_lrclib_desc),
+        LyricsProviderChoice(LyricsProviderPreference.AUTO, R.string.lyrics_provider_auto),
+        LyricsProviderChoice(LyricsProviderPreference.LRC_RED, R.string.lyrics_provider_lrc_red),
+        LyricsProviderChoice(LyricsProviderPreference.BETTER_LYRICS, R.string.lyrics_provider_better),
+        LyricsProviderChoice(LyricsProviderPreference.BETTER_LYRICS_PORTATO, R.string.lyrics_provider_portato),
+        LyricsProviderChoice(LyricsProviderPreference.LYRICS_PLUS, R.string.lyrics_provider_plus),
+        LyricsProviderChoice(LyricsProviderPreference.UNISON, R.string.lyrics_provider_unison),
+        LyricsProviderChoice(LyricsProviderPreference.KUGOU, R.string.lyrics_provider_kugou),
+        LyricsProviderChoice(LyricsProviderPreference.LRCLIB, R.string.lyrics_provider_lrclib),
     )
 
     SettingsPage(title = stringResource(R.string.lyrics), onBack = onBack) {
@@ -51,7 +50,6 @@ fun LyricsSettingsScreen(onBack: () -> Unit) {
                 choices.forEachIndexed { index, choice ->
                     SettingsChoiceRow(
                         title = stringResource(choice.title),
-                        subtitle = stringResource(choice.description),
                         selected = settings.lyricsProvider == choice.provider,
                         divider = index < choices.lastIndex,
                         onClick = {
@@ -64,10 +62,7 @@ fun LyricsSettingsScreen(onBack: () -> Unit) {
             }
         }
         item(key = "player_lyrics") {
-            SettingsGroup(
-                header = stringResource(R.string.lyrics_player_section),
-                footer = stringResource(R.string.lyrics_player_footer),
-            ) {
+            SettingsGroup(header = stringResource(R.string.lyrics_player_section)) {
                 SettingsSwitchRow(
                     title = stringResource(R.string.lyrics_player_strip),
                     subtitle = stringResource(R.string.lyrics_player_strip_desc),

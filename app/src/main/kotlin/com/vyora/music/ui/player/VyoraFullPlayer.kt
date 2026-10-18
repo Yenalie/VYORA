@@ -875,16 +875,13 @@ private fun CurrentLyricsPeek(
                     clock = lyricClock,
                     style = lyricStyle,
                     modifier = Modifier.fillMaxWidth(),
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    maxLines = Int.MAX_VALUE,
                 )
             } else {
                 Text(
                     text = text,
                     color = Color.White.copy(alpha = if (line == null) 0.55f else 1f),
                     style = lyricStyle,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 )
             }
         }

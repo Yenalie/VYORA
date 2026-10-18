@@ -1,4 +1,8 @@
 # Changelog
+## 1.9.13
+- Strip lirik full player kini membungkus teks panjang ke beberapa baris tanpa ellipsis; sapuan karaoke tetap mengikuti baris visual
+- Pengaturan Lirik diringkas menjadi pilihan provider yang mudah dipindai dan satu keterangan fallback singkat
+
 ## 1.9.12
 - Tambah halaman Pengaturan > Lirik untuk memilih sumber prioritas; provider lain tetap menjadi fallback otomatis, dan hasil tersinkron kata dapat mengungguli hasil per baris
 - Tambah sakelar pratinjau lirik di bawah judul/artis full player, dengan transisi expand/fade yang ringan dan tetap mempertahankan akses ke layar lirik penuh
