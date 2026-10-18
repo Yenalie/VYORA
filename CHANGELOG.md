@@ -1,4 +1,7 @@
 # Changelog
+## 1.9.15
+- Strip lirik full player dikembalikan ke baris tunggal stabil ala BitChord: tanpa panel ekstra, tanpa perubahan tinggi antarbaris, dengan chevron ikon yang lebih ringan
+
 ## 1.9.14
 - Strip lirik full player dirapikan dengan permukaan rounded yang halus, ikon/teks sejajar, dan padding konsisten; chevron teks yang janggal dihapus
 

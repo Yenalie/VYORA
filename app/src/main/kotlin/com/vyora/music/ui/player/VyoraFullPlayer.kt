@@ -78,6 +78,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.VolumeMute
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Cast
@@ -259,7 +260,6 @@ fun VyoraPlayerSheet(
 private const val MODE_ART = 0
 private const val MODE_LYRICS = 1
 private const val MODE_QUEUE = 2
-private val CurrentLyricsPeekShape = RoundedCornerShape(16.dp)
 
 @Composable
 private fun FullPlayerContent(sheet: PlayerSheetState) {
@@ -844,22 +844,12 @@ private fun CurrentLyricsPeek(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp)
-            .clip(CurrentLyricsPeekShape)
-            .background(Color.White.copy(alpha = 0.065f))
-            .border(1.dp, Color.White.copy(alpha = 0.12f), CurrentLyricsPeekShape)
-            .glassClickable(pressedScale = 0.985f, onClick = onOpen)
-            .heightIn(min = 52.dp)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
+            .padding(top = 6.dp)
+            .height(40.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .glassClickable(pressedScale = 0.985f, onClick = onOpen),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            Icons.Default.Lyrics,
-            contentDescription = stringResource(R.string.lyrics),
-            tint = Color.White.copy(alpha = 0.76f),
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(12.dp))
         AnimatedContent(
             targetState = Triple(activeIndex, activeLyric, currentLine),
             transitionSpec = {
@@ -884,16 +874,26 @@ private fun CurrentLyricsPeek(
                     clock = lyricClock,
                     style = lyricStyle,
                     modifier = Modifier.fillMaxWidth(),
-                    maxLines = Int.MAX_VALUE,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 )
             } else {
                 Text(
                     text = text,
                     color = Color.White.copy(alpha = if (line == null) 0.55f else 1f),
                     style = lyricStyle,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
+        Spacer(Modifier.width(4.dp))
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = Color.White.copy(alpha = 0.42f),
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 
