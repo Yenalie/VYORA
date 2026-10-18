@@ -1,4 +1,8 @@
 # Changelog
+## 1.9.16
+- Timer berjalan/sisa dipasangkan dalam kartu Liquid Glass dengan pemisah halus; kualitas Lossless/Opus dibuat kartu yang bisa diketuk untuk detail format
+- Sleep timer aktif memakai kartu ringkas seukuran, dengan batas lebar dan ellipsis aman untuk layar kecil
+
 ## 1.9.15
 - Strip lirik full player dikembalikan ke baris tunggal stabil ala BitChord: tanpa panel ekstra, tanpa perubahan tinggi antarbaris, dengan chevron ikon yang lebih ringan
 

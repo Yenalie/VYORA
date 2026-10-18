@@ -68,6 +68,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -1502,24 +1503,59 @@ private fun SeekSection() {
                     },
             )
         }
-        Box(Modifier.fillMaxWidth()) {
-            Text(
-                formatTime(shownPositionMs),
-                color = Color.White.copy(alpha = 0.6f),
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.align(Alignment.CenterStart),
+        Spacer(Modifier.height(8.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PlaybackTimeCard(
+                elapsedMs = shownPositionMs,
+                remainingMs = (durationMs - shownPositionMs).coerceAtLeast(0L),
+                modifier = Modifier.weight(1f),
             )
-            Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
-                SleepBadge()
-                NowPlayingQuality()
-            }
-            Text(
-                "-" + formatTime((durationMs - shownPositionMs).coerceAtLeast(0L)),
-                color = Color.White.copy(alpha = 0.6f),
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.align(Alignment.CenterEnd),
-            )
+            NowPlayingQuality(Modifier.weight(1.12f))
+            SleepBadge()
         }
+    }
+}
+
+@Composable
+private fun PlaybackTimeCard(elapsedMs: Long, remainingMs: Long, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .height(40.dp)
+            .liquidFill(
+                shape = RoundedCornerShape(12.dp),
+                fill = Color.White.copy(alpha = 0.095f),
+                rimAlpha = 0.42f,
+            )
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            formatTime(elapsedMs),
+            color = Color.White.copy(alpha = 0.94f),
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            maxLines = 1,
+            softWrap = false,
+        )
+        Spacer(Modifier.width(8.dp))
+        Box(
+            Modifier
+                .width(1.dp)
+                .height(14.dp)
+                .background(Color.White.copy(alpha = 0.24f)),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "−${formatTime(remainingMs)}",
+            color = Color.White.copy(alpha = 0.56f),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            softWrap = false,
+        )
     }
 }
 
@@ -1529,32 +1565,43 @@ private fun SeekSection() {
  * playing. Tap for the full format details.
  */
 @Composable
-private fun NowPlayingQuality() {
+private fun NowPlayingQuality(modifier: Modifier = Modifier) {
     val format by PlayerManager.audioFormat.collectAsState()
     val current by PlayerManager.currentItem.collectAsState()
     var details by remember { mutableStateOf(false) }
     val f = format ?: return
     val kbps = (f.bitrate + 500) / 1000
-    val muted = Color.White.copy(alpha = 0.45f)
-    val style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium, fontSize = 12.sp)
+    val style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
+    val cardShape = RoundedCornerShape(12.dp)
     Row(
-        Modifier.padding(horizontal = 6.dp).glassClickable(pressedScale = 0.94f) { details = true },
+        modifier
+            .height(40.dp)
+            .liquidFill(
+                shape = cardShape,
+                fill = Color.White.copy(alpha = 0.095f),
+                rimAlpha = 0.42f,
+            )
+            .glassClickable(pressedScale = 0.97f) { details = true }
+            .padding(horizontal = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         when {
             f.tier != com.vyora.music.data.local.AudioTier.LOSSY -> {
-                Icon(Icons.Default.GraphicEq, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.GraphicEq, null, tint = Color.White.copy(alpha = 0.78f), modifier = Modifier.size(15.dp))
                 Spacer(Modifier.width(4.dp))
                 ShimmerText(com.vyora.music.ui.components.tierLabel(f.tier), style)
             }
             kbps >= HIGH_QUALITY_KBPS -> {
-                Icon(Icons.Default.Headphones, null, tint = muted, modifier = Modifier.size(13.dp))
+                Icon(Icons.Default.Headphones, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
-                Text(stringResource(R.string.player_high_quality), color = muted, style = style, maxLines = 1)
+                Text(stringResource(R.string.player_high_quality), color = Color.White.copy(alpha = 0.88f), style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             else -> Text(
                 if (kbps > 0) "${f.codec} · $kbps kbps" else f.codec,
-                color = muted, style = style, maxLines = 1,
+                color = Color.White.copy(alpha = 0.88f),
+                style = style,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -1640,16 +1687,26 @@ private fun SleepBadge(modifier: Modifier = Modifier) {
     }
     Row(
         modifier
-            .liquidFill(shape = GlassShapes.Pill, fill = Color.White.copy(alpha = 0.12f))
-            .padding(horizontal = 8.dp, vertical = 2.dp),
+            .height(40.dp)
+            .widthIn(max = 92.dp)
+            .liquidFill(
+                shape = RoundedCornerShape(12.dp),
+                fill = Color.White.copy(alpha = 0.095f),
+                rimAlpha = 0.42f,
+            )
+            .padding(horizontal = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Default.Bedtime, null, tint = Color.White.copy(alpha = 0.75f), modifier = Modifier.size(12.dp))
+        Icon(Icons.Default.Bedtime, null, tint = Color.White.copy(alpha = 0.75f), modifier = Modifier.size(13.dp))
         Spacer(Modifier.width(4.dp))
         Text(
             if (current is SleepTimer.Mode.At) formatTime(left) else stringResource(R.string.sleep_end_of_song),
             color = Color.White.copy(alpha = 0.75f),
             style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            softWrap = false,
         )
     }
 }

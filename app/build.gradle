@@ -12,8 +12,8 @@ android {
         applicationId = 'com.vyora.music'
         minSdk = 29
         targetSdk = 35
-        versionCode = 27
-        versionName = '1.9.15'
+        versionCode = 28
+        versionName = '1.9.16'
 
         testInstrumentationRunner = 'androidx.test.runner.AndroidJUnitRunner'
 
