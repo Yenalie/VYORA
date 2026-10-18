@@ -1504,55 +1504,46 @@ private fun SeekSection() {
             )
         }
         Spacer(Modifier.height(8.dp))
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        Box(Modifier.fillMaxWidth().height(28.dp)) {
             PlaybackTimeCard(
-                elapsedMs = shownPositionMs,
-                remainingMs = (durationMs - shownPositionMs).coerceAtLeast(0L),
+                text = formatTime(shownPositionMs),
+                muted = false,
+                modifier = Modifier.align(Alignment.CenterStart),
             )
-            Spacer(Modifier.width(8.dp))
-            NowPlayingQuality()
-            SleepBadge(Modifier.padding(start = 8.dp))
+            Row(
+                Modifier.align(Alignment.Center),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                NowPlayingQuality()
+                SleepBadge(Modifier.padding(start = 6.dp))
+            }
+            PlaybackTimeCard(
+                text = "−${formatTime((durationMs - shownPositionMs).coerceAtLeast(0L))}",
+                muted = true,
+                modifier = Modifier.align(Alignment.CenterEnd),
+            )
         }
     }
 }
 
 @Composable
-private fun PlaybackTimeCard(elapsedMs: Long, remainingMs: Long) {
+private fun PlaybackTimeCard(text: String, muted: Boolean, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(6.dp)
     Row(
-        modifier = Modifier
-            .height(34.dp)
+        modifier = modifier
+            .height(26.dp)
             .liquidFill(
-                shape = GlassShapes.Pill,
-                fill = Color.White.copy(alpha = 0.07f),
-                rimAlpha = 0.28f,
+                shape = shape,
+                fill = Color.White.copy(alpha = 0.045f),
+                rimAlpha = 0.32f,
             )
-            .padding(horizontal = 9.dp),
+            .padding(horizontal = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
     ) {
         Text(
-            formatTime(elapsedMs),
-            color = Color.White.copy(alpha = 0.94f),
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-            maxLines = 1,
-            softWrap = false,
-        )
-        Spacer(Modifier.width(6.dp))
-        Box(
-            Modifier
-                .width(1.dp)
-                .height(14.dp)
-                .background(Color.White.copy(alpha = 0.24f)),
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            "−${formatTime(remainingMs)}",
-            color = Color.White.copy(alpha = 0.56f),
-            style = MaterialTheme.typography.labelSmall,
+            text,
+            color = Color.White.copy(alpha = if (muted) 0.66f else 0.9f),
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
             maxLines = 1,
             softWrap = false,
         )
@@ -1571,36 +1562,30 @@ private fun NowPlayingQuality(modifier: Modifier = Modifier) {
     var details by remember { mutableStateOf(false) }
     val f = format ?: return
     val kbps = (f.bitrate + 500) / 1000
-    val style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
-    val cardShape = GlassShapes.Pill
+    val style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 10.sp, letterSpacing = 0.35.sp)
+    val cardShape = RoundedCornerShape(6.dp)
     Row(
         modifier
-            .height(34.dp)
+            .height(26.dp)
             .liquidFill(
                 shape = cardShape,
-                fill = Color.White.copy(alpha = 0.07f),
-                rimAlpha = 0.28f,
+                fill = Color.White.copy(alpha = 0.045f),
+                rimAlpha = 0.36f,
             )
             .glassClickable(pressedScale = 0.97f) { details = true }
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         when {
             f.tier != com.vyora.music.data.local.AudioTier.LOSSY -> {
-                Icon(Icons.Default.GraphicEq, null, tint = Color.White.copy(alpha = 0.78f), modifier = Modifier.size(15.dp))
-                Spacer(Modifier.width(4.dp))
-                ShimmerText(com.vyora.music.ui.components.tierLabel(f.tier), style)
+                ShimmerText(com.vyora.music.ui.components.tierLabel(f.tier).uppercase(), style)
             }
             kbps >= HIGH_QUALITY_KBPS -> {
-                Icon(Icons.Default.Headphones, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(stringResource(R.string.player_high_quality), color = Color.White.copy(alpha = 0.88f), style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(stringResource(R.string.player_high_quality).uppercase(), color = Color.White.copy(alpha = 0.88f), style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             else -> {
-                Icon(Icons.Default.GraphicEq, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(4.dp))
                 Text(
-                    if (kbps > 0) "${f.codec} · $kbps kbps" else f.codec,
+                    f.codec.uppercase(),
                     color = Color.White.copy(alpha = 0.88f),
                     style = style,
                     maxLines = 1,
@@ -1691,14 +1676,14 @@ private fun SleepBadge(modifier: Modifier = Modifier) {
     }
     Row(
         modifier
-            .height(34.dp)
+            .height(26.dp)
             .widthIn(max = 92.dp)
             .liquidFill(
-                shape = GlassShapes.Pill,
-                fill = Color.White.copy(alpha = 0.07f),
-                rimAlpha = 0.28f,
+                shape = RoundedCornerShape(6.dp),
+                fill = Color.White.copy(alpha = 0.045f),
+                rimAlpha = 0.32f,
             )
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(Icons.Default.Bedtime, null, tint = Color.White.copy(alpha = 0.75f), modifier = Modifier.size(13.dp))

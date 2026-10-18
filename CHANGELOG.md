@@ -1,4 +1,7 @@
 # Changelog
+## 1.9.18
+- Timestamp dan badge kualitas audio di bawah seekbar disusun ulang mengikuti referensi: timer kiri/kanan dan codec di tengah, masing-masing mini-card kotak 26dp bersudut lembut, bukan capsule/panel lebar
+
 ## 1.9.17
 - Kartu timer dan kualitas audio di full player kini membungkus isi dan berukuran ringkas, bukan melebar memenuhi baris; chip codec diberi ikon audio dengan Liquid Glass yang lebih halus
 
