@@ -126,12 +126,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -152,6 +155,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -1066,39 +1070,76 @@ private fun rememberSmoothPositionMs(): androidx.compose.runtime.State<Long> {
     return out
 }
 
-/**
- * Karaoke sweep: each timed word reveals smoothly from its first character to its last.
- * Previously the whole word brightened at once, which looked like a sudden color change.
- */
+/** Draw-phase karaoke mask: text layout stays static while only the reveal edge moves. */
 @Composable
 private fun KaraokeLine(line: LyricLine, style: androidx.compose.ui.text.TextStyle, modifier: Modifier) {
-    val position by rememberSmoothPositionMs()
-    val t = position + 120
-    val text = androidx.compose.ui.text.buildAnnotatedString {
-        line.words.forEach { w ->
-            val progress = when {
-                t >= w.endMs -> 1f
-                t <= w.startMs -> 0f
-                else -> ((t - w.startMs).toFloat() / (w.endMs - w.startMs).coerceAtLeast(1)).coerceIn(0f, 1f)
-            }
-            val codePoints = w.text.codePoints().toArray()
-            val count = codePoints.size.coerceAtLeast(1)
-            codePoints.forEachIndexed { index, codePoint ->
-                // A two-character feather keeps the leading edge from looking
-                // like it is stepping or flickering at glyph boundaries.
-                val feather = 2f
-                val characterProgress = (progress * (count + feather) - index) / feather
-                val clampedProgress = characterProgress.coerceIn(0f, 1f)
-                val eased = clampedProgress * clampedProgress * (3f - 2f * clampedProgress)
-                val alpha = 0.34f + 0.66f * eased
-                val character = String(Character.toChars(codePoint))
-                withStyle(androidx.compose.ui.text.SpanStyle(color = Color.White.copy(alpha = alpha))) {
-                    append(character)
-                }
-            }
-        }
+    val position = rememberSmoothPositionMs()
+    var textLayout by remember(line) { mutableStateOf<TextLayoutResult?>(null) }
+    val sweepPath = remember(line) { Path() }
+    val text = line.text
+    Box(modifier.padding(vertical = 10.dp)) {
+        Text(
+            text = text,
+            color = Color.White.copy(alpha = 0.34f),
+            style = style,
+            modifier = Modifier.fillMaxWidth(),
+            onTextLayout = { textLayout = it },
+        )
+        Text(
+            text = text,
+            color = Color.White,
+            style = style,
+            modifier = Modifier
+                .fillMaxWidth()
+                .drawWithContent {
+                    val contentScope = this
+                    val layout = textLayout
+                    if (layout == null || text.isEmpty()) return@drawWithContent
+                    val now = position.value + 120L
+                    var revealOffset = 0f
+                    for (word in line.words) {
+                        val wordLength = word.text.length.toFloat()
+                        when {
+                            now >= word.endMs -> revealOffset += wordLength
+                            now <= word.startMs -> break
+                            else -> {
+                                val fraction = ((now - word.startMs).toFloat() /
+                                    (word.endMs - word.startMs).coerceAtLeast(1L)).coerceIn(0f, 1f)
+                                revealOffset += wordLength * fraction
+                                break
+                            }
+                        }
+                    }
+                    revealOffset = revealOffset.coerceIn(0f, text.length.toFloat())
+                    when {
+                        revealOffset <= 0f -> Unit
+                        revealOffset >= text.length -> drawContent()
+                        else -> {
+                            val charOffset = revealOffset.toInt().coerceIn(0, text.lastIndex)
+                            val lineIndex = layout.getLineForOffset(charOffset)
+                            val charBounds = layout.getBoundingBox(charOffset)
+                            val fraction = revealOffset - charOffset
+                            val cutX = charBounds.left + charBounds.width * fraction
+                            sweepPath.reset()
+                            for (i in 0 until lineIndex) {
+                                sweepPath.addRect(
+                                    Rect(layout.getLineLeft(i), layout.getLineTop(i), layout.getLineRight(i), layout.getLineBottom(i))
+                                )
+                            }
+                            val left = layout.getLineLeft(lineIndex)
+                            val right = cutX.coerceIn(left, layout.getLineRight(lineIndex))
+                            if (right > left) {
+                                sweepPath.addRect(
+                                    Rect(left, layout.getLineTop(lineIndex), right, layout.getLineBottom(lineIndex))
+                                )
+                            }
+                            clipPath(sweepPath) { contentScope.drawContent() }
+                        }
+                    }
+                },
+            onTextLayout = {},
+        )
     }
-    Text(text = text, style = style, modifier = modifier.padding(vertical = 10.dp))
 }
 
 @Composable

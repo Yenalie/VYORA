@@ -1,4 +1,7 @@
 # Changelog
+## 1.9.9
+- Optimasi sapuan karaoke: layout teks tetap statis, hanya mask highlight yang bergerak saat digambar agar animasi lebih stabil
+
 ## 1.9.8
 - Menghaluskan clock dan tepi sapuan karaoke supaya highlight vokal tidak bergetar atau berkedip
 
