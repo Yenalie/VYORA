@@ -616,4 +616,14 @@
     <string name="lyrics_player_section">Full player</string>
     <string name="lyrics_player_strip">Show current lyric</string>
     <string name="lyrics_player_strip_desc">Under the title and artist in the full player.</string>
+    <string name="home_stations">Stations for You</string>
+    <string name="station_artist">%1$s Station</string>
+    <string name="station_discovery">Discovery Station</string>
+    <string name="station_label">Station</string>
+    <string name="home_albums">Albums for You</string>
+    <string name="home_music_videos">Music Videos</string>
+    <string name="home_replay">Replay: Your Top Songs</string>
+    <string name="mix_favorites">Favorites Mix</string>
+    <string name="mix_discovery">Discovery Mix</string>
+    <string name="mix_rediscover">Rediscover Mix</string>
 </resources>

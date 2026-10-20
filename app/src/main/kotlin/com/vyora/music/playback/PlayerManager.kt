@@ -219,7 +219,12 @@ object PlayerManager {
             .filter { it.type == C.TRACK_TYPE_AUDIO && it.isSelected }
             .flatMap { group -> (0 until group.length).asSequence().filter(group::isTrackSelected).map(group::getTrackFormat) }
             .firstOrNull() ?: return null
-        val mime = format.sampleMimeType ?: format.containerMimeType ?: return null
+        // Our AIFF and DSD extractors hand the decoder plain PCM; name the file's own format instead.
+        val mime = when (format.containerMimeType) {
+            com.vyora.music.playback.extractor.AiffExtractor.MIME_AIFF -> format.containerMimeType
+            com.vyora.music.playback.extractor.DsdExtractor.MIME_DSD -> "audio/x-" + (format.codecs ?: "dsd")
+            else -> format.sampleMimeType ?: format.containerMimeType
+        } ?: return null
         val stream = mediaId?.takeIf(SimpleItem::isYouTubeId)?.let(StreamResolver::pickedAudio)
         val bits = when (format.pcmEncoding) {
             C.ENCODING_PCM_8BIT -> 8
@@ -228,10 +233,12 @@ object PlayerManager {
             C.ENCODING_PCM_32BIT, C.ENCODING_PCM_32BIT_BIG_ENDIAN, C.ENCODING_PCM_FLOAT -> 32
             else -> 0
         }
+        val dsd = format.containerMimeType == com.vyora.music.playback.extractor.DsdExtractor.MIME_DSD
         return AudioFormatInfo(
             mimeType = mime,
-            sampleRateHz = format.sampleRate.coerceAtLeast(0),
-            bitDepth = bits,
+            // DSD is decoded to PCM here, but the badge should show the 1-bit source, e.g. DSD64 at 2.8 MHz.
+            sampleRateHz = if (dsd) (format.bitrate / format.channelCount.coerceAtLeast(1)).coerceAtLeast(0) else format.sampleRate.coerceAtLeast(0),
+            bitDepth = if (dsd) 1 else bits,
             // NewPipe reports average bitrate in kbps but itag bitrate in bps.
             bitrate = stream?.bitrate?.takeIf { it > 0 }?.let { if (it < 10_000) it * 1000 else it }
                 ?: maxOf(format.averageBitrate, format.bitrate, 0),

@@ -1,4 +1,15 @@
 # Changelog
+## 1.9.6
+- Full player tidak lagi force close di mode landscape; landscape kini memakai tata letak dua kolom (artwork, lirik, atau antrean di kiri, kontrol di kanan) dan player tetap terbuka saat layar diputar
+- Navigasi tab diperbaiki: Search selalu bisa dibuka lagi setelah kembali ke Home, tap tab yang sedang aktif kembali ke halaman awalnya, dan back di full player memakai gestur predictive back
+- Transisi mini player ke full player kini zoom seperti Apple Music iOS 26: seluruh player membesar dari mini player dan mengecil kembali ke sana
+- Artwork full player bergerak pelan berulang seperti motion artwork Apple Music, dan berhenti perlahan saat lagu dijeda
+- Tanpa Liquid Glass, bar bawah memakai navigasi Material 3 yang solid dengan mini player menempel di atasnya seperti Apple Music Android; tidak ada lagi puck slider, dan permukaan lain jadi tonal datar tanpa kilap kaca
+- Home dilengkapi Made for You (Favorites Mix, Discovery Mix, Rediscover Mix), Stations for You, Albums for You, Music Videos, dan Replay: lagu teratas tahun ini
+- File AIFF dan AIFF-C (8 sampai 32-bit, float) kini bisa diputar dengan resolusi penuh; DSD (DSF dan DFF, DSD64 sampai DSD512) diputar sebagai PCM 88,2 atau 176,4 kHz, termasuk dari music server
+- Badge kualitas menampilkan AIFF dan DSD (misalnya DSD64) beserta resolusi aslinya
+- Teks pengaturan lirik kini lengkap dalam bahasa Melayu, Jepang, dan Spanyol
+
 ## 1.9.21
 - Mini-card kualitas audio dan sleep timer kini transparan dengan outline tipis saja, tanpa warna fill gelap atau efek Liquid Glass; komentar penjelas terkait kartu dihapus
 

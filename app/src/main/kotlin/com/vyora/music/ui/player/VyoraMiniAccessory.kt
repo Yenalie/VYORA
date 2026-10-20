@@ -119,6 +119,8 @@ fun VyoraMiniAccessory(
     modifier: Modifier = Modifier,
     onOpenDrag: (dyPx: Float) -> Unit = {},
     onOpenRelease: (velocityY: Float) -> Unit = {},
+    /** Edge-to-edge bar docked on the opaque nav bar (Liquid Glass off), like Apple Music for Android. */
+    docked: Boolean = false,
 ) {
     val title by PlayerManager.currentTitle.collectAsState()
     val artist by PlayerManager.currentArtist.collectAsState()
@@ -195,7 +197,7 @@ fun VyoraMiniAccessory(
     val pressSource = remember { MutableInteractionSource() }
     val pressed by pressSource.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
-        targetValue = if (pressed) 1.035f else 1f,
+        targetValue = if (pressed && !docked) 1.035f else 1f,
         animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium),
         label = "accessoryPressScale",
     )
@@ -205,10 +207,10 @@ fun VyoraMiniAccessory(
     val t = collapseProgress?.invoke() ?: if (isInline) 1f else 0f
     val compact = t >= 0.5f
 
-    val rowMinHeight = lerp(ExpandedPillHeight, FloatingTabBarInlineHeight, t)
-    val artSize = lerp(42.dp, 36.dp, t)
-    val artRadius = lerp(12.dp, 10.dp, t)
-    val edgeInset = (rowMinHeight - artSize) / 2
+    val rowMinHeight = if (docked) 64.dp else lerp(ExpandedPillHeight, FloatingTabBarInlineHeight, t)
+    val artSize = if (docked) 48.dp else lerp(42.dp, 36.dp, t)
+    val artRadius = if (docked) 6.dp else lerp(12.dp, 10.dp, t)
+    val edgeInset = if (docked) 8.dp else (rowMinHeight - artSize) / 2
     val controlSize = 40.dp
     val iconSize = lerp(26.dp, 22.dp, t)
     val endInset = (edgeInset - (controlSize - iconSize) / 2).coerceAtLeast(0.dp)
@@ -331,7 +333,7 @@ fun VyoraMiniAccessory(
                     )
                 }
                 .heightIn(min = rowMinHeight)
-                .padding(start = edgeInset, end = endInset, top = edgeInset, bottom = edgeInset),
+                .padding(start = if (docked) 16.dp else edgeInset, end = if (docked) 8.dp else endInset, top = edgeInset, bottom = edgeInset),
         ) {
             Box(
                 modifier = Modifier

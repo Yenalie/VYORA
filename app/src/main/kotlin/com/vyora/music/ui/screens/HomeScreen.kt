@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.CircularProgressIndicator
@@ -47,11 +48,15 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.vyora.music.R
 import com.vyora.music.data.library.HomeContent
 import com.vyora.music.data.library.HomeFeed
 import com.vyora.music.data.library.LibraryManager
 import com.vyora.music.data.library.TopPick
+import com.vyora.music.data.library.MixKind
+import com.vyora.music.data.library.PersonalMix
+import com.vyora.music.data.library.Station
 import com.vyora.music.data.youtube.SimpleItem
 import com.vyora.music.ui.components.AccountButton
 import com.vyora.music.ui.components.ItemRow
@@ -89,6 +94,9 @@ fun HomeScreen(
     onOpenCollection: (String) -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenArtist: (String) -> Unit = {},
+    onOpenAlbum: (SimpleItem) -> Unit = {},
+    onStartRadio: (SimpleItem) -> Unit = {},
+    onOpenRecap: () -> Unit = {},
 ) {
     val recent by LibraryManager.recentSongs.collectAsState()
     val liked by LibraryManager.likedSongs.collectAsState()
@@ -115,7 +123,16 @@ fun HomeScreen(
     val topSongs = content?.topSongs.orEmpty()
     val artistShelves = content?.artistShelves.orEmpty()
     val mixes = content?.mixes.orEmpty()
-    val rediscover = content?.rediscover.orEmpty()
+    val madeForYou = content?.madeForYou.orEmpty()
+    val stations = content?.stations.orEmpty()
+    val albums = content?.albums.orEmpty()
+    val musicVideos = content?.musicVideos.orEmpty()
+    val replaySince = remember { replayYearStart() }
+    val replayFlow = remember(replaySince) { LibraryManager.stats()?.topSongs(replaySince, 25) }
+    val replayRows by (replayFlow ?: kotlinx.coroutines.flow.flowOf(emptyList())).collectAsState(initial = emptyList())
+    val replay = remember(replayRows) {
+        replayRows.map { SimpleItem(id = it.itemId, title = it.title, artist = it.artist, thumbnail = it.thumbnail, url = SimpleItem.playbackUrl(it.itemId)) }
+    }
 
     val listState = rememberLazyListState()
     OnTabReselect("home") { listState.scrollToTopSmooth() }
@@ -178,6 +195,40 @@ fun HomeScreen(
             }
         }
 
+        if (madeForYou.isNotEmpty()) {
+            item(key = "made_for_you") {
+                Column {
+                    SectionTitle(stringResource(R.string.made_for_you), Modifier.padding(horizontal = Spacing.ScreenH))
+                    Spacer(Modifier.height(10.dp))
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = Spacing.ScreenH),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        itemsIndexed(madeForYou, key = { _, it -> "mfy_" + it.kind }) { _, mix ->
+                            MixCard(mix) { onPlayList(mix.songs, 0) }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (stations.isNotEmpty()) {
+            item(key = "stations") {
+                Column {
+                    SectionTitle(stringResource(R.string.home_stations), Modifier.padding(horizontal = Spacing.ScreenH))
+                    Spacer(Modifier.height(10.dp))
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = Spacing.ScreenH),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        itemsIndexed(stations, key = { _, it -> "station_" + it.seed.id }) { _, station ->
+                            StationCard(station) { onStartRadio(station.seed) }
+                        }
+                    }
+                }
+            }
+        }
+
         if (topSongs.isNotEmpty()) {
             item(key = "top_songs") {
                 Column {
@@ -215,6 +266,23 @@ fun HomeScreen(
             }
         }
 
+        if (albums.size >= 3) {
+            item(key = "albums") {
+                Column {
+                    SectionTitle(stringResource(R.string.home_albums), Modifier.padding(horizontal = Spacing.ScreenH))
+                    Spacer(Modifier.height(10.dp))
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = Spacing.ScreenH),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        itemsIndexed(albums, key = { _, it -> "album_" + it.id }) { _, album ->
+                            SquareTile(album) { onOpenAlbum(album) }
+                        }
+                    }
+                }
+            }
+        }
+
         artistShelves.forEach { shelf ->
             item(key = "more_" + shelf.artist) {
                 Shelf(
@@ -226,6 +294,34 @@ fun HomeScreen(
             }
         }
 
+        if (musicVideos.size >= 3) {
+            item(key = "videos") {
+                Column {
+                    SectionTitle(stringResource(R.string.home_music_videos), Modifier.padding(horizontal = Spacing.ScreenH))
+                    Spacer(Modifier.height(10.dp))
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = Spacing.ScreenH),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        itemsIndexed(musicVideos, key = { _, it -> "video_" + it.id }) { i, video ->
+                            VideoTile(video) { onPlayList(musicVideos, i) }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (replay.size >= 5) {
+            item(key = "replay") {
+                Shelf(
+                    title = stringResource(R.string.home_replay),
+                    items = replay,
+                    onTitle = onOpenRecap,
+                    onPlay = { i -> onPlayList(replay, i) },
+                )
+            }
+        }
+
         if (liked.isNotEmpty()) {
             item(key = "liked") {
                 Shelf(
@@ -233,17 +329,6 @@ fun HomeScreen(
                     items = liked.take(15),
                     onTitle = { onOpenCollection(Collections.LIKED) },
                     onPlay = { i -> onPlayList(liked.take(15), i) },
-                )
-            }
-        }
-
-        if (rediscover.size >= 4) {
-            item(key = "rediscover") {
-                Shelf(
-                    title = stringResource(R.string.home_rediscover),
-                    items = rediscover,
-                    onTitle = { onOpenCollection(Collections.LIKED) },
-                    onPlay = { i -> onPlayList(rediscover, i) },
                 )
             }
         }
@@ -382,5 +467,131 @@ private fun LoadingShelf() {
         CircularProgressIndicator(color = VyoraAccent, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(12.dp))
         Text(stringResource(R.string.home_loading), color = VyoraTextMuted, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+private fun replayYearStart(): Long = java.util.Calendar.getInstance().run {
+    set(get(java.util.Calendar.YEAR), java.util.Calendar.JANUARY, 1, 0, 0, 0)
+    set(java.util.Calendar.MILLISECOND, 0)
+    timeInMillis
+}
+
+/** Gradient sleeves in the spirit of Apple Music's personal mixes, one colour story per mix. */
+private fun mixColors(kind: MixKind): List<Color> = when (kind) {
+    MixKind.FAVORITES -> listOf(Color(0xFFFF5E7E), Color(0xFFE0245E), Color(0xFF8E1446))
+    MixKind.DISCOVERY -> listOf(Color(0xFF5AD8E6), Color(0xFF2F8FD8), Color(0xFF1C3E8C))
+    MixKind.REDISCOVER -> listOf(Color(0xFFC79BFF), Color(0xFF8A5CF5), Color(0xFF4B2AA8))
+}
+
+@Composable
+private fun mixTitle(kind: MixKind): String = stringResource(
+    when (kind) {
+        MixKind.FAVORITES -> R.string.mix_favorites
+        MixKind.DISCOVERY -> R.string.mix_discovery
+        MixKind.REDISCOVER -> R.string.mix_rediscover
+    }
+)
+
+@Composable
+private fun MixCard(mix: PersonalMix, onClick: () -> Unit) {
+    val title = mixTitle(mix.kind)
+    val colors = mixColors(mix.kind)
+    val artists = remember(mix) {
+        mix.songs.map { com.vyora.music.data.library.primaryArtist(it.artist) }.filter { it.isNotBlank() }.distinct().take(3).joinToString(", ")
+    }
+    Column(Modifier.width(160.dp).glassClickable(pressedScale = 0.96f, onClick = onClick)) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(GlassShapes.Small)
+                .background(Brush.linearGradient(colors)),
+        ) {
+            // Three covers fanned at the top, the mix name set large at the bottom, as Apple lays out its mixes.
+            Row(
+                Modifier.align(Alignment.TopStart).padding(10.dp),
+                horizontalArrangement = Arrangement.spacedBy((-14).dp),
+            ) {
+                mix.songs.distinctBy { it.thumbnail }.take(3).forEach { song ->
+                    Artwork(
+                        url = song.thumbnail,
+                        shape = GlassShapes.Small,
+                        placeholderSize = 14.dp,
+                        contentDescription = null,
+                        modifier = Modifier.size(44.dp),
+                    )
+                }
+            }
+            Text(
+                text = title,
+                color = Color.White,
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, lineHeight = 24.sp),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
+            )
+        }
+        Spacer(Modifier.height(7.dp))
+        // The sleeve already names the mix; underneath, Apple lists who is in it.
+        Text(artists, color = VyoraTextMuted, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun StationCard(station: Station, onClick: () -> Unit) {
+    val title = station.artist?.let { stringResource(R.string.station_artist, it) } ?: stringResource(R.string.station_discovery)
+    val tint by rememberArtworkTint(station.seed.thumbnail)
+    Column(Modifier.width(160.dp).glassClickable(pressedScale = 0.96f, onClick = onClick)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(GlassShapes.Small)) {
+            Artwork(
+                url = station.seed.thumbnail,
+                shape = androidx.compose.ui.graphics.RectangleShape,
+                placeholderSize = 32.dp,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Brush.verticalGradient(0.35f to Color.Transparent, 1f to lerp(tint, Color.Black, 0.45f)))
+            )
+            Row(
+                Modifier.align(Alignment.BottomStart).padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Default.Radio, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(5.dp))
+                Text(
+                    stringResource(R.string.station_label),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+                )
+            }
+        }
+        Spacer(Modifier.height(7.dp))
+        Text(title, color = VyoraText, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(station.seed.artist, color = VyoraTextMuted, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun VideoTile(item: SimpleItem, onClick: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    Box(Modifier.width(260.dp)) {
+        Column(Modifier.glassClickable(pressedScale = 0.97f, onLongClick = { menu = true }, onClick = onClick)) {
+            Artwork(
+                url = item.thumbnail,
+                shape = GlassShapes.Small,
+                placeholderSize = 32.dp,
+                contentDescription = item.title,
+                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
+            )
+            Spacer(Modifier.height(7.dp))
+            Text(item.title, color = VyoraText, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (item.artist.isNotBlank()) {
+                Text(item.artist, color = VyoraTextMuted, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        SongMenu(item = item, expanded = menu, onDismiss = { menu = false })
     }
 }

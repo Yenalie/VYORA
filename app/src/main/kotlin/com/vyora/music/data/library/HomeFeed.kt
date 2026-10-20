@@ -14,6 +14,14 @@ data class ArtistShelf(val artist: String, val songs: List<SimpleItem>)
 /** A station built from one song the listener played or liked ("Because you listened to …"). */
 data class SongMix(val seed: SimpleItem, val songs: List<SimpleItem>)
 
+/** The personal playlists of the "Made for You" row, like Apple Music's Favourites / Discovery mixes. */
+enum class MixKind { FAVORITES, DISCOVERY, REDISCOVER }
+
+data class PersonalMix(val kind: MixKind, val songs: List<SimpleItem>)
+
+/** An endless radio built from one seed song ("Stations for You"). [artist] is null for the Discovery Station. */
+data class Station(val artist: String?, val seed: SimpleItem)
+
 data class HomeContent(
     val topPicks: List<TopPick>,
     val topSongs: List<SimpleItem>,
@@ -21,6 +29,11 @@ data class HomeContent(
     val mixes: List<SongMix> = emptyList(),
     /** Liked songs that have not come round in a while. */
     val rediscover: List<SimpleItem> = emptyList(),
+    val madeForYou: List<PersonalMix> = emptyList(),
+    val stations: List<Station> = emptyList(),
+    /** Albums by the artists the listener plays most. */
+    val albums: List<SimpleItem> = emptyList(),
+    val musicVideos: List<SimpleItem> = emptyList(),
 ) {
     val isEmpty get() = topPicks.isEmpty() && topSongs.isEmpty() && artistShelves.isEmpty() && mixes.isEmpty()
 }
@@ -78,6 +91,9 @@ object HomeFeed {
         val chartJob = async { YouTubeClient.search(chartQuery, SearchFilter.SONGS) }
         val seedJobs = seeds.map { artist -> artist to async { YouTubeClient.search(artist, SearchFilter.SONGS) } }
         val mixJobs = mixSeeds.map { seed -> seed to async { YouTubeClient.radio(seed.id) } }
+        val albumJobs = seeds.take(3).map { artist -> artist to async { YouTubeClient.search(artist, SearchFilter.ALBUMS) } }
+        // Official videos from the artists in rotation; a chart query mostly finds hour-long compilations.
+        val videoJobs = seeds.take(3).map { artist -> artist to async { YouTubeClient.search("$artist official music video", SearchFilter.VIDEOS) } }
 
         val chart = chartJob.await().getOrNull()?.items.orEmpty().filter { it.type == ItemType.SONG }.distinctBy { it.id }
         val shelves = seedJobs.mapNotNull { (artist, job) ->
@@ -95,17 +111,64 @@ object HomeFeed {
         }
         if (chart.isEmpty() && shelves.isEmpty() && mixes.isEmpty()) return@coroutineScope Result.failure(IllegalStateException("No home content"))
 
+        val albums = interleave(albumJobs.map { (artist, job) ->
+            job.await().getOrNull()?.items.orEmpty()
+                .filter { it.type == ItemType.ALBUM && primaryArtist(it.artist).equals(artist, ignoreCase = true) }
+                .distinctBy { it.id }
+                .take(6)
+        }).take(12)
+        val videos = interleave(videoJobs.map { (artist, job) ->
+            job.await().getOrNull()?.items.orEmpty()
+                .filter { it.type == ItemType.SONG && (it.duration in 1..MAX_VIDEO_SECONDS || it.duration <= 0) }
+                .filter { primaryArtist(it.artist).contains(artist, ignoreCase = true) || it.title.contains(artist, ignoreCase = true) }
+                .take(5)
+        }).distinctBy { it.id }.take(12)
+        val rediscover = rediscover(recent, liked)
+
         val content = HomeContent(
             topPicks = mixTopPicks(shelves + mixes.map { ArtistShelf(it.seed.title, it.songs) }, chart, heard, size = 8),
             topSongs = chart.take(20),
             artistShelves = shelves,
             mixes = mixes,
-            rediscover = rediscover(recent, liked),
+            rediscover = rediscover,
+            madeForYou = madeForYou(liked, rediscover, discovery(mixes, shelves, chart, heard)),
+            stations = stations(shelves, chart, heard),
+            albums = albums,
+            musicVideos = videos,
         )
         cacheKey = key
         cache = content
         Result.success(content)
     }
+
+    /** Songs the listener has not heard yet, drawn from every station and shelf, two per artist at most. */
+    fun discovery(mixes: List<SongMix>, shelves: List<ArtistShelf>, chart: List<SimpleItem>, heard: Set<String>): List<SimpleItem> {
+        val pool = interleave(mixes.map { it.songs } + shelves.map { it.songs } + listOf(chart))
+        return Recommend.extend(emptyList(), pool, limit = 25, exclude = heard)
+    }
+
+    fun madeForYou(liked: List<SimpleItem>, rediscover: List<SimpleItem>, discovery: List<SimpleItem>): List<PersonalMix> = buildList {
+        if (liked.size >= MIN_MIX) add(PersonalMix(MixKind.FAVORITES, liked.take(50)))
+        if (discovery.size >= MIN_MIX) add(PersonalMix(MixKind.DISCOVERY, discovery))
+        if (rediscover.size >= MIN_MIX) add(PersonalMix(MixKind.REDISCOVER, rediscover))
+    }
+
+    /** One station per favourite artist, then a Discovery Station seeded by something not heard yet. */
+    fun stations(shelves: List<ArtistShelf>, chart: List<SimpleItem>, heard: Set<String>): List<Station> = buildList {
+        shelves.forEach { shelf -> shelf.songs.firstOrNull { it.isYouTube }?.let { add(Station(shelf.artist, it)) } }
+        val fresh = (shelves.flatMap { it.songs } + chart).firstOrNull { it.isYouTube && it.id !in heard && none { s -> s.seed.id == it.id } }
+        if (fresh != null) add(Station(null, fresh))
+    }
+
+    private fun <T> interleave(lists: List<List<T>>): List<T> {
+        val out = mutableListOf<T>()
+        val longest = lists.maxOfOrNull { it.size } ?: 0
+        for (i in 0 until longest) lists.forEach { list -> list.getOrNull(i)?.let(out::add) }
+        return out
+    }
+
+    private const val MIN_MIX = 5
+    private const val MAX_VIDEO_SECONDS = 12 * 60L
 
     fun mixTopPicks(shelves: List<ArtistShelf>, chart: List<SimpleItem>, heard: Set<String>, size: Int = 6): List<TopPick> {
         val picks = mutableListOf<TopPick>()

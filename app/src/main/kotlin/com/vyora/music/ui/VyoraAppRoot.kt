@@ -88,6 +88,8 @@ import com.vyora.music.ui.glass.GlassStyle
 import com.vyora.music.ui.glass.LocalAppBackdrop
 import com.vyora.music.ui.glass.LocalGlassEffectConfig
 import com.vyora.music.ui.glass.VyoraFloatingNavBar
+import com.vyora.music.ui.glass.VyoraDockedNavBar
+import com.vyora.music.ui.glass.GlassComponent
 import com.vyora.music.ui.glass.VyoraTab
 import com.vyora.music.ui.glass.backdrop.backdrops.layerBackdrop
 import com.vyora.music.ui.glass.backdrop.backdrops.rememberBackdropFreeze
@@ -173,6 +175,7 @@ fun VyoraAppRoot(settings: AppSettings) {
         )
     }
     val glassActive = glassConfig.anyComponentEnabled && isGlassAllowed()
+    val glassNavBar = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
     val pageBackground = colors.background
     val backdropDraw = remember<ContentDrawScope.() -> Unit>(pageBackground) {
         {
@@ -390,6 +393,9 @@ fun VyoraAppRoot(settings: AppSettings) {
                     onOpenCollection = { kind -> navController.navigate("collection/$kind") },
                     onOpenSettings = { navController.navigate("settings") },
                     onOpenArtist = { name -> openArtistPage(name, null, null) },
+                    onOpenAlbum = openCollectionPage,
+                    onStartRadio = { seed -> PlayerManager.startRadio(seed) },
+                    onOpenRecap = { navController.navigate(LibraryPages.RECAP) },
                 )
             }
             screen("search") {
@@ -676,15 +682,38 @@ fun VyoraAppRoot(settings: AppSettings) {
                 enter = slideInVertically(spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)) { it } + fadeIn(tween(180)),
                 exit = slideOutVertically(tween(220)) { it } + fadeOut(tween(160)),
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onSizeChanged { bottomBarHeightPx = maxOf(bottomBarHeightPx, it.height) }
-                        .graphicsLayer {
-                            val p = playerSheet.progress.value.coerceIn(0f, 1f)
-                            alpha = (1f - p * 1.6f).coerceIn(0f, 1f)
-                            translationY = chromeDropPx * p
-                        }
+                val chromeLayer = Modifier
+                    .fillMaxWidth()
+                    .onSizeChanged { bottomBarHeightPx = maxOf(bottomBarHeightPx, it.height) }
+                    .graphicsLayer {
+                        val p = playerSheet.progress.value.coerceIn(0f, 1f)
+                        alpha = (1f - p * 1.6f).coerceIn(0f, 1f)
+                        translationY = chromeDropPx * p
+                    }
+                if (!glassNavBar) {
+                    VyoraDockedNavBar(
+                        tabs = navTabs + searchTab,
+                        currentRoute = currentRoute,
+                        onNavigate = navigateToTab,
+                        modifier = chromeLayer,
+                        miniPlayer = if (hasSong) {
+                            { contentColor, miniModifier ->
+                                VyoraMiniAccessory(
+                                    isInline = false,
+                                    contentColor = contentColor,
+                                    onClick = { playerSheet.expand() },
+                                    onOpenDrag = { dy -> playerSheet.dragBy(-dy / screenHeightPx) },
+                                    onOpenRelease = { vy ->
+                                        playerSheet.settle(vy, screenHeightPx, sheetFlingPx, fromCollapsed = true)
+                                    },
+                                    docked = true,
+                                    modifier = miniModifier,
+                                )
+                            }
+                        } else null,
+                    )
+                } else Column(
+                    modifier = chromeLayer
                         .navigationBarsPadding()
                         .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 10.dp)
                 ) {

@@ -619,4 +619,14 @@
     <string name="lyrics_player_section">Reproductor completo</string>
     <string name="lyrics_player_strip">Mostrar la letra actual</string>
     <string name="lyrics_player_strip_desc">Debajo del título y el artista en el reproductor completo.</string>
+    <string name="home_stations">Estaciones para ti</string>
+    <string name="station_artist">Estación de %1$s</string>
+    <string name="station_discovery">Estación Descubrimiento</string>
+    <string name="station_label">Estación</string>
+    <string name="home_albums">Álbumes para ti</string>
+    <string name="home_music_videos">Videos musicales</string>
+    <string name="home_replay">Replay: tus canciones top</string>
+    <string name="mix_favorites">Mix de favoritas</string>
+    <string name="mix_discovery">Mix Descubrimiento</string>
+    <string name="mix_rediscover">Mix Redescubre</string>
 </resources>

@@ -611,4 +611,14 @@
     <string name="lyrics_player_section">フルプレーヤー</string>
     <string name="lyrics_player_strip">現在の歌詞を表示</string>
     <string name="lyrics_player_strip_desc">フルプレーヤーの曲名とアーティスト名の下に表示します。</string>
+    <string name="home_stations">あなたにおすすめのステーション</string>
+    <string name="station_artist">%1$s ステーション</string>
+    <string name="station_discovery">ディスカバリーステーション</string>
+    <string name="station_label">ステーション</string>
+    <string name="home_albums">あなたにおすすめのアルバム</string>
+    <string name="home_music_videos">ミュージックビデオ</string>
+    <string name="home_replay">Replay: あなたのトップソング</string>
+    <string name="mix_favorites">お気に入りミックス</string>
+    <string name="mix_discovery">ディスカバリーミックス</string>
+    <string name="mix_rediscover">再発見ミックス</string>
 </resources>

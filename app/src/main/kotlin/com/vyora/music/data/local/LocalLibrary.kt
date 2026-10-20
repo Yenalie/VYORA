@@ -163,6 +163,8 @@ object LocalLibrary {
         return when {
             "flac" in mime && needsDetail -> header(context, uri, AudioHeaders::parseFlac)?.copy(bitrate = store.bitrate) ?: store
             "wav" in mime && needsDetail -> header(context, uri, AudioHeaders::parseWav) ?: store
+            "aif" in mime -> header(context, uri, AudioHeaders::parseAiff) ?: store
+            "dsf" in mime || "dsd" in mime || mime == "audio/x-dff" -> header(context, uri, AudioHeaders::parseDsf) ?: store
             (mime == "audio/mp4" || "m4a" in mime) && (store.bitrate == 0 || store.bitrate >= ALAC_MIN_BITRATE) ->
                 extractor(context, uri) ?: store
             else -> store

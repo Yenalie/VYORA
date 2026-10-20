@@ -1,6 +1,8 @@
 package com.vyora.music.ui.design
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CornerBasedShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -21,6 +23,8 @@ fun Modifier.liquidFill(
     val base = LocalGlassEffectConfig.current
     if (!base.globalEnabled || !base.contentEnabled || base.style == GlassStyle.TRANSPARENT || !isGlassAllowed()) {
         val flat = if (overlay) fill.copy(alpha = maxOf(fill.alpha, OVERLAY_FALLBACK_ALPHA)) else fill
+        // Glass switched off by the listener: plain Material 3 tonal surfaces, no glassy rim or sheen.
+        if (!base.globalEnabled) return this.clip(shape).background(flat, shape)
         return this.glass(shape = shape, fill = flat, sheen = !overlay)
     }
     val tint = fill.copy(alpha = 1f)

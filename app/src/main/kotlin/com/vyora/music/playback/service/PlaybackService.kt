@@ -130,7 +130,7 @@ class PlaybackService : MediaLibraryService() {
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
 
-        val sourceFactory = DefaultMediaSourceFactory(this).setDataSourceFactory(YouTubeDataSource.audioFactory(this))
+        val sourceFactory = DefaultMediaSourceFactory(YouTubeDataSource.audioFactory(this), com.vyora.music.playback.extractor.VyoraExtractorsFactory())
         val renderers = VyoraRenderersFactory(this)
         renderers.loudness.targetGain = { loudnessGainFor(mainMediaId) }
         renderers.spatial.enabled = SettingsRepository.current.spatialAudio

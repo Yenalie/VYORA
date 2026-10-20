@@ -49,7 +49,10 @@ object AudioQuality {
         "audio/x-wavpack", "audio/wavpack",
     )
 
-    fun isLosslessMime(mime: String?): Boolean = mime?.lowercase(Locale.ROOT)?.trim() in LOSSLESS_MIMES
+    fun isLosslessMime(mime: String?): Boolean {
+        val m = mime?.lowercase(Locale.ROOT)?.trim() ?: return false
+        return m in LOSSLESS_MIMES || m.startsWith("audio/x-dsd") || m == "audio/dsf" || m == "audio/x-dsf" || m == "audio/x-dff"
+    }
 
     fun tier(mime: String?, sampleRateHz: Int, bitDepth: Int): AudioTier = when {
         !isLosslessMime(mime) -> AudioTier.LOSSY
@@ -63,7 +66,9 @@ object AudioQuality {
             "flac" in m -> "FLAC"
             "alac" in m -> "ALAC"
             "wav" in m || "wave" in m -> "WAV"
-            "aiff" in m -> "AIFF"
+            "aiff" in m || "aifc" in m -> "AIFF"
+            m.startsWith("audio/x-dsd") -> m.removePrefix("audio/x-").uppercase(Locale.ROOT)
+            "dsf" in m || "dff" in m -> "DSD"
             "ape" in m -> "APE"
             "wavpack" in m -> "WavPack"
             m == "audio/raw" -> "PCM"
@@ -87,7 +92,7 @@ object AudioQuality {
  * They only read the first few dozen bytes of a file.
  */
 object AudioHeaders {
-    const val PROBE_BYTES = 64
+    const val PROBE_BYTES = 512
 
     /** FLAC: "fLaC" + metadata block header + STREAMINFO (always the first block). */
     fun parseFlac(head: ByteArray): AudioFormatInfo? {
@@ -125,6 +130,42 @@ object AudioHeaders {
         return null
     }
 
+    /** AIFF / AIFF-C: the COMM chunk carries channels, bit depth and an 80-bit float sample rate. */
+    fun parseAiff(head: ByteArray): AudioFormatInfo? {
+        if (head.size < 12) return null
+        if (String(head, 0, 4, Charsets.US_ASCII) != "FORM") return null
+        val form = String(head, 8, 4, Charsets.US_ASCII)
+        if (form != "AIFF" && form != "AIFC") return null
+        var p = 12
+        while (p + 8 <= head.size) {
+            val id = String(head, p, 4, Charsets.US_ASCII)
+            val len = be32(head, p + 4)
+            if (id == "COMM" && p + 8 + 18 <= head.size) {
+                val channels = be16(head, p + 8)
+                val bits = be16(head, p + 14)
+                val sampleRate = com.vyora.music.playback.extractor.Extended80.decode(head, p + 16).toInt()
+                if (sampleRate <= 0) return null
+                return AudioFormatInfo("audio/x-aiff", sampleRate, bits, sampleRate * channels * bits, channels)
+            }
+            if (len < 0) return null
+            p += 8 + len + (len and 1)
+        }
+        return null
+    }
+
+    /** DSF: the "fmt " chunk follows the 28-byte "DSD " chunk. Reported at its 1-bit DSD rate. */
+    fun parseDsf(head: ByteArray): AudioFormatInfo? {
+        if (head.size < 28 + 52) return null
+        if (String(head, 0, 4, Charsets.US_ASCII) != "DSD " || String(head, 28, 4, Charsets.US_ASCII) != "fmt ") return null
+        val f = 28 + 12
+        val channels = le32(head, f + 12)
+        val rate = le32(head, f + 16)
+        if (rate <= 0) return null
+        return AudioFormatInfo("audio/x-dsd${rate / 44_100}", rate, 1, rate * channels, channels)
+    }
+
+    private fun be16(b: ByteArray, i: Int) = ((b[i].toInt() and 0xFF) shl 8) or (b[i + 1].toInt() and 0xFF)
+    private fun be32(b: ByteArray, i: Int) = (be16(b, i) shl 16) or be16(b, i + 2)
     private fun le16(b: ByteArray, i: Int) = (b[i].toInt() and 0xFF) or ((b[i + 1].toInt() and 0xFF) shl 8)
     private fun le32(b: ByteArray, i: Int) = le16(b, i) or (le16(b, i + 2) shl 16)
 }

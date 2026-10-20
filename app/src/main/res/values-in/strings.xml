@@ -611,4 +611,14 @@
     <string name="lyrics_player_section">Pemutar layar penuh</string>
     <string name="lyrics_player_strip">Tampilkan lirik berjalan</string>
     <string name="lyrics_player_strip_desc">Di bawah judul dan artis pada pemutar layar penuh.</string>
+    <string name="home_stations">Stasiun untuk Kamu</string>
+    <string name="station_artist">Stasiun %1$s</string>
+    <string name="station_discovery">Stasiun Penemuan</string>
+    <string name="station_label">Stasiun</string>
+    <string name="home_albums">Album untuk Kamu</string>
+    <string name="home_music_videos">Video Musik</string>
+    <string name="home_replay">Replay: Lagu Teratas Kamu</string>
+    <string name="mix_favorites">Mix Favorit</string>
+    <string name="mix_discovery">Mix Penemuan</string>
+    <string name="mix_rediscover">Mix Kenangan</string>
 </resources>

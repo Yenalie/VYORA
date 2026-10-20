@@ -611,4 +611,14 @@
     <string name="lyrics_player_section">Pemain skrin penuh</string>
     <string name="lyrics_player_strip">Tunjukkan lirik semasa</string>
     <string name="lyrics_player_strip_desc">Di bawah tajuk dan artis dalam pemain skrin penuh.</string>
+    <string name="home_stations">Stesen untuk Anda</string>
+    <string name="station_artist">Stesen %1$s</string>
+    <string name="station_discovery">Stesen Penemuan</string>
+    <string name="station_label">Stesen</string>
+    <string name="home_albums">Album untuk Anda</string>
+    <string name="home_music_videos">Video Muzik</string>
+    <string name="home_replay">Replay: Lagu Teratas Anda</string>
+    <string name="mix_favorites">Mix Kegemaran</string>
+    <string name="mix_discovery">Mix Penemuan</string>
+    <string name="mix_rediscover">Mix Nostalgia</string>
 </resources>
