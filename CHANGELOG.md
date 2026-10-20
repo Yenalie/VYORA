@@ -58,6 +58,8 @@
 - Bila sumber lirik tidak menyediakan timestamp kata, strip tetap mengikuti lirik per baris seperti biasa
 
 ## 1.9.5
+- Port sistem lirik BitChord: timing kata/suku kata presisi, rantai provider termasuk lrc.red, pilihan provider, dan opsi strip lirik yang membungkus baris panjang
+- Player dirapikan: timer lagu tetap teks biasa; kualitas audio dan sleep timer aktif berupa outline transparan yang mengikuti isi
 - **Lyric strip ala BitChord:** satu baris lirik aktif tampil sederhana di bawah judul dan artis; ketuk untuk membuka panel lirik penuh
 - Lirik panjang di strip membungkus ke beberapa baris, sementara pergantian lirik memakai transisi fade dan slide yang ringan
 - Kartu lirik berbagi mendapat tampilan Liquid Glass baru
