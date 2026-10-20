@@ -2,6 +2,8 @@
 
 package com.vyora.music.ui.glass
 
+import androidx.compose.foundation.border
+
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
@@ -63,7 +65,9 @@ fun VyoraFloatingNavBar(
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
 
-    val backgroundColor = if (useGlass) Color.Transparent else VyoraSurfaceElevated
+    // Liquid Glass off: a plain tinted surface (translucent theme tint with a hairline rim), no lens, no puck.
+    val tintFill = VyoraSurfaceElevated.copy(alpha = TintedChromeAlpha)
+    val backgroundColor = if (useGlass) Color.Transparent else tintFill
 
     val tabTextColor by animateColorAsState(
         targetValue = glassConfig.textColor,
@@ -83,7 +87,7 @@ fun VyoraFloatingNavBar(
             frozen = glassFrozen,
         )
     } else {
-        Modifier
+        Modifier.tintedRim(NavBarShape)
     }
 
     val miniGlass = glassConfig.isEnabledFor(GlassComponent.MINI_PLAYER) && isGlassAllowed()
@@ -95,7 +99,7 @@ fun VyoraFloatingNavBar(
             frozen = glassFrozen,
         )
     } else {
-        Modifier.background(VyoraSurfaceElevated, NavBarShape)
+        Modifier.background(tintFill, NavBarShape).tintedRim(NavBarShape)
     }
 
     val haptics = LocalHapticFeedback.current
@@ -206,4 +210,17 @@ fun VyoraFloatingNavBar(
             }
         }
     }
+}
+
+private const val TintedChromeAlpha = 0.88f
+
+/** The hairline edge of a tinted (non-glass) chrome surface, lighter at the top like the glass rim. */
+@Composable
+private fun Modifier.tintedRim(shape: androidx.compose.ui.graphics.Shape): Modifier {
+    val colors = com.vyora.music.ui.theme.LocalVyoraColors.current
+    return this.border(
+        width = 0.8.dp,
+        brush = androidx.compose.ui.graphics.Brush.verticalGradient(listOf(colors.glassRimTop, colors.glassRimBottom)),
+        shape = shape,
+    )
 }

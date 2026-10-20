@@ -956,9 +956,10 @@ private fun SharedTransitionScope.ExpandedTabs(
                 animationScope.launch {
                     offsetAnimation.animateTo(0f, spring(1f, 300f, 0.5f))
                 }
-                if (hasDraggedPuck) {
-                    currentTabs.value.getOrNull(targetIndex)?.onClick?.invoke()
-                }
+                // The puck sits on top of the selected tab and swallows its touches, so a plain tap on it has to
+                // count as tapping that tab too. Otherwise, with Search open (puck resting on Home), Home could
+                // not be tapped at all.
+                currentTabs.value.getOrNull(targetIndex)?.onClick?.invoke()
             },
             onDrag = { _, dragAmount ->
                 if (dragAmount != Offset.Zero) hasDraggedPuck = true
@@ -1155,114 +1156,118 @@ private fun SharedTransitionScope.ExpandedTabs(
             }
         }
 
-        Box(
-            Modifier
-                .padding(sizes.tabBarContentPadding)
-                .graphicsLayer {
-                    translationX =
-                        if (isLtr) dampedDragAnimation.value * tabWidthPx + panelOffset
-                        else size.width - (dampedDragAnimation.value + 1f) * tabWidthPx + panelOffset
-                }
-                .then(interactiveHighlight.gestureModifier)
-                .then(dampedDragAnimation.modifier)
-                .width(sizes.tabWidth)
-                .fillMaxHeight()
-                .then(
-                    if (backdrop != null) {
-                        Modifier.drawBackdrop(
-                            backdrop = rememberCombinedBackdrop(backdrop, tabsBackdrop),
-                            shape = { shapes.tabShape },
-                            effects = {
-                                val progress = dampedDragAnimation.pressProgress
-                                blur(3f.dp.toPx() * (1f - progress))
-
-                                lens(
-                                    lerp(0f.dp.toPx(), 10f.dp.toPx(), progress),
-                                    lerp(0f.dp.toPx(), 12f.dp.toPx(), progress),
-                                    chromaticAberration = progress > 0.01f
-                                )
-                            },
-                            highlight = {
-                                val progress = dampedDragAnimation.pressProgress
-                                Highlight.Default.copy(
-                                    alpha = lerp(PuckRestHighlightAlpha, 1f, progress)
-                                )
-                            },
-                            shadow = {
-                                val progress = dampedDragAnimation.pressProgress
-                                Shadow(alpha = lerp(PuckRestShadowAlpha, 1f, progress))
-                            },
-                            innerShadow = {
-                                val progress = dampedDragAnimation.pressProgress
-                                InnerShadow(radius = 8f.dp * progress, alpha = progress)
-                            },
-                            layerBlock = {
-                                scaleX = dampedDragAnimation.scaleX
-                                scaleY = dampedDragAnimation.scaleY
-                                val velocity = dampedDragAnimation.velocity / 10f
-                                scaleX /= 1f - (velocity * 0.75f).fastCoerceIn(-0.2f, 0.2f)
-                                scaleY *= 1f - (velocity * 0.25f).fastCoerceIn(-0.2f, 0.2f)
-                            },
-                            onDrawSurface = {
-                                val progress = dampedDragAnimation.pressProgress
-
-                                drawRect(puckWash.copy(alpha = puckRestAlpha * (1f - 0.75f * progress)))
-                            },
-                            frozen = LocalTabBarBackdropFrozen.current
-                        )
-                    } else {
-                        Modifier
-                            .graphicsLayer {
-                                scaleX = dampedDragAnimation.scaleX
-                                scaleY = dampedDragAnimation.scaleY
-                            }
-                            .shadow(
-                                shape = shapes.tabShape,
-                                elevation = elevations.expandedElevation * dampedDragAnimation.pressProgress
-                            )
-                            .background(
-                                colors.backgroundColor.copy(
-                                    alpha = 0.5f + 0.5f * dampedDragAnimation.pressProgress
-                                ),
-                                shapes.tabShape
-                            )
-                            .clip(shapes.tabShape)
+        // Without Liquid Glass there is no draggable puck: the selected tab is marked by its accent tint only,
+        // like the classic iOS tab bar, and every tab takes its own taps.
+        if (backdrop != null) {
+            Box(
+                Modifier
+                    .padding(sizes.tabBarContentPadding)
+                    .graphicsLayer {
+                        translationX =
+                            if (isLtr) dampedDragAnimation.value * tabWidthPx + panelOffset
+                            else size.width - (dampedDragAnimation.value + 1f) * tabWidthPx + panelOffset
                     }
-                )
-        )
+                    .then(interactiveHighlight.gestureModifier)
+                    .then(dampedDragAnimation.modifier)
+                    .width(sizes.tabWidth)
+                    .fillMaxHeight()
+                    .then(
+                        if (backdrop != null) {
+                            Modifier.drawBackdrop(
+                                backdrop = rememberCombinedBackdrop(backdrop, tabsBackdrop),
+                                shape = { shapes.tabShape },
+                                effects = {
+                                    val progress = dampedDragAnimation.pressProgress
+                                    blur(3f.dp.toPx() * (1f - progress))
 
-        val puckIndex by remember(tabsCount) {
-            derivedStateOf {
-                dampedDragAnimation.value
-                    .fastRoundToInt()
-                    .coerceIn(0, (tabsCount - 1).coerceAtLeast(0))
-            }
-        }
-        Box(
-            Modifier
-                .padding(sizes.tabBarContentPadding)
-                .graphicsLayer {
-                    translationX =
-                        if (isLtr) dampedDragAnimation.value * tabWidthPx + panelOffset
-                        else size.width - (dampedDragAnimation.value + 1f) * tabWidthPx + panelOffset
-                    scaleX = dampedDragAnimation.scaleX
-                    scaleY = dampedDragAnimation.scaleY
-                    alpha = (1f - dampedDragAnimation.pressProgress * 3f).fastCoerceIn(0f, 1f)
+                                    lens(
+                                        lerp(0f.dp.toPx(), 10f.dp.toPx(), progress),
+                                        lerp(0f.dp.toPx(), 12f.dp.toPx(), progress),
+                                        chromaticAberration = progress > 0.01f
+                                    )
+                                },
+                                highlight = {
+                                    val progress = dampedDragAnimation.pressProgress
+                                    Highlight.Default.copy(
+                                        alpha = lerp(PuckRestHighlightAlpha, 1f, progress)
+                                    )
+                                },
+                                shadow = {
+                                    val progress = dampedDragAnimation.pressProgress
+                                    Shadow(alpha = lerp(PuckRestShadowAlpha, 1f, progress))
+                                },
+                                innerShadow = {
+                                    val progress = dampedDragAnimation.pressProgress
+                                    InnerShadow(radius = 8f.dp * progress, alpha = progress)
+                                },
+                                layerBlock = {
+                                    scaleX = dampedDragAnimation.scaleX
+                                    scaleY = dampedDragAnimation.scaleY
+                                    val velocity = dampedDragAnimation.velocity / 10f
+                                    scaleX /= 1f - (velocity * 0.75f).fastCoerceIn(-0.2f, 0.2f)
+                                    scaleY *= 1f - (velocity * 0.25f).fastCoerceIn(-0.2f, 0.2f)
+                                },
+                                onDrawSurface = {
+                                    val progress = dampedDragAnimation.pressProgress
+
+                                    drawRect(puckWash.copy(alpha = puckRestAlpha * (1f - 0.75f * progress)))
+                                },
+                                frozen = LocalTabBarBackdropFrozen.current
+                            )
+                        } else {
+                            Modifier
+                                .graphicsLayer {
+                                    scaleX = dampedDragAnimation.scaleX
+                                    scaleY = dampedDragAnimation.scaleY
+                                }
+                                .shadow(
+                                    shape = shapes.tabShape,
+                                    elevation = elevations.expandedElevation * dampedDragAnimation.pressProgress
+                                )
+                                .background(
+                                    colors.backgroundColor.copy(
+                                        alpha = 0.5f + 0.5f * dampedDragAnimation.pressProgress
+                                    ),
+                                    shapes.tabShape
+                                )
+                                .clip(shapes.tabShape)
+                        }
+                    )
+            )
+
+            val puckIndex by remember(tabsCount) {
+                derivedStateOf {
+                    dampedDragAnimation.value
+                        .fastRoundToInt()
+                        .coerceIn(0, (tabsCount - 1).coerceAtLeast(0))
                 }
-                .width(sizes.tabWidth)
-                .fillMaxHeight()
-                .clearAndSetSemantics {},
-        ) {
-            currentTabs.value.getOrNull(puckIndex)?.let { tab ->
-                Tab(
-                    icon = { tab.icon() },
-                    title = { tab.title() },
-                    isInline = false,
-                    isStandalone = false,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(sizes.tabExpandedContentPadding),
-                )
+            }
+            Box(
+                Modifier
+                    .padding(sizes.tabBarContentPadding)
+                    .graphicsLayer {
+                        translationX =
+                            if (isLtr) dampedDragAnimation.value * tabWidthPx + panelOffset
+                            else size.width - (dampedDragAnimation.value + 1f) * tabWidthPx + panelOffset
+                        scaleX = dampedDragAnimation.scaleX
+                        scaleY = dampedDragAnimation.scaleY
+                        alpha = (1f - dampedDragAnimation.pressProgress * 3f).fastCoerceIn(0f, 1f)
+                    }
+                    .width(sizes.tabWidth)
+                    .fillMaxHeight()
+                    .clearAndSetSemantics {},
+            ) {
+                currentTabs.value.getOrNull(puckIndex)?.let { tab ->
+                    Tab(
+                        icon = { tab.icon() },
+                        title = { tab.title() },
+                        isInline = false,
+                        isStandalone = false,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(sizes.tabExpandedContentPadding),
+                    )
+                }
             }
         }
     }

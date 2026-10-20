@@ -45,10 +45,18 @@ class ArtworkFlight {
     /** Lower fraction of the target that dissolves into the background (the full-bleed sleeve); 0 for the card. */
     var fullFade by mutableFloatStateOf(0f)
 
+    /**
+     * True while the full-bleed sleeve is up: the whole player zooms out of (and back into) the mini player's
+     * capsule instead of a lone square cover flying between the two, the way iOS 26 Music does it.
+     */
+    var zoom by mutableStateOf(false)
+
     internal var sheetContainer: LayoutCoordinates? = null
     internal var sheetContent: LayoutCoordinates? = null
 
-    val ready: Boolean get() = mini != Rect.Zero && full != Rect.Zero
+    // A collapsed target (e.g. the artwork squeezed to nothing in a short landscape window) would divide by zero
+    // below and hand NaN corners to the layer outline, which throws.
+    val ready: Boolean get() = !zoom && mini.width >= 1f && mini.height >= 1f && full.width >= 1f && full.height >= 1f
 
     fun inFlight(progress: Float) = ready && progress > 0.001f && progress < 0.999f
 }
@@ -91,7 +99,7 @@ internal fun Modifier.sheetContent(flight: ArtworkFlight?) =
 fun ArtworkFlightOverlay(sheet: PlayerSheetState, flight: ArtworkFlight) {
     val thumbnail by PlayerManager.currentThumbnail.collectAsState()
     val full = flight.full
-    if (full == Rect.Zero || thumbnail == null) return
+    if (full.width < 1f || full.height < 1f || thumbnail == null || flight.zoom) return
     val density = LocalDensity.current
     val sharp = remember(thumbnail) { YouTubeClient.artUrl(thumbnail, 1080) }
     Box(
@@ -107,7 +115,7 @@ fun ArtworkFlightOverlay(sheet: PlayerSheetState, flight: ArtworkFlight) {
                 val from = flight.mini
                 val to = flight.full
                 val w = from.width + (to.width - from.width) * t
-                val s = w / to.width
+                val s = (w / to.width).takeIf { it.isFinite() && it > 0f } ?: 1f
                 transformOrigin = TransformOrigin(0f, 0f)
                 scaleX = s
                 scaleY = s

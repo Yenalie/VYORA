@@ -605,4 +605,18 @@
     <string name="full_bleed_artwork">Portada a pantalla completa</string>
     <string name="full_bleed_artwork_desc">Pellizca hacia fuera sobre la portada en Reproduciendo para llenar la pantalla, y hacia dentro para volver.</string>
     <string name="player_high_quality">Alta calidad</string>
+    <string name="lyrics_settings_summary">Fuente y visualización en el reproductor.</string>
+    <string name="lyrics_provider_heading">Fuente preferida</string>
+    <string name="lyrics_provider_footer">Se prueba primero; las demás fuentes quedan como respaldo.</string>
+    <string name="lyrics_provider_auto">Automático</string>
+    <string name="lyrics_provider_lrc_red">lrc.red + BiniLyrics</string>
+    <string name="lyrics_provider_better">BetterLyrics</string>
+    <string name="lyrics_provider_portato">BetterLyrics Portato</string>
+    <string name="lyrics_provider_plus">LyricsPlus</string>
+    <string name="lyrics_provider_unison">Unison</string>
+    <string name="lyrics_provider_kugou">KuGou</string>
+    <string name="lyrics_provider_lrclib">LRCLIB</string>
+    <string name="lyrics_player_section">Reproductor completo</string>
+    <string name="lyrics_player_strip">Mostrar la letra actual</string>
+    <string name="lyrics_player_strip_desc">Debajo del título y el artista en el reproductor completo.</string>
 </resources>

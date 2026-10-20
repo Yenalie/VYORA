@@ -200,8 +200,16 @@ fun VyoraAppRoot(settings: AppSettings) {
         { backdropFreeze.frozen() || navTransitionFreeze.frozen() || playerSheet.isVisible }
     }
 
-    BackHandler(enabled = playerSheet.isExpanded) {
-        playerSheet.collapse()
+    // Predictive back on the open player: the swipe pulls it down with the finger, letting go closes it, and
+    // cancelling springs it back up, the same feel as dragging the grabber.
+    androidx.activity.compose.PredictiveBackHandler(enabled = playerSheet.isExpanded) { events ->
+        try {
+            events.collect { e -> playerSheet.dragTo(1f - 0.18f * e.progress) }
+            playerSheet.collapse()
+        } catch (c: kotlin.coroutines.cancellation.CancellationException) {
+            playerSheet.expand()
+            throw c
+        }
     }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -245,8 +253,6 @@ fun VyoraAppRoot(settings: AppSettings) {
     )
     val searchTab = VyoraTab("search", stringResource(R.string.search), Icons.Rounded.Search)
     val tabReselect = remember { MutableSharedFlow<String>(extraBufferCapacity = 1) }
-    var ownerTab by remember { mutableStateOf("home") }
-    if (currentRoute != null && currentRoute in TabRoots) ownerTab = currentRoute
     val navigateToTab: (VyoraTab) -> Unit = navigate@{ tab ->
         val route = navController.currentDestination?.route
         if (route == tab.route) {
@@ -254,14 +260,20 @@ fun VyoraAppRoot(settings: AppSettings) {
             tabReselect.tryEmit(tab.route)
             return@navigate
         }
-        val pushedInsideTab = route != null && route !in TabRoots && ownerTab == tab.route &&
-            runCatching { navController.getBackStackEntry(tab.route) }.isSuccess
-        if (pushedInsideTab) {
-            navTransitionFreeze.markTransitionStarted()
+        navTransitionFreeze.markTransitionStarted()
+        // The tab that owns the page on screen is the closest tab root under it in the back stack (an artist
+        // opened from Search belongs to Search). Tapping that tab again goes back to its root, like iOS.
+        if (owningTab(navController) == tab.route) {
             navController.popBackStack(tab.route, inclusive = false)
             return@navigate
         }
-        navTransitionFreeze.markTransitionStarted()
+        if (tab.route == "home") {
+            // Home is the start destination and is always at the bottom of the stack: just drop back to it
+            // (keeping the tab we leave so it comes back as it was). Navigating "to" it with restoreState would
+            // revive whatever stack was last saved under home's id, which is how Search used to get stuck.
+            navController.popBackStack("home", inclusive = false, saveState = true)
+            return@navigate
+        }
         navController.navigate(tab.route) {
             launchSingleTop = true
             popUpTo("home") { saveState = true }
@@ -731,6 +743,16 @@ fun VyoraAppRoot(settings: AppSettings) {
 }
 
 private val TabRoots = setOf("home", "search", "library")
+
+/** The tab root nearest the top of the back stack: the tab the page on screen belongs to. */
+// Home always sits at the bottom of the stack and at most one other tab is stacked on top of it,
+// so the first non-home tab still on the stack is the one that owns the page on screen.
+private fun owningTab(nav: androidx.navigation.NavController): String? {
+    nav.currentDestination?.route?.takeIf { it in TabRoots }?.let { return it }
+    return listOf("search", "library", "home").firstOrNull { route ->
+        runCatching { nav.getBackStackEntry(route) }.isSuccess
+    }
+}
 
 private enum class NavKind { TAB, ALBUM, PUSH }
 

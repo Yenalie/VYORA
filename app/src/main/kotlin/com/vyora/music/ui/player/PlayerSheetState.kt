@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.CoroutineScope
@@ -14,8 +15,8 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 
 @Stable
-class PlayerSheetState(private val scope: CoroutineScope) {
-    val progress = Animatable(0f)
+class PlayerSheetState(private val scope: CoroutineScope, initiallyExpanded: Boolean = false) {
+    val progress = Animatable(if (initiallyExpanded) 1f else 0f)
 
     val isVisible: Boolean by derivedStateOf { progress.value > 0.001f }
 
@@ -42,6 +43,10 @@ class PlayerSheetState(private val scope: CoroutineScope) {
         }
     }
 
+    fun dragTo(value: Float) {
+        scope.launch(start = CoroutineStart.UNDISPATCHED) { progress.snapTo(value.coerceIn(0f, 1f)) }
+    }
+
     fun settle(velocityY: Float, heightPx: Int, flingThresholdPx: Float = 1200f, fromCollapsed: Boolean = false) {
         val p = progress.value
         val open = if (fromCollapsed) {
@@ -63,5 +68,12 @@ class PlayerSheetState(private val scope: CoroutineScope) {
 @Composable
 fun rememberPlayerSheetState(): PlayerSheetState {
     val scope = rememberCoroutineScope()
-    return remember(scope) { PlayerSheetState(scope) }
+    // Survives the activity being recreated (rotating the phone), so turning it sideways with the player open
+    // keeps the player open instead of dropping back to the mini player.
+    var wasExpanded by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    val state = remember(scope) { PlayerSheetState(scope, initiallyExpanded = wasExpanded) }
+    androidx.compose.runtime.LaunchedEffect(state) {
+        androidx.compose.runtime.snapshotFlow { state.isExpanded }.collect { wasExpanded = it }
+    }
+    return state
 }

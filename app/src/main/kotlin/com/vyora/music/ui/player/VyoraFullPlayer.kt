@@ -41,6 +41,7 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.GraphicEq
@@ -244,10 +245,23 @@ fun VyoraPlayerSheet(
                 .fillMaxSize()
                 .graphicsLayer {
                     val p = sheet.progress.value
-                    translationY = (1f - p) * size.height
-                    val corner = SheetTopCorner.toPx() * (1f - p)
-                    shape = RoundedCornerShape(topStart = corner, topEnd = corner, bottomEnd = 0f, bottomStart = 0f)
-                    clip = true
+                    val zoom = flight?.zoomWindow(p, size.width, size.height, SheetTopCorner.toPx())
+                    if (zoom != null) {
+                        transformOrigin = TransformOrigin(0f, 0f)
+                        scaleX = zoom.scale
+                        scaleY = zoom.scale
+                        translationX = zoom.translation.x
+                        translationY = zoom.translation.y
+                        shape = zoom.shape
+                        clip = true
+                        // The capsule's own content is still underneath: let the player fade up over it as it grows.
+                        alpha = (p / ZOOM_FADE_IN).coerceIn(0f, 1f)
+                    } else {
+                        translationY = (1f - p) * size.height
+                        val corner = SheetTopCorner.toPx() * (1f - p)
+                        shape = RoundedCornerShape(topStart = corner, topEnd = corner, bottomEnd = 0f, bottomStart = 0f)
+                        clip = true
+                    }
                 }
                 .sheetContent(flight)
                 .background(VyoraBackground),
@@ -293,7 +307,11 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
 
     // BitChord's full-bleed artwork: the sleeve edge to edge at the top, its lower part dissolving into the
     // background. Pinch out on the artwork to switch it on, pinch in to go back; the choice is remembered.
-    val heroWanted = appSettings.fullBleedArtwork && mode == MODE_ART && videoItem == null
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    // A phone on its side: too short for the stacked layout (the artwork would be squeezed to nothing), so the
+    // player splits into artwork on the left and the controls on the right.
+    val landscape = configuration.screenWidthDp > configuration.screenHeightDp && configuration.screenHeightDp < 600
+    val heroWanted = appSettings.fullBleedArtwork && mode == MODE_ART && videoItem == null && !landscape
     val heroAnim = remember { androidx.compose.animation.core.Animatable(if (heroWanted) 1f else 0f) }
     LaunchedEffect(heroWanted) {
         val target = if (heroWanted) 1f else 0f
@@ -308,7 +326,10 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
     var cardRect by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
     val flightState = LocalArtworkFlight.current
     // No artwork on screen (lyrics / queue): the mini player's cover has nowhere to fly to.
-    androidx.compose.runtime.SideEffect { if (mode != MODE_ART) flightState?.full = androidx.compose.ui.geometry.Rect.Zero }
+    androidx.compose.runtime.SideEffect {
+        if (mode != MODE_ART) flightState?.full = androidx.compose.ui.geometry.Rect.Zero
+        flightState?.zoom = heroWanted
+    }
     val heroHaptics = LocalHapticFeedback.current
     val setHero: (Boolean) -> Unit = { on ->
         if (com.vyora.music.data.settings.SettingsRepository.current.fullBleedArtwork != on) {
@@ -327,18 +348,35 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
             )
             // Kept composed on the artwork page even while hidden, so the sharp cover is already decoded when
             // a pinch starts the morph instead of the first frames being blank.
-            if (hero > 0.001f || (mode == MODE_ART && videoItem == null)) {
+            if (!landscape && (hero > 0.001f || (mode == MODE_ART && videoItem == null))) {
                 HeroArtwork(
                     thumbnail, title, sheet,
                     progress = { heroState.value },
                     cardRect = { cardRect },
                     morph = mode == MODE_ART,
                     flightEnabled = heroWanted,
+                    animate = sheet.isVisible && isPlaying && appSettings.animatedPlayerBackground,
                 )
             }
         }
 
         CompositionLocalProvider(LocalAppBackdrop provides playerBackdrop, LocalMenuBackdrop provides playerBackdrop) {
+        if (landscape) {
+            LandscapePlayer(
+                sheet = sheet,
+                mode = mode,
+                onMode = { mode = it },
+                thumbnail = thumbnail,
+                title = title,
+                artist = artist,
+                isPlaying = isPlaying,
+                isLiked = isLiked,
+                videoId = videoId,
+                wide = videoItem != null,
+                playbackSpeed = appSettings.playbackSpeed,
+                speedActive = appSettings.playbackSpeed != 1f || appSettings.playbackPitch != 1f,
+            )
+        } else
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -357,39 +395,7 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
                 Box(Modifier.width(38.dp).height(5.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.45f)))
             }
 
-            val favorite: () -> Unit = { currentItem?.let { LibraryManager.toggleLike(it) } }
-            val actions: @Composable () -> Unit = {
-                GlassIconButton(
-                    icon = if (isLiked) Icons.Default.Star else Icons.Default.StarBorder,
-                    contentDescription = stringResource(if (isLiked) R.string.unfavorite else R.string.favorite),
-                    onClick = favorite,
-                    size = 40.dp, iconSize = 20.dp,
-                    tint = Color.White,
-                    fill = Color.White.copy(alpha = 0.16f),
-                )
-                Spacer(Modifier.width(10.dp))
-                Box {
-                    GlassIconButton(
-                        icon = Icons.Default.MoreHoriz,
-                        contentDescription = stringResource(R.string.more),
-                        onClick = { menu = true },
-                        size = 40.dp, iconSize = 20.dp,
-                        tint = Color.White,
-                        fill = Color.White.copy(alpha = 0.16f),
-                    )
-                    val sleepMode by SleepTimer.mode.collectAsState()
-                    val sleepLabel = when (val m = sleepMode) {
-                        is SleepTimer.Mode.At -> stringResource(R.string.sleep_timer_left, formatTime(SleepTimer.remainingMs() ?: 0L))
-                        SleepTimer.Mode.EndOfTrack -> stringResource(R.string.sleep_timer_left, stringResource(R.string.sleep_end_of_song))
-                        null -> stringResource(R.string.sleep_timer)
-                    }
-                    val sleepAction = MenuAction(sleepLabel, Icons.Default.Bedtime, accent = sleepMode != null) { sleepMenu = true }
-                    currentItem?.let {
-                        SongMenu(item = it, expanded = menu, onDismiss = { menu = false }, extraActions = listOf(sleepAction))
-                    }
-                    SleepTimerMenu(expanded = sleepMenu, onDismiss = { sleepMenu = false })
-                }
-            }
+            val actions: @Composable () -> Unit = { PlayerActions(isLiked) }
 
             AnimatedContent(
                 targetState = mode,
@@ -493,33 +499,194 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
             VolumeSection(active = sheet.isVisible)
             Spacer(Modifier.height(14.dp))
 
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 26.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BottomToggle(Icons.Default.Lyrics, stringResource(R.string.lyrics), mode == MODE_LYRICS) {
-                    mode = if (mode == MODE_LYRICS) MODE_ART else MODE_LYRICS
-                }
-                val castStatus by CastSupport.status.collectAsState()
-                var outputs by remember { mutableStateOf(false) }
-                BottomToggle(
-                    if (castStatus.connected) Icons.Default.CastConnected else Icons.Default.Cast,
-                    stringResource(R.string.output),
-                    castStatus.connected,
-                ) {
-                    if (castStatus.available) outputs = true else openOutputSwitcher(context)
-                }
-                if (outputs) OutputPickerDialog(onDismiss = { outputs = false })
-                var speedDialog by remember { mutableStateOf(false) }
-                SpeedToggle(appSettings.playbackSpeed, appSettings.playbackSpeed != 1f || appSettings.playbackPitch != 1f) { speedDialog = true }
-                if (speedDialog) PlaybackSpeedDialog(onDismiss = { speedDialog = false })
-                BottomToggle(Icons.AutoMirrored.Filled.QueueMusic, stringResource(R.string.queue), mode == MODE_QUEUE) {
-                    mode = if (mode == MODE_QUEUE) MODE_ART else MODE_QUEUE
-                }
-            }
+            PlayerBottomToggles(
+                mode = mode,
+                onMode = { mode = it },
+                speed = appSettings.playbackSpeed,
+                speedActive = appSettings.playbackSpeed != 1f || appSettings.playbackPitch != 1f,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 26.dp),
+            )
             Spacer(Modifier.height(18.dp))
         }
+        }
+    }
+}
+
+/** Favourite + "more" (song menu with the sleep timer) at the end of the title row. */
+@Composable
+private fun PlayerActions(isLiked: Boolean) {
+    val currentItem by PlayerManager.currentItem.collectAsState()
+    var menu by remember { mutableStateOf(false) }
+    var sleepMenu by remember { mutableStateOf(false) }
+    GlassIconButton(
+        icon = if (isLiked) Icons.Default.Star else Icons.Default.StarBorder,
+        contentDescription = stringResource(if (isLiked) R.string.unfavorite else R.string.favorite),
+        onClick = { currentItem?.let { LibraryManager.toggleLike(it) } },
+        size = 40.dp, iconSize = 20.dp,
+        tint = Color.White,
+        fill = Color.White.copy(alpha = 0.16f),
+    )
+    Spacer(Modifier.width(10.dp))
+    Box {
+        GlassIconButton(
+            icon = Icons.Default.MoreHoriz,
+            contentDescription = stringResource(R.string.more),
+            onClick = { menu = true },
+            size = 40.dp, iconSize = 20.dp,
+            tint = Color.White,
+            fill = Color.White.copy(alpha = 0.16f),
+        )
+        val sleepMode by SleepTimer.mode.collectAsState()
+        val sleepLabel = when (sleepMode) {
+            is SleepTimer.Mode.At -> stringResource(R.string.sleep_timer_left, formatTime(SleepTimer.remainingMs() ?: 0L))
+            SleepTimer.Mode.EndOfTrack -> stringResource(R.string.sleep_timer_left, stringResource(R.string.sleep_end_of_song))
+            null -> stringResource(R.string.sleep_timer)
+        }
+        val sleepAction = MenuAction(sleepLabel, Icons.Default.Bedtime, accent = sleepMode != null) { sleepMenu = true }
+        currentItem?.let {
+            SongMenu(item = it, expanded = menu, onDismiss = { menu = false }, extraActions = listOf(sleepAction))
+        }
+        SleepTimerMenu(expanded = sleepMenu, onDismiss = { sleepMenu = false })
+    }
+}
+
+/** Lyrics · output · speed · queue, the row under the volume slider. */
+@Composable
+private fun PlayerBottomToggles(
+    mode: Int,
+    onMode: (Int) -> Unit,
+    speed: Float,
+    speedActive: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    Row(
+        modifier,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BottomToggle(Icons.Default.Lyrics, stringResource(R.string.lyrics), mode == MODE_LYRICS) {
+            onMode(if (mode == MODE_LYRICS) MODE_ART else MODE_LYRICS)
+        }
+        val castStatus by CastSupport.status.collectAsState()
+        var outputs by remember { mutableStateOf(false) }
+        BottomToggle(
+            if (castStatus.connected) Icons.Default.CastConnected else Icons.Default.Cast,
+            stringResource(R.string.output),
+            castStatus.connected,
+        ) {
+            if (castStatus.available) outputs = true else openOutputSwitcher(context)
+        }
+        if (outputs) OutputPickerDialog(onDismiss = { outputs = false })
+        var speedDialog by remember { mutableStateOf(false) }
+        SpeedToggle(speed, speedActive) { speedDialog = true }
+        if (speedDialog) PlaybackSpeedDialog(onDismiss = { speedDialog = false })
+        BottomToggle(Icons.AutoMirrored.Filled.QueueMusic, stringResource(R.string.queue), mode == MODE_QUEUE) {
+            onMode(if (mode == MODE_QUEUE) MODE_ART else MODE_QUEUE)
+        }
+    }
+}
+
+/**
+ * The player on a phone held sideways: artwork (or lyrics / queue) on the left half, title and every control on
+ * the right half, both vertically centred. The full-bleed sleeve has no room here, so the card is always used.
+ */
+@Composable
+private fun LandscapePlayer(
+    sheet: PlayerSheetState,
+    mode: Int,
+    onMode: (Int) -> Unit,
+    thumbnail: String?,
+    title: String?,
+    artist: String?,
+    isPlaying: Boolean,
+    isLiked: Boolean,
+    videoId: String?,
+    wide: Boolean,
+    playbackSpeed: Float,
+    speedActive: Boolean,
+) {
+    val currentItem by PlayerManager.currentItem.collectAsState()
+    Row(
+        Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .displayCutoutPadding()
+            .padding(horizontal = 28.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AnimatedContent(
+            targetState = mode,
+            transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            contentAlignment = Alignment.Center,
+            label = "landscapeMode",
+        ) { m ->
+            when (m) {
+                MODE_ART -> BoxWithConstraints(Modifier.fillMaxSize().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                    val side = minOf(maxWidth, maxHeight)
+                    SwipeArtwork(
+                        thumbnail, title, isPlaying, side, sheet,
+                        flightEnabled = true,
+                        wide = wide,
+                        videoId = videoId,
+                    )
+                }
+                MODE_LYRICS -> Box(Modifier.fillMaxSize()) { LyricsPanel() }
+                else -> Box(Modifier.fillMaxSize().padding(top = 8.dp)) { QueuePanel() }
+            }
+        }
+        Spacer(Modifier.width(32.dp))
+        Column(
+            Modifier.weight(1f).fillMaxHeight(),
+            verticalArrangement = Arrangement.SpaceEvenly,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                Modifier
+                    .size(width = 60.dp, height = 18.dp)
+                    .glassClickable(pressedScale = 0.9f) { sheet.collapse() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.width(38.dp).height(5.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.45f)))
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = title.orEmpty(),
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 2500),
+                    )
+                    val appActions = com.vyora.music.ui.components.LocalAppActions.current
+                    val artistName = com.vyora.music.data.library.primaryArtist(artist.orEmpty())
+                    Text(
+                        text = artist.orEmpty(),
+                        color = Color.White.copy(alpha = 0.6f),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Normal),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = if (artistName.isNotBlank()) {
+                            Modifier.glassClickable(pressedScale = 0.97f) { appActions.openArtist(artistName, null, currentItem?.artistId) }
+                        } else Modifier,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                PlayerActions(isLiked)
+            }
+            SeekSection()
+            TransportRow()
+            VolumeSection(active = sheet.isVisible)
+            PlayerBottomToggles(
+                mode = mode,
+                onMode = onMode,
+                speed = playbackSpeed,
+                speedActive = speedActive,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            )
         }
     }
 }
@@ -612,8 +779,10 @@ private fun HeroArtwork(
     cardRect: () -> androidx.compose.ui.geometry.Rect,
     morph: Boolean,
     flightEnabled: Boolean,
+    animate: Boolean = false,
 ) {
     val sharp = remember(thumbnail) { com.vyora.music.data.youtube.YouTubeClient.artUrl(thumbnail, 1080) ?: thumbnail }
+    val motion = rememberSleeveMotion(animate)
     val cardCorner = with(androidx.compose.ui.platform.LocalDensity.current) { GlassCardCorner.toPx() }
     val shadow = with(androidx.compose.ui.platform.LocalDensity.current) { 24.dp.toPx() }
     Box(
@@ -652,7 +821,14 @@ private fun HeroArtwork(
                 }
             },
     ) {
-        AsyncImage(model = sharp, contentDescription = title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        Box(Modifier.fillMaxSize().clipToBounds()) {
+            AsyncImage(
+                model = sharp,
+                contentDescription = title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().graphicsLayer { motion.applyTo(this) },
+            )
+        }
         // Keeps the status bar and the grabber legible over a bright sleeve.
         Box(
             Modifier
