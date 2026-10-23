@@ -290,7 +290,7 @@ private fun ArtworkRow(image: String?, title: String, subtitle: String, divider:
 }
 
 /** Matches Spotify tracks to YouTube Music in small batches so playback starts right away. */
-private object SpotifyPlayer {
+internal object SpotifyPlayer {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var job: Job? = null
 

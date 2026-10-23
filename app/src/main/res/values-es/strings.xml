@@ -629,4 +629,24 @@
     <string name="mix_favorites">Mix de favoritas</string>
     <string name="mix_discovery">Mix Descubrimiento</string>
     <string name="mix_rediscover">Mix Redescubre</string>
+    <string name="spotify_home_title">De Spotify</string>
+    <string name="spotify_artist">Artista</string>
+    <string name="lyrics_card_style_photo">Foto</string>
+    <string name="lyrics_card_photo_failed">No se pudo abrir esa foto</string>
+    <string name="lyrics_card_change_photo">Cambiar foto</string>
+    <string name="lyrics_card_glass_hint">El cristal refracta lo que tiene detrás</string>
+    <string name="library_filter_playlists">Playlists</string>
+    <string name="library_filter_artists">Artistas</string>
+    <string name="library_filter_albums">Álbumes</string>
+    <string name="library_filter_downloaded">Descargado</string>
+    <string name="library_sort_recents">Recientes</string>
+    <string name="library_kind_playlist">Playlist</string>
+    <string name="library_kind_collection">Colección</string>
+    <string name="library_view_grid">Vista de cuadrícula</string>
+    <string name="library_view_list">Vista de lista</string>
+    <string name="library_sort_alpha">Alfabético</string>
+    <string name="library_more">Más</string>
+    <string name="mini_player_stop">Detener reproducción</string>
+    <string name="motion_artwork">Portada animada</string>
+    <string name="motion_artwork_footer">Las canciones con portada animada (Apple Music) o Canvas (Spotify, con sesión iniciada) la reproducen sin sonido en Reproduciendo. Los bucles se guardan en caché y con datos móviles se usa una versión más ligera.</string>
 </resources>

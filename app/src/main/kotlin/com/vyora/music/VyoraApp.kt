@@ -25,6 +25,7 @@ class VyoraApp : Application(), ImageLoaderFactory {
         com.vyora.music.core.SecureBox.init(this)
         com.vyora.music.data.discord.DiscordAccount.init(this)
         com.vyora.music.data.spotify.SpotifyAccount.init(this)
+        com.vyora.music.data.motion.MotionArtwork.init(this)
         com.vyora.music.core.NetworkState.init(this)
         com.vyora.music.data.server.MusicServer.init(this)
         com.vyora.music.data.lyrics.LyricsRepository.init(this)

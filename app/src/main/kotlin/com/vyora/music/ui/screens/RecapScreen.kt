@@ -1,5 +1,7 @@
 package com.vyora.music.ui.screens
 
+import com.vyora.music.ui.design.bleedHorizontal
+import com.vyora.music.ui.design.scrollEdgeFade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateIntAsState
@@ -184,9 +186,15 @@ fun RecapScreen(
                     Spacer(Modifier.height(12.dp))
                 }
                 item(key = "artists") {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        itemsIndexed(artists, key = { _, a -> a.artist }) { i, a -> ArtistBubble(i + 1, a) { onOpenArtist(a.artist, a.thumbnail) } }
-                    }
+                    run { val edgeRow = androidx.compose.foundation.lazy.rememberLazyListState(); LazyRow(
+                        state = edgeRow,
+                        modifier = Modifier.bleedHorizontal(com.vyora.music.ui.design.Spacing.ScreenH).scrollEdgeFade(edgeRow),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = com.vyora.music.ui.design.Spacing.ScreenH),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        val keys0 = com.vyora.music.ui.design.uniqueKeys(artists) { a -> a.artist }
+                        itemsIndexed(artists, key = { i, _ -> keys0[i] }) { i, a -> ArtistBubble(i + 1, a) { onOpenArtist(a.artist, a.thumbnail) } }
+                    } }
                 }
             }
             item(key = "songs_title") {
@@ -194,7 +202,8 @@ fun RecapScreen(
                 SectionTitle(stringResource(R.string.recap_top_songs))
                 Spacer(Modifier.height(6.dp))
             }
-            itemsIndexed(songs, key = { _, s -> "song_" + s.itemId }) { i, s ->
+            val keys1 = com.vyora.music.ui.design.uniqueKeys(songs) { s -> "song_" + s.itemId }
+            itemsIndexed(songs, key = { i, _ -> keys1[i] }) { i, s ->
                 RankedSongRow(i + 1, s, last = i == songs.lastIndex) { onPlay(songItems, i) }
             }
         }

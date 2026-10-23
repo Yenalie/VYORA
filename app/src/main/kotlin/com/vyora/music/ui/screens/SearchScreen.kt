@@ -96,6 +96,8 @@ import com.vyora.music.ui.design.LargeTitleHeader
 import com.vyora.music.ui.design.OnTabReselect
 import com.vyora.music.ui.design.SectionTitle
 import com.vyora.music.ui.design.Spacing
+import com.vyora.music.ui.design.bleedHorizontal
+import com.vyora.music.ui.design.scrollEdgeFade
 import com.vyora.music.ui.design.glass
 import com.vyora.music.ui.design.glassClickable
 import com.vyora.music.ui.design.isAtTop
@@ -347,7 +349,8 @@ private fun AllTab(
             state = allListState,
             contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp + bottomInset)
         ) {
-            itemsIndexed(results, key = { _, item -> "top_${item.type}_${item.id}" }) { index, item ->
+            val keys0 = com.vyora.music.ui.design.uniqueKeys(results) { item -> "top_${item.type}_${item.id}" }
+            itemsIndexed(results, key = { i, _ -> keys0[i] }) { index, item ->
                 ItemRow(
                     item = item,
                     showKind = true,
@@ -370,7 +373,14 @@ private fun AllTab(
                 Column(Modifier.padding(top = 18.dp)) {
                     SectionTitle(title = stringResource(R.string.search_more_results))
                     Spacer(Modifier.height(10.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val moreState = androidx.compose.foundation.lazy.rememberLazyListState()
+                    LazyRow(
+                        state = moreState,
+                        // This row sits inside the padded results list, which clips at its edges: fade the
+                        // ends instead so chips never stop in a hard vertical cut.
+                        modifier = Modifier.scrollEdgeFade(moreState),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
                         items(SearchViewModel.SEARCH_TABS, key = { "more_" + it.name }) { tab ->
                             GlassChip(label = tabTitle(tab), selected = false, onClick = { onSeeAll(tab) }, icon = tabIcon(tab))
                         }
@@ -388,7 +398,8 @@ private fun Suggestions(query: String, suggestions: List<String>, onPick: (Strin
         (listOf(query.trim()) + suggestions).distinctBy { it.lowercase() }.filter { it.isNotBlank() }
     }
     LazyColumn(contentPadding = PaddingValues(top = 2.dp, bottom = 24.dp + bottomInset)) {
-        itemsIndexed(rows, key = { _, q -> "suggest_$q" }) { i, q ->
+        val keys1 = com.vyora.music.ui.design.uniqueKeys(rows) { q -> "suggest_$q" }
+        itemsIndexed(rows, key = { i, _ -> keys1[i] }) { i, q ->
             Column {
                 Row(
                     Modifier
@@ -479,14 +490,23 @@ private fun LazyListScope.itemRows(
     fullQueue: List<SimpleItem>,
     onItem: (SimpleItem, List<SimpleItem>, Int) -> Unit
 ) {
-    itemsIndexed(shown, key = { _, item -> "${tab.name}_${item.id}" }) { index, item ->
+    val keys2 = com.vyora.music.ui.design.uniqueKeys(shown) { item -> "${tab.name}_${item.id}" }
+    itemsIndexed(shown, key = { i, _ -> keys2[i] }) { index, item ->
         ItemRow(item, onClick = { onItem(item, fullQueue, index) })
     }
 }
 
 @Composable
 private fun TabChips(selected: SearchTab, onSelect: (SearchTab) -> Unit) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    val rowState = androidx.compose.foundation.lazy.rememberLazyListState()
+    LazyRow(
+        state = rowState,
+        modifier = Modifier
+            .bleedHorizontal(Spacing.ScreenH)
+            .scrollEdgeFade(rowState),
+        contentPadding = PaddingValues(horizontal = Spacing.ScreenH),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         items(SearchTab.entries.toList(), key = { it.name }) { tab ->
             GlassChip(label = tabTitle(tab), selected = tab == selected, onClick = { onSelect(tab) })
         }

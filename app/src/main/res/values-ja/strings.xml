@@ -621,4 +621,24 @@
     <string name="mix_favorites">お気に入りミックス</string>
     <string name="mix_discovery">ディスカバリーミックス</string>
     <string name="mix_rediscover">再発見ミックス</string>
+    <string name="spotify_home_title">Spotifyから</string>
+    <string name="spotify_artist">アーティスト</string>
+    <string name="lyrics_card_style_photo">写真</string>
+    <string name="lyrics_card_photo_failed">その写真を開けませんでした</string>
+    <string name="lyrics_card_change_photo">写真を変更</string>
+    <string name="lyrics_card_glass_hint">ガラスが背景を屈折させます</string>
+    <string name="library_filter_playlists">プレイリスト</string>
+    <string name="library_filter_artists">アーティスト</string>
+    <string name="library_filter_albums">アルバム</string>
+    <string name="library_filter_downloaded">ダウンロード済み</string>
+    <string name="library_sort_recents">最近</string>
+    <string name="library_kind_playlist">プレイリスト</string>
+    <string name="library_kind_collection">コレクション</string>
+    <string name="library_view_grid">グリッド表示</string>
+    <string name="library_view_list">リスト表示</string>
+    <string name="library_sort_alpha">アルファベット順</string>
+    <string name="library_more">その他</string>
+    <string name="mini_player_stop">再生を停止</string>
+    <string name="motion_artwork">モーションアートワーク</string>
+    <string name="motion_artwork_footer">アニメーションアートワーク（Apple Music）や Canvas（Spotify、サインイン時）がある曲は、再生中画面で無音再生されます。ループはキャッシュされ、モバイルデータ通信では軽量版を使用します。</string>
 </resources>

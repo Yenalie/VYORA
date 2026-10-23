@@ -164,7 +164,49 @@ class IntegrationsTest {
         val pl = SpotifyAccount.parsePlaylistTracks(JSONObject("""{"data":{"playlistV2":{"name":"Mix","content":{"totalCount":2,"items":[{"itemV2":$track},$episode]}}}}"""))
         assertEquals(1, pl.items.size)
         assertEquals("Manusia", pl.items[0].album)
-        assertEquals(SpotifyAccount.HASHES.keys, setOf("profileAttributes", "libraryV3", "fetchPlaylist", "fetchLibraryTracks"))
+        assertEquals(SpotifyAccount.HASHES.keys, setOf("profileAttributes", "libraryV3", "fetchPlaylist", "fetchLibraryTracks", "home", "getAlbum", "searchTracks", "canvas"))
+    }
+
+    private fun fixture(name: String) = JSONObject(javaClass.getResource("/spotify/$name")!!.readText())
+
+    @Test fun spotifyParsesHomeFeed() {
+        // Trimmed copy of a real logged-out pathfinder "home" response (October 2026).
+        val home = SpotifyAccount.parseHome(fixture("home.json"))
+        assertEquals("Good morning", home.greeting)
+        assertEquals(listOf("Trending songs", "Popular artists", "Popular albums and singles", "Popular radio", "Featured Charts"), home.shelves.map { it.title })
+        val song = home.shelves[0].cards.first()
+        assertEquals(com.vyora.music.data.spotify.SpotifyCard.Kind.TRACK, song.kind)
+        assertEquals("Housewife", song.title)
+        assertEquals("Tate McRae", song.subtitle)
+        assertTrue(song.imageUrl!!.startsWith("https://i.scdn.co/image/ab67616d0000b273"))
+        assertEquals("Housewife", song.track!!.title)
+        assertEquals(com.vyora.music.data.spotify.SpotifyCard.Kind.ARTIST, home.shelves[1].cards.first().kind)
+        val album = home.shelves[2].cards.first()
+        assertEquals(com.vyora.music.data.spotify.SpotifyCard.Kind.ALBUM, album.kind)
+        assertTrue(album.uri.startsWith("spotify:album:"))
+        val chart = home.shelves[4].cards.first()
+        assertEquals(com.vyora.music.data.spotify.SpotifyCard.Kind.PLAYLIST, chart.kind)
+        assertEquals("Top Songs - Global", chart.title)
+    }
+
+    @Test fun spotifyParsesAlbumTracks() {
+        val (name, cover, page) = SpotifyAccount.parseAlbum(fixture("album.json"))
+        assertEquals("After Hours", name)
+        assertEquals(14, page.total)
+        assertEquals("Alone Again", page.items.first().title)
+        assertEquals("The Weeknd", page.items.first().artist)
+        assertEquals(250_053L, page.items.first().durationMs)
+        assertEquals("After Hours", page.items.first().album)
+        assertEquals(cover, page.items.first().imageUrl)
+    }
+
+    @Test fun spotifyReadsHashesFromWebPlayerBundle() {
+        val js = """x=new a.l("home","query","5fb7da7a03ee2776c0670856609cb85a189a3cecc36cc160b91cde79063b9cf1",null),""" +
+            """y=new a.l("addToLibrary","mutation","${"a".repeat(64)}",null)"""
+        val map = SpotifyAccount.parseBundleHashes(js)
+        assertEquals("5fb7da7a03ee2776c0670856609cb85a189a3cecc36cc160b91cde79063b9cf1", map["home"])
+        assertEquals("a".repeat(64), map["addToLibrary"])
+        assertEquals("Hits & more", SpotifyAccount.plainText("<a href=\"x\">Hits</a> &amp; more"))
     }
 
     @Test fun spotifyLoginWebViewHelpers() {

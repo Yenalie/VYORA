@@ -337,6 +337,25 @@ object PlayerManager {
         else controller.addMediaItem(item.toMediaItem())
     }
 
+    /**
+     * Swipe-to-dismiss on the mini player: stop playback and empty the queue, so the bar goes away and the
+     * media notification is released. Nothing is resumed until the listener picks something new.
+     */
+    fun stopAndClear() {
+        pendingQueue = null
+        val controller = mediaController
+        if (controller != null) {
+            controller.pause()
+            controller.stop()
+            controller.clearMediaItems()
+        }
+        stopProgressUpdates()
+        _isPlaying.value = false
+        _isBuffering.value = false
+        publishCurrent(null)
+        _upNext.value = emptyList()
+    }
+
     fun clearUpNext() {
         val controller = mediaController ?: return
         val current = controller.currentMediaItemIndex

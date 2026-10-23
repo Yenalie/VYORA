@@ -621,4 +621,24 @@
     <string name="mix_favorites">Mix Favorit</string>
     <string name="mix_discovery">Mix Penemuan</string>
     <string name="mix_rediscover">Mix Kenangan</string>
+    <string name="spotify_home_title">Dari Spotify</string>
+    <string name="spotify_artist">Artis</string>
+    <string name="lyrics_card_style_photo">Foto</string>
+    <string name="lyrics_card_photo_failed">Foto itu tidak bisa dibuka</string>
+    <string name="lyrics_card_change_photo">Ganti foto</string>
+    <string name="lyrics_card_glass_hint">Kaca membiaskan apa pun di belakangnya</string>
+    <string name="library_filter_playlists">Playlist</string>
+    <string name="library_filter_artists">Artis</string>
+    <string name="library_filter_albums">Album</string>
+    <string name="library_filter_downloaded">Diunduh</string>
+    <string name="library_sort_recents">Terbaru</string>
+    <string name="library_kind_playlist">Playlist</string>
+    <string name="library_kind_collection">Koleksi</string>
+    <string name="library_view_grid">Tampilan grid</string>
+    <string name="library_view_list">Tampilan daftar</string>
+    <string name="library_sort_alpha">Abjad</string>
+    <string name="library_more">Lainnya</string>
+    <string name="mini_player_stop">Hentikan pemutaran</string>
+    <string name="motion_artwork">Artwork bergerak</string>
+    <string name="motion_artwork_footer">Lagu yang punya cover animasi (Apple Music) atau Canvas (Spotify, saat masuk) akan memutarnya tanpa suara di layar Sedang Diputar. Loop disimpan di cache, dan versi yang lebih ringan dipakai saat memakai data seluler.</string>
 </resources>

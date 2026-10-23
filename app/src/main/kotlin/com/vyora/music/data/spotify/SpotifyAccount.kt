@@ -49,6 +49,24 @@ data class SpotifyTrackInfo(
 
 data class SpotifyPage<T>(val items: List<T>, val total: Int)
 
+/** One tile of a Spotify Home shelf. */
+data class SpotifyCard(
+    val uri: String,
+    val kind: Kind,
+    val title: String,
+    val subtitle: String,
+    val imageUrl: String?,
+    /** Set for [Kind.TRACK] so a tap can be matched and played straight away. */
+    val track: SpotifyTrackInfo? = null,
+) {
+    enum class Kind { TRACK, ALBUM, PLAYLIST, ARTIST }
+}
+
+/** A Spotify Home section ("Trending songs", "Made for you", ...). */
+data class SpotifyShelf(val title: String, val cards: List<SpotifyCard>)
+
+data class SpotifyHome(val greeting: String?, val shelves: List<SpotifyShelf>)
+
 class SpotifyException(val code: Int, message: String) : Exception(message)
 
 /**
@@ -95,7 +113,23 @@ object SpotifyAccount {
         "libraryV3" to "973e511ca44261fda7eebac8b653155e7caee3675abb4fb110cc1b8c78b091c3",
         "fetchPlaylist" to "346811f856fb0b7e4f6c59f8ebea78dd081c6e2fb01b77c954b26259d5fc6763",
         "fetchLibraryTracks" to "087278b20b743578a6262c2b0b4bcd20d879c503cc359a2285baf083ef944240",
+        "home" to "5fb7da7a03ee2776c0670856609cb85a189a3cecc36cc160b91cde79063b9cf1",
+        "getAlbum" to "0b6ce3511e1b02e4a40fa95440f992acbe85080eb308af9194322d708fc1914f",
+        "searchTracks" to "b02683192a98dde7966b5e6655a79eeb62713eab703eda9902c932818dd52751",
+        "canvas" to "575138ab27cd5c1b3e54da54d0a7cc8d85485402de26340c2145f0f6bb5e7a9f",
     )
+
+    /** Operations that also work with an anonymous web-player token (no sign-in needed). */
+    private val PUBLIC_OPS = setOf("home", "getAlbum", "fetchPlaylist", "searchTracks")
+
+    /**
+     * Live hashes. Starts from [HASHES]; when Spotify answers PersistedQueryNotFound the current ones are read
+     * again from the web player bundle (Rustify's scrape_gql_hashes, GPL-3.0), so a rotation heals itself.
+     */
+    private val liveHashes = java.util.concurrent.ConcurrentHashMap(HASHES)
+    @Volatile private var hashesRefreshedAt = 0L
+    @Volatile private var anonToken: String? = null
+    @Volatile private var anonExpires = 0L
 
     private var appContext: Context? = null
     private val tokenLock = Mutex()
@@ -170,6 +204,7 @@ object SpotifyAccount {
         prefs()?.edit { clear() }
         token = null
         tokenExpires = 0L
+        anonToken = null
         _profile.value = null
     }
 
@@ -208,6 +243,10 @@ object SpotifyAccount {
         do {
             val page = if (uri == LIKED_URI) {
                 likedSongs(out.size, 50)
+            } else if (uri.startsWith("spotify:album:")) {
+                val (n, _, p) = album(uri, out.size, 50)
+                name = n
+                p
             } else {
                 val (n, p) = playlist(uri, out.size, 100)
                 name = n
@@ -221,12 +260,79 @@ object SpotifyAccount {
         return name to out
     }
 
+    /** Spotify's own Home feed: personal when signed in, the public editorial one otherwise. */
+    suspend fun home(itemsPerShelf: Int = 12): SpotifyHome {
+        val vars = JSONObject()
+            .put("homeEndUserIntegration", "INTEGRATION_WEB_PLAYER")
+            .put("includeHomeChapterVideoCards", false)
+            .put("includeEpisodeContentRatingsV2", false)
+            .put("timeZone", java.util.TimeZone.getDefault().id)
+            .put("sp_t", "")
+            .put("facet", "")
+            .put("sectionItemsLimit", itemsPerShelf)
+        return parseHome(query("home", vars))
+    }
+
+    /** Album name, cover and one page of tracks. */
+    suspend fun album(uri: String, offset: Int = 0, limit: Int = 50): Triple<String, String?, SpotifyPage<SpotifyTrackInfo>> {
+        val vars = JSONObject().put("uri", uri).put("locale", "").put("offset", offset).put("limit", limit)
+        return parseAlbum(query("getAlbum", vars))
+    }
+
+    /**
+     * The Canvas loop (the short vertical video Spotify plays behind Now Playing) for a song, or null when the
+     * song has none. Spotify only hands Canvas to signed-in sessions; anonymous tokens always get `null`.
+     */
+    suspend fun canvasFor(title: String, artist: String, durationMs: Long = 0L): String? {
+        if (!isSignedIn) return null
+        val search = JSONObject()
+            .put("searchTerm", "$title $artist")
+            .put("offset", 0).put("limit", 8).put("numberOfTopResults", 5)
+            .put("includeAudiobooks", false).put("includePreReleases", false)
+            .put("includeLocalConcertsField", false).put("includeAuthors", false)
+        val uri = bestTrackUri(query("searchTracks", search), title, artist, durationMs) ?: return null
+        return parseCanvas(query("canvas", JSONObject().put("trackUri", uri)))
+    }
+
+    internal fun bestTrackUri(json: JSONObject, title: String, artist: String, durationMs: Long): String? {
+        val items = json.optJSONObject("data")?.optJSONObject("searchV2")?.optJSONObject("tracksV2")?.optJSONArray("items")
+            ?: return null
+        var best: String? = null
+        var bestScore = 0
+        for (i in 0 until items.length()) {
+            val t = items.optJSONObject(i)?.optJSONObject("item")?.optJSONObject("data") ?: continue
+            val uri = t.optString("uri").takeIf { it.startsWith("spotify:track:") } ?: continue
+            val artists = t.optJSONObject("artists")?.optJSONArray("items")
+            val names = (0 until (artists?.length() ?: 0)).mapNotNull { artists?.optJSONObject(it)?.optJSONObject("profile")?.optString("name") }
+            val ms = t.optJSONObject("duration")?.optLong("totalMilliseconds") ?: 0L
+            val score = com.vyora.music.data.motion.MotionMatch.score(title, artist, t.optString("name"), names.joinToString(", "), durationMs, ms)
+            if (score > bestScore) { bestScore = score; best = uri }
+        }
+        return best
+    }
+
+    internal fun parseCanvas(json: JSONObject): String? {
+        val canvas = json.optJSONObject("data")?.optJSONObject("trackUnion")?.optJSONObject("canvas") ?: return null
+        val type = canvas.optString("type")
+        val url = canvas.optString("url").takeIf { it.startsWith("https://") } ?: return null
+        if ("IMAGE" in type.uppercase() || !url.substringBefore('?').endsWith(".mp4")) return null
+        return url
+    }
+
     // ---- HTTP -----------------------------------------------------------------------------------------
 
-    private suspend fun query(operation: String, variables: JSONObject): JSONObject = withContext(Dispatchers.IO) {
+    private suspend fun query(operation: String, variables: JSONObject): JSONObject = try {
+        queryOnce(operation, variables)
+    } catch (e: SpotifyException) {
+        if (e.code != 412 || !refreshHashes()) throw e
+        queryOnce(operation, variables)
+    }
+
+    private suspend fun queryOnce(operation: String, variables: JSONObject): JSONObject = withContext(Dispatchers.IO) {
         var lastError: Exception? = null
         for (attempt in 0 until 3) {
-            val access = accessToken()
+            val anonymous = operation in PUBLIC_OPS && SecureBox.get(KEY_SP_DC) == null
+            val access = if (anonymous) anonymousToken() else accessToken()
             val body = gqlBody(operation, variables).toString().toRequestBody("application/json; charset=UTF-8".toMediaType())
             val request = Request.Builder().url(GQL_URL).post(body)
                 .header("Authorization", "Bearer $access")
@@ -239,7 +345,7 @@ object SpotifyAccount {
                 .build()
             client.newCall(request).execute().use { r ->
                 when {
-                    r.code == 401 -> { token = null; lastError = SpotifyException(401, "Token expired") }
+                    r.code == 401 -> { token = null; anonToken = null; lastError = SpotifyException(401, "Token expired") }
                     r.code == 429 -> {
                         lastError = SpotifyException(429, "Rate limited")
                         delay((r.header("Retry-After")?.toLongOrNull() ?: (2L * (attempt + 1))).coerceAtMost(8) * 1000)
@@ -261,7 +367,43 @@ object SpotifyAccount {
     internal fun gqlBody(operation: String, variables: JSONObject): JSONObject = JSONObject()
         .put("variables", variables)
         .put("operationName", operation)
-        .put("extensions", JSONObject().put("persistedQuery", JSONObject().put("version", 1).put("sha256Hash", HASHES.getValue(operation))))
+        .put("extensions", JSONObject().put("persistedQuery", JSONObject().put("version", 1).put("sha256Hash", liveHashes[operation] ?: HASHES.getValue(operation))))
+
+    /**
+     * Re-reads every persisted-query hash from open.spotify.com's web-player bundle, where they sit as
+     * `"operationName","query","<sha256>"` triples. At most once every 10 minutes.
+     */
+    private suspend fun refreshHashes(): Boolean = withContext(Dispatchers.IO) {
+        if (System.currentTimeMillis() - hashesRefreshedAt < 10 * 60_000L) return@withContext false
+        hashesRefreshedAt = System.currentTimeMillis()
+        runCatching {
+            val html = get("https://open.spotify.com", mapOf("Accept" to "text/html"))
+            val bundle = Regex("src=\"([^\"]*web-player/web-player\\.[a-z0-9]+\\.js)\"").find(html)?.groupValues?.get(1)
+                ?: return@runCatching false
+            val url = if (bundle.startsWith("/")) "https://open.spotify.com$bundle" else bundle
+            val found = parseBundleHashes(get(url, emptyMap()))
+            found.forEach { (op, hash) -> if (op in HASHES) liveHashes[op] = hash }
+            Log.i(TAG, "Refreshed ${found.size} Spotify query hashes")
+            found.isNotEmpty()
+        }.getOrElse { Log.w(TAG, "Hash refresh failed", it); false }
+    }
+
+    internal fun parseBundleHashes(js: String): Map<String, String> =
+        Regex("\"([A-Za-z0-9_]+)\",\"(?:query|mutation)\",\"([a-f0-9]{64})\"").findAll(js)
+            .associate { it.groupValues[1] to it.groupValues[2] }
+
+    /** Logged-out web-player token, enough for the public Home feed, albums and playlists. */
+    private suspend fun anonymousToken(): String = tokenLock.withLock {
+        anonToken?.takeIf { System.currentTimeMillis() < anonExpires - 60_000L }?.let { return@withLock it }
+        val (secret, version) = nuance()
+        val serverTime = JSONObject(get(SERVER_TIME_URL, emptyMap())).getLong("serverTime")
+        val code = totp(secret, serverTime)
+        val json = JSONObject(get("$TOKEN_URL?reason=init&productType=web-player&totp=$code&totpServer=$code&totpVer=$version", emptyMap()))
+        val access = json.optString("accessToken").takeIf { it.isNotBlank() } ?: throw SpotifyException(503, "No anonymous token")
+        anonToken = access
+        anonExpires = json.optLong("accessTokenExpirationTimestampMs", System.currentTimeMillis() + 30 * 60_000L)
+        access
+    }
 
     private suspend fun accessToken(): String = tokenLock.withLock {
         token?.takeIf { System.currentTimeMillis() < tokenExpires - 60_000L }?.let { return@withLock it }
@@ -479,5 +621,73 @@ object SpotifyAccount {
             parseTrack(data, wrapper.str("_uri") ?: wrapper.str("uri"))
         }
         return SpotifyPage(out, content.optInt("totalCount", out.size))
+    }
+
+    internal fun parseAlbum(json: JSONObject): Triple<String, String?, SpotifyPage<SpotifyTrackInfo>> {
+        val album = json.obj("data")?.obj("albumUnion") ?: throw SpotifyException(500, "Invalid getAlbum response")
+        val name = album.str("name").orEmpty()
+        val cover = bestImage(album.obj("coverArt")?.optJSONArray("sources"))
+        val tracks = album.obj("tracksV2") ?: album.obj("tracks")
+        val items = tracks?.optJSONArray("items") ?: JSONArray()
+        val out = (0 until items.length()).mapNotNull { i ->
+            val t = items.optJSONObject(i)?.obj("track") ?: return@mapNotNull null
+            // Album tracks carry no albumOfTrack; borrow the album's name and cover.
+            parseTrack(t, null)?.copy(album = name, imageUrl = cover)
+        }
+        return Triple(name, cover, SpotifyPage(out, tracks?.optInt("totalCount", out.size) ?: out.size))
+    }
+
+    internal fun parseHome(json: JSONObject): SpotifyHome {
+        val home = json.obj("data")?.obj("home") ?: throw SpotifyException(500, "Invalid home response")
+        val greeting = home.obj("greeting")?.str("transformedLabel")
+        val sections = home.obj("sectionContainer")?.obj("sections")?.optJSONArray("items") ?: JSONArray()
+        val shelves = (0 until sections.length()).mapNotNull { i ->
+            val section = sections.optJSONObject(i) ?: return@mapNotNull null
+            val data = section.obj("data") ?: return@mapNotNull null
+            val title = data.obj("title")?.str("transformedLabel") ?: data.obj("title")?.str("text") ?: return@mapNotNull null
+            val items = section.obj("sectionItems")?.optJSONArray("items") ?: return@mapNotNull null
+            val cards = (0 until items.length()).mapNotNull { j -> items.optJSONObject(j)?.obj("content")?.let(::parseCard) }
+                .distinctBy { it.uri }
+            if (cards.isEmpty()) null else SpotifyShelf(title, cards)
+        }
+        return SpotifyHome(greeting, shelves)
+    }
+
+    /** Spotify descriptions can hold `<a>` tags and HTML entities. */
+    internal fun plainText(html: String): String = html.replace(Regex("<[^>]+>"), "")
+        .replace("&amp;", "&").replace("&quot;", "\"").replace("&#x27;", "'").replace("&#39;", "'")
+        .replace("&lt;", "<").replace("&gt;", ">").trim()
+
+    private fun names(o: JSONObject?): String {
+        val arr = o?.optJSONArray("items") ?: return ""
+        return (0 until arr.length()).mapNotNull { arr.optJSONObject(it)?.obj("profile")?.str("name") }.joinToString(", ")
+    }
+
+    internal fun parseCard(content: JSONObject): SpotifyCard? {
+        val d = content.obj("data") ?: return null
+        val uri = d.str("uri") ?: content.str("_uri") ?: return null
+        return when (d.str("__typename")) {
+            "Track" -> {
+                val track = parseTrack(d, uri) ?: return null
+                SpotifyCard(uri, SpotifyCard.Kind.TRACK, track.title, track.artist, track.imageUrl, track)
+            }
+            "Album" -> SpotifyCard(
+                uri, SpotifyCard.Kind.ALBUM, d.str("name") ?: return null, names(d.obj("artists")),
+                bestImage(d.obj("coverArt")?.optJSONArray("sources")),
+            )
+            "Playlist" -> {
+                val description = d.str("description")?.let(::plainText)
+                SpotifyCard(
+                    uri, SpotifyCard.Kind.PLAYLIST, d.str("name") ?: return null,
+                    description?.takeIf { it.isNotBlank() } ?: d.obj("ownerV2")?.obj("data")?.str("name").orEmpty(),
+                    d.obj("images")?.optJSONArray("items")?.optJSONObject(0)?.optJSONArray("sources")?.let(::bestImage),
+                )
+            }
+            "Artist" -> SpotifyCard(
+                uri, SpotifyCard.Kind.ARTIST, d.obj("profile")?.str("name") ?: return null, "",
+                bestImage(d.obj("visuals")?.obj("avatarImage")?.optJSONArray("sources")),
+            )
+            else -> null
+        }
     }
 }

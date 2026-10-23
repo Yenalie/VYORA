@@ -1,4 +1,25 @@
 # Changelog
+## 1.9.9
+- Artwork bergerak di layar Sedang Diputar: lagu yang punya cover animasi Apple Music diputar tanpa suara di bagian atas layar dan menyatu dengan latar, dan Spotify Canvas (saat masuk ke Spotify) mengisi seluruh layar. Loop disimpan di cache, versi yang lebih ringan dipakai di data seluler, dan bisa diatur di Pengaturan, Artwork bergerak (Selalu, Wi-Fi, Mati)
+- Mini player bisa ditutup dengan swipe ke bawah: musik berhenti dan antrean dikosongkan, dengan getaran saat melewati batas
+- Bar kategori hasil Search (Hasil Teratas, Lagu, Artis, Album, dan lainnya) kini bergulir sampai ke tepi layar dengan pudar halus, tidak lagi terpotong tegak di pinggir
+- Teks kartu lirik dirapikan: ketebalan semibold, jarak baris lebih rapat dalam satu lirik dan lebih lega antar lirik, serta pemenggalan baris yang seimbang
+- Library kembali ke tata letak Apple Music
+
+## 1.9.8
+- Home tidak lagi force close saat dua station memakai lagu yang sama (misalnya lagu kolaborasi yang muncul di shelf dua artis); tiap station kini punya lagu awal sendiri
+- Semua daftar (Home, Search, Library, playlist, album, artis, server musik, Recap, musik lokal, feed Spotify) kini memakai key unik, jadi lagu atau video yang muncul dua kali tidak lagi membuat aplikasi crash
+- Shelf artis, mix, dan album di Home dibersihkan dari duplikat
+
+## 1.9.7
+- Kartu lirik didesain ulang menjadi lempeng liquid glass tebal: tepinya membiaskan background dengan fringe warna halus, rim berkilau dari kiri atas, bayangan lembut, header artwork, judul, dan artis, ikon waveform, serta footer V Y O R A dengan progress dan waktu lagu
+- Background kartu lirik bisa diganti: artwork, foto sendiri dari galeri, warna, atau gelap; refraksi kaca dan tingkat redupnya menyesuaikan otomatis dengan background yang dipilih
+- Home kini menampilkan feed Spotify (Trending songs, Popular artists, albums, radio, charts); saat login Spotify, ada grid akses cepat Liked Songs dan playlist kamu; lagu diputar lewat YouTube Music, album dan playlist dibuka langsung
+- Album Spotify kini bisa dibuka dan diputar seperti playlist
+- Query Spotify memperbarui hash-nya sendiri dari web player saat Spotify mengubahnya, sehingga playlist dan Liked Songs tetap bisa dimuat
+- Library ditata ulang seperti Spotify: filter Playlists, Artists, Albums, Downloaded; urutan Recents atau abjad; tampilan list atau grid; Liked Songs, Downloads, dan Recently Played berupa tile gradien yang di-pin; playlist memakai cover mozaik 2x2, artis berbentuk lingkaran, dan artwork memiliki bayangan serta kilap halus
+- Tombol buat playlist baru langsung dari header Library
+
 ## 1.9.6
 - Full player tidak lagi force close di mode landscape; landscape kini memakai tata letak dua kolom (artwork, lirik, atau antrean di kiri, kontrol di kanan) dan player tetap terbuka saat layar diputar
 - Navigasi tab diperbaiki: Search selalu bisa dibuka lagi setelah kembali ke Home, tap tab yang sedang aktif kembali ke halaman awalnya, dan back di full player memakai gestur predictive back

@@ -234,7 +234,8 @@ fun ArtistScreen(
                     }
                 }
                 val shown = if (showAllSongs) songs else songs.take(5)
-                itemsIndexed(shown, key = { _, it -> "song_" + it.id }) { i, item ->
+                val keys0 = com.vyora.music.ui.design.uniqueKeys(shown) { "song_" + it.id }
+                itemsIndexed(shown, key = { i, _ -> keys0[i] }) { i, item ->
                     ItemRow(
                         item = item,
                         onClick = { onPlay(songs, i, false) },
@@ -268,7 +269,8 @@ fun ArtistScreen(
                             contentPadding = PaddingValues(horizontal = Spacing.ScreenH),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            itemsIndexed(videos, key = { _, it -> "v_" + it.id }) { i, item ->
+                            val keys1 = com.vyora.music.ui.design.uniqueKeys(videos) { "v_" + it.id }
+                            itemsIndexed(videos, key = { i, _ -> keys1[i] }) { i, item ->
                                 VideoTile(item) { onPlay(videos, i, false) }
                             }
                         }
@@ -289,7 +291,8 @@ fun CollectionShelf(title: String, items: List<SimpleItem>, onOpen: (SimpleItem)
             contentPadding = PaddingValues(horizontal = Spacing.ScreenH),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            itemsIndexed(items, key = { _, it -> "c_" + it.id }) { _, item ->
+            val keys2 = com.vyora.music.ui.design.uniqueKeys(items) { "c_" + it.id }
+            itemsIndexed(items, key = { i, _ -> keys2[i] }) { _, item ->
                 CollectionTile(item, width = 160.dp) { onOpen(item) }
             }
         }

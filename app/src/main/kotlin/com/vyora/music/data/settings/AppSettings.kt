@@ -161,6 +161,8 @@ data class AppSettings(
     val crossfadeSeconds: Float = 6f,
     val equalizer: EqualizerSettings = EqualizerSettings(),
     val videoArtwork: VideoArtwork = VideoArtwork.ALWAYS,
+    /** Apple Music motion art / Spotify Canvas loops in Now Playing, for songs that have them. */
+    val motionArtwork: VideoArtwork = VideoArtwork.ALWAYS,
     val lyricsProvider: LyricsProviderPreference = LyricsProviderPreference.AUTO,
     val showPlayerLyricsStrip: Boolean = true,
     val mediaCache: CacheSize = CacheSize.MB_512,
@@ -344,6 +346,7 @@ object SettingsRepository {
                 loudness = p.getFloat("eq_loud", e.loudness),
             ),
             videoArtwork = p.enum("video_artwork", d.videoArtwork),
+            motionArtwork = p.enum("motion_artwork", d.motionArtwork),
             lyricsProvider = p.enum("lyrics_provider", d.lyricsProvider),
             showPlayerLyricsStrip = p.getBoolean("player_lyrics_strip", d.showPlayerLyricsStrip),
             mediaCache = p.enum("media_cache", d.mediaCache),
@@ -413,6 +416,7 @@ object SettingsRepository {
         }
         putInt("eq_version", EQ_VERSION)
         putString("video_artwork", s.videoArtwork.name)
+        putString("motion_artwork", s.motionArtwork.name)
         putString("lyrics_provider", s.lyricsProvider.name)
         putBoolean("player_lyrics_strip", s.showPlayerLyricsStrip)
         putString("media_cache", s.mediaCache.name)

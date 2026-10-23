@@ -103,12 +103,12 @@ object HomeFeed {
                 .filter { channel == null || it.artistId == null || it.artistId == channel }
                 .distinctBy { it.id }
             if (songs.isEmpty()) null else ArtistShelf(artist, songs.take(15))
-        }
+        }.distinctBy { it.artist.lowercase() }
         val mixes = mixJobs.mapNotNull { (seed, job) ->
             val radio = job.await().getOrNull().orEmpty()
             val songs = Recommend.extend(listOf(seed), radio, limit = 15, exclude = setOf(seed.id))
             if (songs.size < 4) null else SongMix(seed, songs)
-        }
+        }.distinctBy { it.seed.id }
         if (chart.isEmpty() && shelves.isEmpty() && mixes.isEmpty()) return@coroutineScope Result.failure(IllegalStateException("No home content"))
 
         val albums = interleave(albumJobs.map { (artist, job) ->
@@ -116,7 +116,7 @@ object HomeFeed {
                 .filter { it.type == ItemType.ALBUM && primaryArtist(it.artist).equals(artist, ignoreCase = true) }
                 .distinctBy { it.id }
                 .take(6)
-        }).take(12)
+        }).distinctBy { it.id }.take(12)
         val videos = interleave(videoJobs.map { (artist, job) ->
             job.await().getOrNull()?.items.orEmpty()
                 .filter { it.type == ItemType.SONG && (it.duration in 1..MAX_VIDEO_SECONDS || it.duration <= 0) }
@@ -155,7 +155,15 @@ object HomeFeed {
 
     /** One station per favourite artist, then a Discovery Station seeded by something not heard yet. */
     fun stations(shelves: List<ArtistShelf>, chart: List<SimpleItem>, heard: Set<String>): List<Station> = buildList {
-        shelves.forEach { shelf -> shelf.songs.firstOrNull { it.isYouTube }?.let { add(Station(shelf.artist, it)) } }
+        // One station per artist, each on its own seed: two artists can open with the same collaboration, and
+        // a repeated seed both sounds the same and collides as a list key.
+        val used = mutableSetOf<String>()
+        shelves.distinctBy { it.artist.lowercase() }.forEach { shelf ->
+            shelf.songs.firstOrNull { it.isYouTube && it.id !in used }?.let {
+                used += it.id
+                add(Station(shelf.artist, it))
+            }
+        }
         val fresh = (shelves.flatMap { it.songs } + chart).firstOrNull { it.isYouTube && it.id !in heard && none { s -> s.seed.id == it.id } }
         if (fresh != null) add(Station(null, fresh))
     }

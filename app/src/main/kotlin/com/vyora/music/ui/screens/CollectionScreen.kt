@@ -145,7 +145,8 @@ fun CollectionScreen(
                     modifier = Modifier.padding(top = 6.dp, bottom = 8.dp),
                 )
             }
-            itemsIndexed(pending, key = { _, it -> "p-" + it.item.id }) { _, entry ->
+            val keys0 = com.vyora.music.ui.design.uniqueKeys(pending) { "p-" + it.item.id }
+            itemsIndexed(pending, key = { i, _ -> keys0[i] }) { _, entry ->
                 PendingDownloadRow(entry)
             }
             item(key = "pending-gap") { Spacer(Modifier.height(18.dp)) }
@@ -161,7 +162,8 @@ fun CollectionScreen(
                 }
             }
         } else {
-            itemsIndexed(songs, key = { _, it -> it.id }) { i, item ->
+            val keys1 = com.vyora.music.ui.design.uniqueKeys(songs) { it.id }
+            itemsIndexed(songs, key = { i, _ -> keys1[i] }) { i, item ->
                 ItemRow(item = item, onClick = { onPlay(songs, i, false) }, showSeparator = i < songs.lastIndex)
             }
         }

@@ -621,4 +621,24 @@
     <string name="mix_favorites">Mix Kegemaran</string>
     <string name="mix_discovery">Mix Penemuan</string>
     <string name="mix_rediscover">Mix Nostalgia</string>
+    <string name="spotify_home_title">Daripada Spotify</string>
+    <string name="spotify_artist">Artis</string>
+    <string name="lyrics_card_style_photo">Foto</string>
+    <string name="lyrics_card_photo_failed">Foto itu tidak dapat dibuka</string>
+    <string name="lyrics_card_change_photo">Tukar foto</string>
+    <string name="lyrics_card_glass_hint">Kaca membiaskan apa sahaja di belakangnya</string>
+    <string name="library_filter_playlists">Senarai main</string>
+    <string name="library_filter_artists">Artis</string>
+    <string name="library_filter_albums">Album</string>
+    <string name="library_filter_downloaded">Dimuat turun</string>
+    <string name="library_sort_recents">Terkini</string>
+    <string name="library_kind_playlist">Senarai main</string>
+    <string name="library_kind_collection">Koleksi</string>
+    <string name="library_view_grid">Paparan grid</string>
+    <string name="library_view_list">Paparan senarai</string>
+    <string name="library_sort_alpha">Abjad</string>
+    <string name="library_more">Lagi</string>
+    <string name="mini_player_stop">Hentikan main balik</string>
+    <string name="motion_artwork">Kerja seni bergerak</string>
+    <string name="motion_artwork_footer">Lagu yang mempunyai kulit album beranimasi (Apple Music) atau Canvas (Spotify, apabila log masuk) akan memainkannya tanpa bunyi di skrin Sedang Dimainkan. Gelung disimpan dalam cache, dan versi lebih ringan digunakan pada data mudah alih.</string>
 </resources>

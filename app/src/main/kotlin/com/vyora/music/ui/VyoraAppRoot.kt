@@ -396,6 +396,7 @@ fun VyoraAppRoot(settings: AppSettings) {
                     onOpenAlbum = openCollectionPage,
                     onStartRadio = { seed -> PlayerManager.startRadio(seed) },
                     onOpenRecap = { navController.navigate(LibraryPages.RECAP) },
+                    onOpenSpotify = { uri -> navController.navigate("spotify/list/" + android.net.Uri.encode(uri)) },
                 )
             }
             screen("search") {

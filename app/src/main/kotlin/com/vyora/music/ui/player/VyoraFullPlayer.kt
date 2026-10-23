@@ -312,6 +312,12 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
     // player splits into artwork on the left and the controls on the right.
     val landscape = configuration.screenWidthDp > configuration.screenHeightDp && configuration.screenHeightDp < 600
     val heroWanted = appSettings.fullBleedArtwork && mode == MODE_ART && videoItem == null && !landscape
+    // Apple Music motion art / Spotify Canvas: looked up as soon as the song changes (cached), played only
+    // on the artwork page of the open player. The still cover steps aside once the first frame is on screen.
+    val motion = rememberMotionArtwork(currentItem?.takeIf { videoItem == null }, appSettings.motionArtwork)
+    val motionActive = motion != null && mode == MODE_ART && !landscape && videoItem == null && sheet.isVisible
+    var motionShown by remember(motion?.url) { mutableStateOf(false) }
+    val motionOn = motionActive && motionShown
     val heroAnim = remember { androidx.compose.animation.core.Animatable(if (heroWanted) 1f else 0f) }
     LaunchedEffect(heroWanted) {
         val target = if (heroWanted) 1f else 0f
@@ -348,7 +354,7 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
             )
             // Kept composed on the artwork page even while hidden, so the sharp cover is already decoded when
             // a pinch starts the morph instead of the first frames being blank.
-            if (!landscape && (hero > 0.001f || (mode == MODE_ART && videoItem == null))) {
+            if (!landscape && !motionOn && (hero > 0.001f || (mode == MODE_ART && videoItem == null))) {
                 HeroArtwork(
                     thumbnail, title, sheet,
                     progress = { heroState.value },
@@ -357,6 +363,9 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
                     flightEnabled = heroWanted,
                     animate = sheet.isVisible && isPlaying && appSettings.animatedPlayerBackground,
                 )
+            }
+            if (motionActive && motion != null) {
+                MotionBackdrop(motion, playing = isPlaying, onShown = { motionShown = it })
             }
         }
 
@@ -426,6 +435,7 @@ private fun FullPlayerContent(sheet: PlayerSheetState) {
                                 wide = videoItem != null,
                                 videoId = videoId,
                                 hidden = hero > 0.001f,
+                                fadedOut = motionOn,
                                 flightToCard = !heroWanted,
                                 onBounds = { c ->
                                     val r = rootCoords
@@ -877,9 +887,12 @@ private fun SwipeArtwork(
     wide: Boolean = false,
     videoId: String? = null,
     hidden: Boolean = false,
+    /** Motion artwork is playing full screen: the still cover dissolves into it (it keeps its gestures). */
+    fadedOut: Boolean = false,
     flightToCard: Boolean = true,
     onBounds: (androidx.compose.ui.layout.LayoutCoordinates) -> Unit = {},
 ) {
+    val fade by animateFloatAsState(if (fadedOut) 0f else 1f, tween(if (fadedOut) 520 else 260), label = "artworkMotionFade")
     val scale by animateFloatAsState(
         targetValue = if (isPlaying) 1f else 0.82f,
         animationSpec = spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow),
@@ -913,7 +926,7 @@ private fun SwipeArtwork(
                 scaleX = scale
                 scaleY = scale
                 // The full-bleed sleeve draws this picture while it is up or morphing.
-                alpha = if (hidden) 0f else 1f
+                alpha = if (hidden) 0f else fade
                 translationX = shownX * 0.6f
                 rotationZ = shownX / size.width * 4f
             }
@@ -1166,10 +1179,16 @@ private fun LyricsPanel() {
         }
     }
     cardLines?.let { picked ->
-        LyricsCardDialog(item = current, lines = picked, onDismiss = {
-            cardLines = null
-            selection = null
-        })
+        LyricsCardDialog(
+            item = current,
+            lines = picked,
+            positionMs = remember(picked) { PlayerManager.positionMs.value },
+            durationMs = remember(picked) { PlayerManager.durationMs.value },
+            onDismiss = {
+                cardLines = null
+                selection = null
+            },
+        )
     }
 }
 
@@ -1844,4 +1863,56 @@ private fun SleepBadge(modifier: Modifier = Modifier) {
 private fun formatTime(ms: Long): String {
     val total = ms.coerceAtLeast(0L) / 1000
     return "%d:%02d".format(total / 60, total % 60)
+}
+
+
+/**
+ * Full-screen motion artwork behind the Now Playing controls. Apple Music loops (3:4) sit edge to edge at the
+ * top and melt into the player background, like iOS Now Playing; Spotify Canvas (9:16) fills the whole
+ * screen. A soft scrim keeps the title and controls legible on any frame.
+ */
+@Composable
+private fun MotionBackdrop(art: com.vyora.music.data.motion.MotionArt, playing: Boolean, onShown: (Boolean) -> Unit) {
+    var shown by remember(art.url) { mutableStateOf(false) }
+    val scrim by animateFloatAsState(if (shown) 1f else 0f, tween(520), label = "motionScrim")
+    val fullScreen = art.source == com.vyora.music.data.motion.MotionSource.SPOTIFY_CANVAS
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val videoHeight = if (fullScreen) maxHeight else (maxWidth / art.aspect).coerceAtMost(maxHeight)
+        MotionArtworkView(
+            art = art,
+            playing = playing,
+            onShown = { shown = it; onShown(it) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(videoHeight)
+                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    if (!fullScreen) {
+                        // Dissolve the lower edge of the loop into the background below it.
+                        drawRect(
+                            Brush.verticalGradient(
+                                0f to Color.Black, 0.62f to Color.Black, 0.86f to Color.Black.copy(alpha = 0.45f), 1f to Color.Transparent,
+                            ),
+                            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                        )
+                    }
+                },
+        )
+        // Legibility: a light shade under the status bar and a deeper one behind the title and controls.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = scrim }
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.28f),
+                        0.14f to Color.Transparent,
+                        if (fullScreen) 0.42f to Color.Transparent else 0.5f to Color.Transparent,
+                        0.72f to Color.Black.copy(alpha = if (fullScreen) 0.5f else 0.34f),
+                        1f to Color.Black.copy(alpha = if (fullScreen) 0.78f else 0.6f),
+                    )
+                )
+        )
+    }
 }

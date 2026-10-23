@@ -626,4 +626,24 @@
     <string name="mix_favorites">Favorites Mix</string>
     <string name="mix_discovery">Discovery Mix</string>
     <string name="mix_rediscover">Rediscover Mix</string>
+    <string name="spotify_home_title">From Spotify</string>
+    <string name="spotify_artist">Artist</string>
+    <string name="lyrics_card_style_photo">Photo</string>
+    <string name="lyrics_card_photo_failed">Couldn\'t open that photo</string>
+    <string name="lyrics_card_change_photo">Change photo</string>
+    <string name="lyrics_card_glass_hint">The glass bends whatever is behind it</string>
+    <string name="library_filter_playlists">Playlists</string>
+    <string name="library_filter_artists">Artists</string>
+    <string name="library_filter_albums">Albums</string>
+    <string name="library_filter_downloaded">Downloaded</string>
+    <string name="library_sort_recents">Recents</string>
+    <string name="library_kind_playlist">Playlist</string>
+    <string name="library_kind_collection">Collection</string>
+    <string name="library_view_grid">Grid view</string>
+    <string name="library_view_list">List view</string>
+    <string name="library_sort_alpha">Alphabetical</string>
+    <string name="library_more">More</string>
+    <string name="mini_player_stop">Stop playing</string>
+    <string name="motion_artwork">Motion artwork</string>
+    <string name="motion_artwork_footer">Songs with animated album art (Apple Music) or a Canvas (Spotify, when signed in) play it silently in Now Playing. Loops are cached, and a lighter version is used on mobile data.</string>
 </resources>

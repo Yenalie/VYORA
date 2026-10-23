@@ -1,5 +1,7 @@
 package com.vyora.music.ui.screens
 
+import com.vyora.music.ui.design.bleedHorizontal
+import com.vyora.music.ui.design.scrollEdgeFade
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -174,11 +176,16 @@ fun LocalMusicScreen(
                     }
                 } else {
                     item(key = "filters") {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        run { val edgeRow = androidx.compose.foundation.lazy.rememberLazyListState(); LazyRow(
+                        state = edgeRow,
+                        modifier = Modifier.bleedHorizontal(com.vyora.music.ui.design.Spacing.ScreenH).scrollEdgeFade(edgeRow),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = com.vyora.music.ui.design.Spacing.ScreenH),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
                             item { GlassChip("${stringResource(R.string.local_filter_all)} ${all.size}", effective == LocalFilter.ALL, { filter = LocalFilter.ALL }) }
                             item { GlassChip("${stringResource(R.string.quality_lossless)} $losslessCount", effective == LocalFilter.LOSSLESS, { filter = LocalFilter.LOSSLESS }, icon = Icons.Default.GraphicEq) }
                             if (hiResCount > 0) item { GlassChip("${stringResource(R.string.quality_hires)} $hiResCount", effective == LocalFilter.HI_RES, { filter = LocalFilter.HI_RES }) }
-                        }
+                        } }
                         Spacer(Modifier.height(14.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             GlassButton(stringResource(R.string.play_all), { onPlay(songs, 0, false) }, Modifier.weight(1f), icon = Icons.Default.PlayArrow, enabled = songs.isNotEmpty())
@@ -186,7 +193,8 @@ fun LocalMusicScreen(
                         }
                         Spacer(Modifier.height(10.dp))
                     }
-                    itemsIndexed(shown, key = { _, track -> track.item.id }) { i, track ->
+                    val keys0 = com.vyora.music.ui.design.uniqueKeys(shown) { track -> track.item.id }
+                    itemsIndexed(shown, key = { i, _ -> keys0[i] }) { i, track ->
                         ItemRow(
                             item = track.item,
                             onClick = { onPlay(songs, i, false) },

@@ -42,4 +42,24 @@ class HomeFeedTest {
         assertTrue(creditsArtist("Tulus", "tulus"))
         assertFalse(creditsArtist("Queens of the Stone Age", "Queen"))
     }
+
+    @Test fun stationsNeverShareASeed() {
+        // DxxW6hyNkOM: one collaboration that opens both artists' shelves.
+        val collab = song("DxxW6hyNkOM", "A, B")
+        val shelves = listOf(
+            ArtistShelf("A", listOf(collab, song("a1", "A"))),
+            ArtistShelf("B", listOf(collab, song("b1", "B"))),
+            ArtistShelf("C", listOf(collab)),
+        )
+        val stations = HomeFeed.stations(shelves, listOf(collab, song("c9", "Z")), emptySet())
+        val ids = stations.map { it.seed.id }
+        assertEquals(ids.distinct(), ids)
+        assertEquals(listOf("DxxW6hyNkOM", "b1", "a1"), ids)
+    }
+
+    @Test fun uniqueKeysSuffixRepeats() {
+        val keys = com.vyora.music.ui.design.uniqueKeys(listOf("x", "y", "x", "x")) { "k_$it" }
+        assertEquals(listOf("k_x", "k_y", "k_x#2", "k_x#3"), keys)
+        assertEquals(keys.distinct(), keys)
+    }
 }

@@ -239,7 +239,8 @@ fun UserPlaylistScreen(
                 )
             }
         } else {
-            itemsIndexed(songs, key = { _, it -> it.id }) { i, item ->
+            val keys0 = com.vyora.music.ui.design.uniqueKeys(songs) { it.id }
+            itemsIndexed(songs, key = { i, _ -> keys0[i] }) { i, item ->
                 ItemRow(item = item, onClick = { onPlay(songs, i, false) }, showSeparator = i < songs.lastIndex, playlistId = playlist.id)
             }
         }
@@ -322,7 +323,8 @@ fun ArtistsScreen(onBack: () -> Unit, onOpenArtist: (String, String?, String?) -
                 )
             }
         } else {
-            itemsIndexed(artists, key = { _, it -> it.name }) { i, (name, art, id) ->
+            val keys1 = com.vyora.music.ui.design.uniqueKeys(artists) { it.name }
+            itemsIndexed(artists, key = { i, _ -> keys1[i] }) { i, (name, art, id) ->
                 LibraryListRow(
                     leading = {
                         Artwork(art, Modifier.size(56.dp), shape = CircleShape, placeholder = Icons.Default.Person, contentDescription = name)

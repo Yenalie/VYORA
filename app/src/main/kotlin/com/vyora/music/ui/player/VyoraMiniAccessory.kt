@@ -155,6 +155,10 @@ fun VyoraMiniAccessory(
     val edgeFadePx = with(density) { 16.dp.toPx() }
 
     var skipping by remember { mutableStateOf(false) }
+    // Pull-down-to-dismiss: like closing the mini player in Spotify, a firm swipe down stops playback.
+    val offsetY = remember { Animatable(0f) }
+    var heightPx by remember { mutableIntStateOf(1) }
+    val dismissFlingPx = with(density) { 900.dp.toPx() }
 
     suspend fun skip(dir: Float, velocity: Float = 0f) {
         skipping = true
@@ -223,8 +227,10 @@ fun VyoraMiniAccessory(
             longPressed = false
             val tracker = VelocityTracker().apply { addPointerInputChange(down) }
             var horizontal = false
+            var dismissing = false
             val afterSlop = awaitTouchSlopOrCancellation(down.id) { change, over ->
                 horizontal = abs(over.x) > abs(over.y) * 0.85f
+                dismissing = !horizontal && over.y > 0f
                 change.consume()
             } ?: return@awaitEachGesture
             if (longPressed) return@awaitEachGesture
@@ -238,6 +244,38 @@ fun VyoraMiniAccessory(
             var raw = unresisted(offsetX.value)
             var armed = abs(offsetX.value) >= commit
 
+            if (dismissing) {
+                val commitY = heightPx * 0.55f
+                var pulled = offsetY.value + afterSlop.positionChange().y
+                var dismissArmed = false
+                drag(afterSlop.id) { change ->
+                    tracker.addPointerInputChange(change)
+                    pulled += change.positionChange().y
+                    // Upward pulls rub against the bar; downward follows the finger.
+                    val shown = if (pulled >= 0f) pulled else -heightPx * 0.12f * (1f - exp(pulled / (heightPx * 0.4f)))
+                    val armedNow = shown >= commitY
+                    if (armedNow != dismissArmed) {
+                        dismissArmed = armedNow
+                        haptics.performHapticFeedback(
+                            if (armedNow) HapticFeedbackType.GestureThresholdActivate else HapticFeedbackType.SegmentFrequentTick
+                        )
+                    }
+                    scope.launch(start = CoroutineStart.UNDISPATCHED) { offsetY.snapTo(shown) }
+                    change.consume()
+                }
+                val vy = tracker.calculateVelocity().y
+                if (dismissArmed || (vy > dismissFlingPx && offsetY.value > minFlickPx)) {
+                    haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                    scope.launch {
+                        offsetY.animateTo(heightPx * 1.6f, spring(dampingRatio = 1f, stiffness = 700f), initialVelocity = vy.coerceAtLeast(0f))
+                        PlayerManager.stopAndClear()
+                        offsetY.snapTo(0f)
+                    }
+                } else {
+                    scope.launch { offsetY.animateTo(0f, returnSpring, initialVelocity = vy) }
+                }
+                return@awaitEachGesture
+            }
             if (horizontal) {
                 raw += if (rtl) -afterSlop.positionChange().x else afterSlop.positionChange().x
             } else {
@@ -289,6 +327,7 @@ fun VyoraMiniAccessory(
     val moreLabel = stringResource(R.string.more)
     val nextLabel = stringResource(R.string.next)
     val previousLabel = stringResource(R.string.previous)
+    val stopLabel = stringResource(R.string.mini_player_stop)
     val shareTitle = stringResource(R.string.share_song)
     val isLiked = currentItem?.let { item -> liked.any { it.id == item.id } } == true
     val favoriteLabel = stringResource(if (isLiked) R.string.unfavorite else R.string.favorite)
@@ -302,9 +341,21 @@ fun VyoraMiniAccessory(
                 scaleX = pressScale * (1f + 0.025f * pull)
                 scaleY = pressScale * (1f - 0.012f * pull)
                 translationX = (if (layoutDirection == LayoutDirection.Rtl) -x else x) * 0.06f
+                val y = offsetY.value
+                translationY = y
+                if (y > 0f) {
+                    val p = (y / (heightPx * 1.2f)).coerceIn(0f, 1f)
+                    alpha = 1f - p
+                    val shrink = 1f - 0.06f * p
+                    scaleX *= shrink
+                    scaleY *= shrink
+                }
             }
             .then(modifier)
-            .onSizeChanged { widthPx = it.width.coerceAtLeast(1) }
+            .onSizeChanged {
+                widthPx = it.width.coerceAtLeast(1)
+                heightPx = it.height.coerceAtLeast(1)
+            }
             .then(highlight.modifier)
             .clipToBounds()
             .then(highlight.gestureModifier)
@@ -330,6 +381,7 @@ fun VyoraMiniAccessory(
                     customActions = listOf(
                         CustomAccessibilityAction(nextLabel) { scope.launch { skip(-1f) }; true },
                         CustomAccessibilityAction(previousLabel) { scope.launch { skip(1f) }; true },
+                        CustomAccessibilityAction(stopLabel) { PlayerManager.stopAndClear(); true },
                     )
                 }
                 .heightIn(min = rowMinHeight)

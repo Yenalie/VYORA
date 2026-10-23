@@ -1,5 +1,7 @@
 package com.vyora.music.ui.screens.sources
 
+import com.vyora.music.ui.design.bleedHorizontal
+import com.vyora.music.ui.design.scrollEdgeFade
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -161,13 +163,19 @@ fun ServerScreen(
                 if (r.albums.isNotEmpty()) item(key = "r_albums") {
                     SectionTitle(stringResource(R.string.library_albums))
                     Spacer(Modifier.height(10.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        items(r.albums, key = { it.id }) { a -> CollectionTile(a, width = 140.dp) { onOpenAlbum(a) } }
-                    }
+                    run { val edgeRow = androidx.compose.foundation.lazy.rememberLazyListState(); LazyRow(
+                        state = edgeRow,
+                        modifier = Modifier.bleedHorizontal(com.vyora.music.ui.design.Spacing.ScreenH).scrollEdgeFade(edgeRow),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = com.vyora.music.ui.design.Spacing.ScreenH),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        itemsIndexed(r.albums, key = { i, a -> "a_" + a.id + "_" + i }) { _, a -> CollectionTile(a, width = 140.dp) { onOpenAlbum(a) } }
+                    } }
                     Spacer(Modifier.height(16.dp))
                 }
                 val songs = r.songs.map { it.item }
-                itemsIndexed(r.songs, key = { _, s -> "s_" + s.item.id }) { i, s ->
+                val keys0 = com.vyora.music.ui.design.uniqueKeys(r.songs) { s -> "s_" + s.item.id }
+                itemsIndexed(r.songs, key = { i, _ -> keys0[i] }) { i, s ->
                     ItemRow(
                         item = s.item, onClick = { onPlay(songs, i, false) }, showSeparator = i < r.songs.lastIndex,
                         badge = s.tier()?.let { t -> { QualityBadge(t) } },
@@ -192,7 +200,7 @@ fun ServerScreen(
                 list.isEmpty() -> item(key = "empty") {
                     GlassEmptyState(Icons.Default.GraphicEq, stringResource(R.string.server_empty_title), stringResource(R.string.server_empty_body))
                 }
-                else -> items(list.chunked(2), key = { row -> row.first().id }) { row ->
+                else -> items(list.chunked(2).let { rows -> rows.zip(com.vyora.music.ui.design.uniqueKeys(rows) { it.first().id }) }, key = { it.second }) { (row, _) ->
                     Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         row.forEach { a -> CollectionTile(a, Modifier.weight(1f), width = androidx.compose.ui.unit.Dp.Unspecified) { onOpenAlbum(a) } }
                         if (row.size == 1) Spacer(Modifier.weight(1f))
@@ -260,7 +268,8 @@ fun ServerAlbumScreen(
                 }
                 Spacer(Modifier.height(10.dp))
             }
-            itemsIndexed(list, key = { _, s -> s.item.id }) { i, s ->
+            val keys1 = com.vyora.music.ui.design.uniqueKeys(list) { s -> s.item.id }
+            itemsIndexed(list, key = { i, _ -> keys1[i] }) { i, s ->
                 ItemRow(
                     item = s.item, index = i + 1, onClick = { onPlay(items, i, false) }, showSeparator = i < list.lastIndex,
                     badge = s.tier()?.let { t -> { QualityBadge(t) } },

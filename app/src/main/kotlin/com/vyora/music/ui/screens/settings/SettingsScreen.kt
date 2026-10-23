@@ -390,6 +390,18 @@ fun AppearanceSettingsScreen(onBack: () -> Unit) {
                 }
             }
         }
+        item(key = "motion") {
+            SettingsGroup(header = stringResource(R.string.motion_artwork), footer = stringResource(R.string.motion_artwork_footer)) {
+                VideoArtwork.entries.forEachIndexed { i, mode ->
+                    SettingsChoiceRow(
+                        title = videoArtworkLabel(mode),
+                        selected = settings.motionArtwork == mode,
+                        onClick = { SettingsRepository.update { it.copy(motionArtwork = mode) } },
+                        divider = i < VideoArtwork.entries.lastIndex,
+                    )
+                }
+            }
+        }
     }
 }
 

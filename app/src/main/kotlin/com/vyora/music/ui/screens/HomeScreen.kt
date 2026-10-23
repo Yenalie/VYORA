@@ -97,6 +97,7 @@ fun HomeScreen(
     onOpenAlbum: (SimpleItem) -> Unit = {},
     onStartRadio: (SimpleItem) -> Unit = {},
     onOpenRecap: () -> Unit = {},
+    onOpenSpotify: (String) -> Unit = {},
 ) {
     val recent by LibraryManager.recentSongs.collectAsState()
     val liked by LibraryManager.likedSongs.collectAsState()
@@ -133,6 +134,16 @@ fun HomeScreen(
     val replay = remember(replayRows) {
         replayRows.map { SimpleItem(id = it.itemId, title = it.title, artist = it.artist, thumbnail = it.thumbnail, url = SimpleItem.playbackUrl(it.itemId)) }
     }
+
+    val spotifyProfile by com.vyora.music.data.spotify.SpotifyAccount.profile.collectAsState()
+    var spotify by remember { mutableStateOf(SpotifyHomeCache.last) }
+    LaunchedEffect(spotifyProfile?.id, attempt) {
+        if (attempt > 0) SpotifyHomeCache.invalidate()
+        spotify = SpotifyHomeCache.load()
+    }
+    val spotifyContext = androidx.compose.ui.platform.LocalContext.current
+    val spotifyNoMatch = stringResource(R.string.spotify_no_match)
+    val spotifyStarting = stringResource(R.string.spotify_starting)
 
     val listState = rememberLazyListState()
     OnTabReselect("home") { listState.scrollToTopSmooth() }
@@ -176,7 +187,8 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         val queue = topPicks.map { it.item }
-                        itemsIndexed(topPicks, key = { _, it -> "pick_" + it.item.id }) { i, pick ->
+                        val keys0 = com.vyora.music.ui.design.uniqueKeys(topPicks) { "pick_" + it.item.id }
+                        itemsIndexed(topPicks, key = { i, _ -> keys0[i] }) { i, pick ->
                             TopPickCard(pick) { onPlayList(queue, i) }
                         }
                     }
@@ -195,6 +207,20 @@ fun HomeScreen(
             }
         }
 
+        spotify?.let { data ->
+            spotifyHomeItems(
+                data = data,
+                onOpenList = onOpenSpotify,
+                onOpenArtist = onOpenArtist,
+                onPlayTracks = { tracks, index ->
+                    android.widget.Toast.makeText(spotifyContext, spotifyStarting, android.widget.Toast.LENGTH_SHORT).show()
+                    com.vyora.music.ui.screens.settings.SpotifyPlayer.play(tracks, index, false) {
+                        android.widget.Toast.makeText(spotifyContext, spotifyNoMatch, android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                },
+            )
+        }
+
         if (madeForYou.isNotEmpty()) {
             item(key = "made_for_you") {
                 Column {
@@ -204,7 +230,8 @@ fun HomeScreen(
                         contentPadding = PaddingValues(horizontal = Spacing.ScreenH),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        itemsIndexed(madeForYou, key = { _, it -> "mfy_" + it.kind }) { _, mix ->
+                        val keys1 = com.vyora.music.ui.design.uniqueKeys(madeForYou) { "mfy_" + it.kind }
+                        itemsIndexed(madeForYou, key = { i, _ -> keys1[i] }) { _, mix ->
                             MixCard(mix) { onPlayList(mix.songs, 0) }
                         }
                     }
@@ -221,7 +248,8 @@ fun HomeScreen(
                         contentPadding = PaddingValues(horizontal = Spacing.ScreenH),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        itemsIndexed(stations, key = { _, it -> "station_" + it.seed.id }) { _, station ->
+                        val keys2 = com.vyora.music.ui.design.uniqueKeys(stations) { "station_" + it.seed.id }
+                        itemsIndexed(stations, key = { i, _ -> keys2[i] }) { _, station ->
                             StationCard(station) { onStartRadio(station.seed) }
                         }
                     }
@@ -255,8 +283,9 @@ fun HomeScreen(
             }
         }
 
-        mixes.forEach { mix ->
-            item(key = "mix_" + mix.seed.id) {
+        val mixKeys = com.vyora.music.ui.design.uniqueKeys(mixes) { "mix_" + it.seed.id }
+        mixes.forEachIndexed { mixIndex, mix ->
+            item(key = mixKeys[mixIndex]) {
                 Shelf(
                     title = stringResource(R.string.home_because_you_listened, mix.seed.title),
                     items = mix.songs,
@@ -275,7 +304,8 @@ fun HomeScreen(
                         contentPadding = PaddingValues(horizontal = Spacing.ScreenH),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        itemsIndexed(albums, key = { _, it -> "album_" + it.id }) { _, album ->
+                        val keys3 = com.vyora.music.ui.design.uniqueKeys(albums) { "album_" + it.id }
+                        itemsIndexed(albums, key = { i, _ -> keys3[i] }) { _, album ->
                             SquareTile(album) { onOpenAlbum(album) }
                         }
                     }
@@ -283,8 +313,9 @@ fun HomeScreen(
             }
         }
 
-        artistShelves.forEach { shelf ->
-            item(key = "more_" + shelf.artist) {
+        val shelfKeys = com.vyora.music.ui.design.uniqueKeys(artistShelves) { "more_" + it.artist }
+        artistShelves.forEachIndexed { shelfIndex, shelf ->
+            item(key = shelfKeys[shelfIndex]) {
                 Shelf(
                     title = stringResource(R.string.home_more_from, shelf.artist),
                     items = shelf.songs,
@@ -303,7 +334,8 @@ fun HomeScreen(
                         contentPadding = PaddingValues(horizontal = Spacing.ScreenH),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        itemsIndexed(musicVideos, key = { _, it -> "video_" + it.id }) { i, video ->
+                        val keys4 = com.vyora.music.ui.design.uniqueKeys(musicVideos) { "video_" + it.id }
+                        itemsIndexed(musicVideos, key = { i, _ -> keys4[i] }) { i, video ->
                             VideoTile(video) { onPlayList(musicVideos, i) }
                         }
                     }
@@ -425,7 +457,8 @@ private fun Shelf(
             contentPadding = PaddingValues(horizontal = Spacing.ScreenH),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            itemsIndexed(items, key = { _, it -> title + it.id }) { i, item ->
+            val keys5 = com.vyora.music.ui.design.uniqueKeys(items) { title + it.id }
+            itemsIndexed(items, key = { i, _ -> keys5[i] }) { i, item ->
                 SquareTile(item) { onPlay(i) }
             }
         }

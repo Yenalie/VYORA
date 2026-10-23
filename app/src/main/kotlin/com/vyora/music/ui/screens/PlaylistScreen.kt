@@ -212,7 +212,8 @@ fun PlaylistScreen(
                         )
                     }
                 }
-                itemsIndexed(songs, key = { _, item -> item.id }) { index, item ->
+                val keys0 = com.vyora.music.ui.design.uniqueKeys(songs) { item -> item.id }
+                itemsIndexed(songs, key = { i, _ -> keys0[i] }) { index, item ->
                     ItemRow(
                         item,
                         index = index + 1,
