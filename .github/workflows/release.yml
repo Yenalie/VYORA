@@ -84,10 +84,13 @@ jobs:
           sha256sum "$OUT" > "$OUT.sha256"
           echo "APK=$OUT" >> "$GITHUB_ENV"
 
-      - name: Release notes from CHANGELOG.md
+      - name: Release notes
         run: |
           NAME=${{ steps.version.outputs.name }}
-          SECTION=$(awk -v v="## $NAME" '$0==v{f=1;next} /^## /{f=0} f' CHANGELOG.md | sed '/./,$!d')
+          SECTION=""
+          if [ -f CHANGELOG.md ]; then
+            SECTION=$(awk -v v="## $NAME" '$0==v{f=1;next} /^## /{f=0} f' CHANGELOG.md | sed '/./,$!d')
+          fi
           {
             echo "## VYORA $NAME"
             echo

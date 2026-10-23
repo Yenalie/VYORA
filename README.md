@@ -105,8 +105,9 @@ cd VYORA
 ./gradlew assembleDebug
 ```
 
-Butuh JDK 17 dan Android SDK 36. Detail struktur project, penyimpanan data, dan signing ada
-di [Panduan Developer](docs/DEVELOPMENT.md).
+Butuh JDK 17 dan Android SDK 36. Untuk menjalankan unit test, gunakan `./gradlew testDebugUnitTest`.
+Build release perlu keystore yang dikonfigurasi secara lokal atau lewat GitHub Actions Secrets;
+jangan simpan keystore di repository.
 
 ## Dibangun dengan
 
@@ -117,11 +118,18 @@ di [Panduan Developer](docs/DEVELOPMENT.md).
 - [Coil](https://github.com/coil-kt/coil)
 - [Google Cast SDK](https://developers.google.com/cast) lewat Media3 Cast
 - [LRCLIB](https://lrclib.net) untuk lirik
-- Efek glass dari [Kyant0/backdrop](https://github.com/Kyant0/backdrop) dan [Kyant0/Capsule](https://github.com/Kyant0/Capsule), tab bar dari [compose-floating-tab-bar](https://github.com/elyesmansour/compose-floating-tab-bar). Daftar lengkap ada di `NOTICE.md`
+- Efek glass dari [Kyant0/backdrop](https://github.com/Kyant0/backdrop) dan [Kyant0/Capsule](https://github.com/Kyant0/Capsule), serta tab bar dari [compose-floating-tab-bar](https://github.com/elyesmansour/compose-floating-tab-bar)
 
-## Lisensi
+## Lisensi & atribusi
 
-VYORA dirilis di bawah lisensi [GPL-3.0](LICENSE). Daftar komponen pihak ketiga ada di [NOTICE.md](NOTICE.md).
+VYORA dirilis di bawah lisensi [GPL-3.0](LICENSE). Timing dan tampilan karaoke, parser TTML,
+rantai penyedia lirik, serta deteksi output lossless diadaptasi dari
+[BitChord](https://github.com/kushagrasinghx/BitChord), GPL-3.0, pada revisi
+`edc1e6f36febf71a118e649411d2fc21b70ead45`. Beberapa bagian integrasi Discord dan Spotify
+diadaptasi dari [YumaPlayer](https://github.com/MuwMx/YumaPlayer) / ArchiveTune; modifier Liquid
+Glass diadaptasi dari [Convx](https://github.com/cosmictaserdev-creator/Convx). Komponen tersebut
+berlisensi GPL-3.0. Backdrop, Capsule, dan floating tab bar berlisensi Apache-2.0. Atribusi asli
+tetap dicantumkan di file source terkait.
 
 ## Disclaimer
 
